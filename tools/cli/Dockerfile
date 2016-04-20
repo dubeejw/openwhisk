@@ -1,12 +1,13 @@
-FROM ubuntu:14.04
+FROM golang
 
-ENV DEBIAN_FRONTEND noninteractive
+ARG GOOS=darwin
+ARG GOARCH=amd64
 
-RUN apt-get update --fix-missing && \
-  apt-get -y dist-upgrade && \
-  apt-get -y install python2.7 && \
-  apt-get -y install python-distribute python-pip && \
-  apt-get clean
+ADD . /src/github.ibm.com/
 
-ADD build/tmp /cli
-CMD cd /cli && python setup.py sdist
+RUN cd /src/github.ibm.com/go-whisk-cli && go get -d -v
+RUN cd /src/github.ibm.com/go-whisk-cli && go build -o wsk main.go
+
+RUN ls /src/github.ibm.com/go-whisk-cli
+
+#RUN cd /src/github.ibm.com/go-whisk-cli/ && ./wsk -h
