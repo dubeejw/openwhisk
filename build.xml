@@ -53,6 +53,7 @@
         <ant antfile="services/build.xml" target="deploy" />
         <ant antfile="core/build.xml" target="deploy" />
         <ant antfile="tools/cli/build.xml" target="buildCLI" />
+        <ant antfile="tools/go-cli/build.xml" target="buildGoCLI" />
         <antcall target="installCatalog" />
     </target>
 
