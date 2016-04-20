@@ -1,47 +1,29 @@
 <!-- vim: set expandtab ts=4 sw=4 : -->
 
-<!-- targets in this file should be called from the parent directory -->
+<!-- Targets in this file should be called from the parent directory -->
 <project basedir="../..">
     <import file="../../config/config.xml" />
 
-    <target name="buildCLI" >
+    <target name="buildCLI">
 
-        <!-- load properties -->
+        <!-- Load properties -->
         <var file="whisk.properties" />
         <property name="go-cli.src.dir" value="${openwhisk.home}/tools/cli" />
 
-        <!-- set arch and os -->
-        <!-- valid options and combinations: https://golang.org/doc/install/source#environment -->
-
-        <!-- TODO :: set arch properly -->
-        <property name="go-cli.build.arch" value="amd64"/>
-        <!-- TODO :: set for linux, freebsd, netbsd, openbsd, solaris -->
-        <condition property="go-cli.build.os" value="darwin">
-            <os family="mac"/>
-        </condition>
-        <condition property="go-cli.build.os" value="windows">
-            <os family="windows"/>
-        </condition>
-
-        <!-- make the build directory -->
+        <!-- Make the build directory -->
         <mkdir dir="${cli.build.dir}" />
         <copy file="${go-cli.src.dir}/Dockerfile" todir="${cli.build.dir}" />
 
-        <!-- copy files needed to build image to a scratch space -->
+        <!-- Copy files needed to build image to a scratch space -->
         <mkdir dir="${cli.build.dir}" />
         <copy todir="${cli.build.dir}">
-            <fileset dir="${openwhisk.home}/tools/cli">
-                <!--<include name="default.props" />-->
-                <!-- <exclude name=".project" />
-                <exclude name="*.pyc" />
-                <exclude name="setup.py" /> -->
-            </fileset>
+            <fileset dir="${openwhisk.home}/tools/cli" />
         </copy>
 
-        <!-- build docker image -->
+        <!-- Build docker image -->
         <exec executable="/bin/bash" failonerror="true">
             <arg line="${openwhisk.home}/tools/docker/dockerWithRetry.sh ${docker.timeout.long}" />
-            <arg line="build -t whisk/cli --build-arg GOOS=${go-cli.build.os} --build-arg GOARCH=${go-cli.build.arch} ${cli.build.dir}" />
+            <arg line="build -t whisk/cli ${cli.build.dir}" />
         </exec>
         <exec executable="docker" failonerror="false" output="/dev/null" error="/dev/null">
             <arg line="${docker.tls.cmd}" />
@@ -52,11 +34,19 @@
             <arg line="run -d --name cli whisk/cli" />
         </exec>
 
-        <!-- copy binary into open/bin -->
+        <!-- Copy binary into open/bin -->
         <delete dir="${openwhisk.home}/bin/wsk" failonerror="false"/>
         <exec executable="docker" failonerror="true">
             <arg line="${docker.tls.cmd}" />
-            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/wsk '${openwhisk.home}/bin'" />
+            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/windows '${openwhisk.home}/bin/windows'" />
+        </exec>
+        <exec executable="docker" failonerror="true">
+            <arg line="${docker.tls.cmd}" />
+            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/mac '${openwhisk.home}/bin/mac'" />
+        </exec>
+        <exec executable="docker" failonerror="true">
+            <arg line="${docker.tls.cmd}" />
+            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/linux '${openwhisk.home}/bin/linux'" />
         </exec>
         <exec executable="docker" failonerror="false">
             <arg line="${docker.tls.cmd}" />
