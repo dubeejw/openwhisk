@@ -5,23 +5,20 @@
     <import file="../../config/config.xml" />
 
     <target name="buildGoCLI">
-<echo message="asfd"></echo>
+
         <!-- Load properties -->
         <var file="whisk.properties" />
         <property name="go-cli.src.dir" value="${openwhisk.home}/tools/go-cli" />
-        <echo message="qwer"></echo>
 
         <!-- Make the build directory -->
         <mkdir dir="${go-cli.build.dir}" />
         <copy file="${go-cli.src.dir}/Dockerfile" todir="${go-cli.build.dir}" />
-        <echo message="dfg"></echo>
 
         <!-- Copy files needed to build image to a scratch space -->
         <mkdir dir="${go-cli.build.dir}" />
         <copy todir="${go-cli.build.dir}">
             <fileset dir="${openwhisk.home}/tools/go-cli" />
         </copy>
-        <echo message="ergerg"></echo>
 
         <!-- Build docker image -->
         <exec executable="/bin/bash" failonerror="true">
@@ -36,21 +33,21 @@
             <arg line="${docker.tls.cmd}" />
             <arg line="run -d --name go-cli whisk/go-cli" />
         </exec>
-        <echo message="eee"></echo>
 
         <!-- Copy binary into open/bin -->
-        <delete dir="${openwhisk.home}/bin/wsk" failonerror="false"/>
+        <delete dir="${openwhisk.home}/bin/go-cli" failonerror="false" />
+        <mkdir dir="${openwhisk.home}/bin/go-cli" />
         <exec executable="docker" failonerror="true">
             <arg line="${docker.tls.cmd}" />
-            <arg line="cp go-cli:/src/github.com/go-whisk-cli/windows '${openwhisk.home}/bin/windows'" />
+            <arg line="cp go-cli:/src/github.com/go-whisk-cli/windows '${openwhisk.home}/bin/go-cli/windows'" />
         </exec>
         <exec executable="docker" failonerror="true">
             <arg line="${docker.tls.cmd}" />
-            <arg line="cp go-cli:/src/github.com/go-whisk-cli/mac '${openwhisk.home}/bin/mac'" />
+            <arg line="cp go-cli:/src/github.com/go-whisk-cli/mac '${openwhisk.home}/bin/go-cli/mac'" />
         </exec>
         <exec executable="docker" failonerror="true">
             <arg line="${docker.tls.cmd}" />
-            <arg line="cp go-cli:/src/github.com/go-whisk-cli/linux '${openwhisk.home}/bin/linux'" />
+            <arg line="cp go-cli:/src/github.com/go-whisk-cli/linux '${openwhisk.home}/bin/go-cli/linux'" />
         </exec>
         <exec executable="docker" failonerror="false">
             <arg line="${docker.tls.cmd}" />
