@@ -680,8 +680,8 @@ trait WaitFor {
 }
 
 object Wsk {
-    //private val cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin")
-    private val cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath)
+    private val cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin")
+    //private val cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath)
     private val binaryName = "wsk"
 
     /** What is the path to a downloaded CLI? **/

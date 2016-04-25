@@ -38,7 +38,8 @@ import common.TestUtils.RunResult;
  */
 public class WskCli {
 
-    private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath());
+    //private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath());
+    private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin");
     private static final String adminBinaryName = "wskadmin";
     private final String binaryName;
     private final File binaryPath;
