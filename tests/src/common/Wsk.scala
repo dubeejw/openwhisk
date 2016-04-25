@@ -680,7 +680,8 @@ trait WaitFor {
 }
 
 object Wsk {
-    private val cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin")
+    //private val cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin")
+    private val cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath)
     private val binaryName = "wsk"
 
     /** What is the path to a downloaded CLI? **/
@@ -705,6 +706,37 @@ object Wsk {
         Buffer(getDownloadedCliPath)
     } else {
         Buffer(WhiskProperties.python, new File(cliDir, binaryName).toString)
+    }
+
+    def isMac = {
+        System.getProperty("os.name").toLowerCase().contains("mac")
+    }
+
+    def isWindows = {
+        System.getProperty("os.name").toLowerCase().contains("windows")
+    }
+
+    def isLinux = {
+        System.getProperty("os.name").toLowerCase().contains("linux")
+    }
+
+    def getCPUArch = {
+        System.getProperty("os.arch") match {
+            case "amd64" | "x86_64" => "amd64"
+            case "386" | "x86" | "x86_32" => "386"
+            case default => default
+        }
+    }
+
+    def getBinaryPath : String = {
+        if (isLinux)
+            s"bin\\linux\\${getCPUArch}"
+        else if (isMac)
+            s"bin\\mac\\${getCPUArch}"
+        else if (isWindows)
+            s"bin\\windows\\${getCPUArch}"
+        else
+            s"bin\\wsk"
     }
 }
 

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.System.*;
 
 import common.TestUtils.RunResult;
 
@@ -37,8 +38,7 @@ import common.TestUtils.RunResult;
  */
 public class WskCli {
 
-    private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin");
-
+    private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath());
     private static final String adminBinaryName = "wskadmin";
     private final String binaryName;
     private final File binaryPath;
@@ -82,6 +82,58 @@ public class WskCli {
         this.binaryPath = new File(cliDir, binaryName);
         this.subject = subject;
         this.authKey = authKey;
+    }
+
+    /**
+    * are we running on Mac OS X?
+    */
+    public static boolean onMac() {
+      return System.getProperty("os.name").toLowerCase().contains("mac");
+    }
+
+    /**
+    * are we running on Linux?
+    */
+    public static boolean onLinux() {
+      return System.getProperty("os.name").equalsIgnoreCase("linux");
+    }
+
+    /**
+    * are we running on Windows?
+    */
+    public static boolean onWindows() {
+      return System.getProperty("os.name").equalsIgnoreCase("windows");
+    }
+
+    public static String getCPUArch() {
+        String arch = System.getProperty("os.arch");
+
+        switch(System.getProperty("os.arch")) {
+            case "amd64":
+            case "x86_64":
+                return "amd64";
+            case "386":
+            case "x86":
+            case "x86_32":
+                return "386";
+            default:
+                return arch;
+        }
+    }
+
+    public static String getBinaryPath() {
+        String res;
+
+        if (onLinux())
+            res = "bin\\linux\\" + getCPUArch();
+        else if (onMac())
+            res = "bin\\mac\\" + getCPUArch();
+        else if (onWindows())
+            res = "bin\\windows\\" + getCPUArch();
+        else
+            res = "bin\\wsk";
+
+        return res;
     }
 
     public void setSubject(String subject) {
