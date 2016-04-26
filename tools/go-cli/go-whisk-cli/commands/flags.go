@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
- */
+*/
 
 package commands
 
@@ -24,32 +24,32 @@ var flags struct {
 	global struct {
 		verbose    bool
 		auth       string
-		namespace  string
 		apihost    string
 		apiversion string
 	}
 
 	common struct {
-		blocking bool
-		// annotation string
+		blocking   bool
 		annotation []string
-		// param      string
-		param   []string
-		shared  bool // AKA "public" or "publish"
-		skip    int  // skip first N records
-		limit   int  // return max N records
-		full    bool // return full records (docs=true for client request)
-		summary bool
+		param      []string
+		shared     bool // AKA "public" or "publish"
+		skip       int  // skip first N records
+		limit      int  // return max N records
+		full       bool // return full records (docs=true for client request)
+		summary    bool
 	}
 
 	property struct {
-		auth       bool
-		apihost    bool
-		apiversion bool
-		namespace  bool
-		cliversion bool
-		apibuild   bool
-		all        bool
+		auth          bool
+		apihost       bool
+		apiversion    bool
+		namespace     bool
+		cliversion    bool
+		apibuild      bool
+		all           bool
+		apihostSet    string
+		apiversionSet string
+		namespaceSet  string
 	}
 
 	action struct {

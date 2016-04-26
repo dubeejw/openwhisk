@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
- */
+*/
 
 package commands
 
@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"../../go-whisk/whisk"
 
@@ -38,60 +37,62 @@ var packageBindCmd = &cobra.Command{
 	Short: "bind parameters to the package",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		var err error
-		if len(args) != 2 {
-			err = errors.New("Invalid argument list")
-			fmt.Println(err)
-			return
-		}
+		fmt.Println("TODO :: this command has been commented out because it is out of date")
 
-		bindingArg := args[0]
-		packageName := args[1]
-
-		parameters, err := parseParameters(flags.common.param)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		annotations, err := parseAnnotations(flags.common.annotation)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		parsedBindingArg := strings.Split(bindingArg, ":")
-		bindingName := parsedBindingArg[0]
-		var bindingNamespace string
-		if len(parsedBindingArg) == 1 {
-			bindingNamespace = client.Config.Namespace
-		} else if len(parsedBindingArg) == 2 {
-			bindingNamespace = parsedBindingArg[1]
-		} else {
-			err = fmt.Errorf("Invalid binding argument %s", bindingArg)
-			fmt.Println(err)
-			return
-		}
-
-		binding := whisk.Binding{
-			Name:      bindingName,
-			Namespace: bindingNamespace,
-		}
-
-		p := &whisk.Package{
-			Name:        packageName,
-			Publish:     flags.common.shared,
-			Annotations: annotations,
-			Parameters:  parameters,
-			Binding:     binding,
-		}
-		p, _, err = client.Packages.Insert(p, false)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		printJSON(p)
+		// var err error
+		// if len(args) != 2 {
+		// 	err = errors.New("Invalid argument list")
+		// 	fmt.Println(err)
+		// 	return
+		// }
+		//
+		// bindingArg := args[0]
+		// packageName := args[1]
+		//
+		// parameters, err := parseParameters(flags.common.param)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// 	return
+		// }
+		//
+		// annotations, err := parseAnnotations(flags.common.annotation)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// 	return
+		// }
+		//
+		// parsedBindingArg := strings.Split(bindingArg, ":")
+		// bindingName := parsedBindingArg[0]
+		// var bindingNamespace string
+		// if len(parsedBindingArg) == 1 {
+		// 	bindingNamespace = client.Config.Namespace
+		// } else if len(parsedBindingArg) == 2 {
+		// 	bindingNamespace = parsedBindingArg[1]
+		// } else {
+		// 	err = fmt.Errorf("Invalid binding argument %s", bindingArg)
+		// 	fmt.Println(err)
+		// 	return
+		// }
+		//
+		// binding := whisk.Binding{
+		// 	Name:      bindingName,
+		// 	Namespace: bindingNamespace,
+		// }
+		//
+		// p := &whisk.Package{
+		// 	Name:        packageName,
+		// 	Publish:     flags.common.shared,
+		// 	Annotations: annotations,
+		// 	Parameters:  parameters,
+		// 	Binding:     binding,
+		// }
+		// p, _, err = client.Packages.Insert(p, false)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// 	return
+		// }
+		//
+		// printJSON(p)
 	},
 }
 
@@ -237,11 +238,27 @@ var packageDeleteCmd = &cobra.Command{
 }
 
 var packageListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list <namespace string>",
 	Short: "list all packages",
 
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
+		qName := qualifiedName{}
+		if len(args) == 1 {
+			qName, err = parseQualifiedName(args[0])
+			if err != nil {
+				fmt.Printf("error: %s", err)
+				return
+			}
+			ns := qName.namespace
+			if len(ns) == 0 {
+				err = errors.New("No valid namespace detected.  Make sure that namespace argument is preceded by a \"/\"")
+				fmt.Printf("error: %s\n", err)
+				return
+			}
+
+			client.Namespace = ns
+		}
 
 		options := &whisk.PackageListOptions{
 			Skip:   flags.common.skip,

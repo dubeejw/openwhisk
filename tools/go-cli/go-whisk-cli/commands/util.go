@@ -12,19 +12,73 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
- */
+*/
 
 package commands
 
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"../../go-whisk/whisk"
 
 	"github.com/fatih/color"
 	prettyjson "github.com/hokaccha/go-prettyjson"
 )
+
+type qualifiedName struct {
+	namespace   string
+	packageName string
+	entityName  string
+}
+
+func (qName qualifiedName) String() string {
+	output := []string{}
+	if len(qName.namespace) > 0 {
+		output = append(output, "/", qName.namespace, "/")
+	}
+	if len(qName.packageName) > 0 {
+		output = append(output, qName.packageName, "/")
+	}
+	output = append(output, qName.entityName)
+
+	return strings.Join(output, "")
+}
+
+func parseQualifiedName(name string) (qName qualifiedName, err error) {
+	if len(name) == 0 {
+		err = errors.New("Invalid name format")
+		return
+	}
+	if name[:1] == "/" {
+		name = name[1:]
+		i := strings.Index(name, "/")
+		if i == -1 {
+			qName.namespace = name
+			return
+		}
+		if i == 0 {
+			err = errors.New("Invalid name format")
+			return
+		}
+
+		qName.namespace = name[:i]
+		name = name[i+1:]
+	}
+
+	i := strings.Index(name, "/")
+
+	if i > 0 {
+		qName.packageName = name[:i]
+		name = name[i+1:]
+	}
+
+	qName.entityName = name
+
+	return
+
+}
 
 func parseKeyValueArray(args []string) ([]whisk.KeyValue, error) {
 	parsed := []whisk.KeyValue{}
@@ -91,7 +145,7 @@ func printActionList(actions []whisk.Action) {
 		if action.Publish {
 			publishState = "shared"
 		}
-		fmt.Printf("/%s/%s%30s\n", action.Namespace, action.Name, publishState)
+		fmt.Printf("%-70s%s\n", fmt.Sprintf("/%s/%s", action.Namespace, action.Name), publishState)
 	}
 }
 
@@ -102,7 +156,7 @@ func printTriggerList(triggers []whisk.Trigger) {
 		if trigger.Publish {
 			publishState = "shared"
 		}
-		fmt.Printf("/%s/%s%30s\n", trigger.Namespace, trigger.Name, publishState)
+		fmt.Printf("%-70s%s\n", fmt.Sprintf("/%s/%s", trigger.Namespace, trigger.Name), publishState)
 	}
 }
 
@@ -113,7 +167,7 @@ func printPackageList(packages []whisk.Package) {
 		if xPackage.Publish {
 			publishState = "shared"
 		}
-		fmt.Printf("/%s/%s%30s\n", xPackage.Namespace, xPackage.Name, publishState)
+		fmt.Printf("%-70s%s\n", fmt.Sprintf("/%s/%s", xPackage.Namespace, xPackage.Name), publishState)
 	}
 }
 
@@ -124,7 +178,7 @@ func printRuleList(rules []whisk.Rule) {
 		if rule.Publish {
 			publishState = "shared"
 		}
-		fmt.Printf("/%s/%s%30s\n", rule.Namespace, rule.Name, publishState)
+		fmt.Printf("%-70s%s\n", fmt.Sprintf("/%s/%s", rule.Namespace, rule.Name), publishState)
 	}
 }
 

@@ -15,7 +15,6 @@ if [ ! -f "$WHISKPROPS_FILE" ]; then
 fi
 EDGE_HOST=`fgrep edge.host= "$WHISKPROPS_FILE" | cut -d'=' -f2`
 GO_CLI_PATH=`fgrep go.cli.path= "$WHISKPROPS_FILE" | cut -d'=' -f2`
-echo "GO PATH: $GO_CLI_PATH"
 
 function createPackage() {
     PACKAGE_NAME=$1
