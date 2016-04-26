@@ -76,4 +76,38 @@ CONSULSERVER_DOCKER_ENDPOINT=$MAIN_DOCKER_ENDPOINT
 EDGE_DOCKER_ENDPOINT=$MAIN_DOCKER_ENDPOINT
 KAFKA_DOCKER_ENDPOINT=$MAIN_DOCKER_ENDPOINT
 
+function isLinux() {
+	if [ "$(uname)"  == 'Linux' ]; then
+		echo true
+	else
+		echo false
+	fi
+}
 
+function isMac() {
+	if [ "$(uname)" == 'Darwin' ]; then
+		echo true
+	else
+		echo false
+	fi
+}
+
+function getCPUArch() {
+    if [ "$(uname -m)" == "amd64" ] || [ "$(uname -m)" == "x86_64" ]; then
+        echo "amd64"
+    elif [ "$(uname -m)" == "386" ] || [ "$(uname -m)" == "x86" ] || [ "$(uname -m)" == "x86_32" ]; then
+        echo "386"
+    else
+        echo "$(uname -m)"
+    fi
+}
+
+function getGoCLIPath() {
+    if [ isLinux ]; then
+        echo "$(dirname "$(pwd)")/bin/go-cli/linux/$(getCPUArch)/wsk"
+    elif [ isMac ]; then
+        echo "$(dirname "$(pwd)")/bin/go-cli/mac/$(getCPUArch)/wsk"
+    fi
+}
+
+GO_CLI_PATH=$(getGoCLIPath)

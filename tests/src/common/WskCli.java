@@ -38,10 +38,9 @@ import common.TestUtils.RunResult;
  */
 public class WskCli {
 
-    //private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome(getBinaryPath());
+    private static final String goCLIPath = WhiskProperties.goCLIPath;
     private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin");
     private static final String adminBinaryName = "wskadmin";
-    private final String binaryName;
     private final File binaryPath;
     public String subject;
     public final String authKey;
@@ -63,78 +62,27 @@ public class WskCli {
     }
 
     public WskCli(String authKey) {
-        this("wsk", "default", authKey);
+        this("default", authKey);
     }
 
-    public WskCli(String subject, String authKey) {
-        this("wsk", subject, authKey);
-    }
+    //public WskCli(String subject, String authKey) {
+    //    this(subject, authKey);
+    //}
 
     protected WskCli(File authFile) {
-        this("wsk", "default", authFile);
+        this("default", authFile);
     }
 
-    protected WskCli(String binaryName, String subject, File authFile) {
-        this(binaryName, subject, WhiskProperties.readAuthKey(authFile));
+    protected WskCli(String subject, File authFile) {
+        this(subject, WhiskProperties.readAuthKey(authFile));
     }
 
-    protected WskCli(String binaryName, String subject, String authKey) {
-        this.binaryName = binaryName;
-        this.binaryPath = new File(cliDir, binaryName);
+    protected WskCli(String subject, String authKey) {
+        System.out.println("GO PATH: " + goCLIPath);
+
+        this.binaryPath = new File(goCLIPath);
         this.subject = subject;
         this.authKey = authKey;
-    }
-
-    /**
-    * are we running on Mac OS X?
-    */
-    public static boolean onMac() {
-      return System.getProperty("os.name").toLowerCase().contains("mac");
-    }
-
-    /**
-    * are we running on Linux?
-    */
-    public static boolean onLinux() {
-      return System.getProperty("os.name").equalsIgnoreCase("linux");
-    }
-
-    /**
-    * are we running on Windows?
-    */
-    public static boolean onWindows() {
-      return System.getProperty("os.name").equalsIgnoreCase("windows");
-    }
-
-    public static String getCPUArch() {
-        String arch = System.getProperty("os.arch");
-
-        switch(System.getProperty("os.arch")) {
-            case "amd64":
-            case "x86_64":
-                return "amd64";
-            case "386":
-            case "x86":
-            case "x86_32":
-                return "386";
-            default:
-                return arch;
-        }
-    }
-
-    public static String getBinaryPath() {
-        String res;
-
-        if (onLinux())
-            res = "bin\\linux\\" + getCPUArch();
-        else if (onMac())
-            res = "bin\\mac\\" + getCPUArch();
-        else if (onWindows())
-            res = "bin\\windows\\" + getCPUArch();
-        else
-            res = "bin\\wsk";
-
-        return res;
     }
 
     public void setSubject(String subject) {
@@ -1013,11 +961,9 @@ public class WskCli {
      * @return RunResult which contains stdout,sterr, exit code
      */
     public RunResult cli(boolean verbose, int expectedExitCode, File workingDir, String... params) throws IllegalArgumentException, IOException {
-        String[] cmd = WhiskProperties.useCliDownload() ? new String[] { getDownloadedCliPath() } : new String[] { WhiskProperties.python, new File(cliDir, binaryName).toString() };
+        String[] cmd = WhiskProperties.useCliDownload() ? new String[] { getDownloadedCliPath() } : new String[] { WhiskProperties.python, new File(goCLIPath).toString() };
         String[] args = verbose ? Util.concat(cmd, "--verbose") : cmd;
-        if (binaryName.equals("wsk")) {
-            args = Util.concat(cmd, "--apihost", WhiskProperties.getEdgeHost());
-        }
+        args = Util.concat(cmd, "--apihost", WhiskProperties.getEdgeHost());
         RunResult rr = TestUtils.runCmd(DONTCARE_EXIT, workingDir, TestUtils.logger, this.env, Util.concat(args, params));
         rr.validateExitCode(expectedExitCode);
         return rr;

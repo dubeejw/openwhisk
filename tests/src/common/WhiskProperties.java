@@ -41,6 +41,11 @@ public class WhiskProperties {
     private static final int DEFAULT_CONCURRENCY = 20;
 
     /**
+     * The path to the Go CLI executable.
+     */
+    public static final String goCLIPath = System.getProperty("go.cli.path");
+
+    /**
      * The deployment target, e.g., local.
      */
     public static final String deployTarget = System.getProperty("deploy.target");
