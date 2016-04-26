@@ -25,6 +25,7 @@ echo "whisk.logs.dir="$WHISK_LOGS_DIR >> "$WHISK_HOME/whisk.properties"
 echo "docker.port="$DOCKER_PORT >> "$WHISK_HOME/whisk.properties"
 echo "docker.timezone.mount="$DOCKER_TIMEZONE_MOUNT >> "$WHISK_HOME/whisk.properties"
 echo "docker.image.tag="$DOCKER_IMAGE_TAG >> "$WHISK_HOME/whisk.properties"
+echo "go.cli.path="$GO_CLI_PATH >> "$WHISK_HOME/whisk.properties"
 
 # Python
 echo "python.27="$PYTHON  >> "$WHISK_HOME/whisk.properties"
@@ -176,3 +177,4 @@ echo "db.password="$OPEN_WHISK_DB_PASSWORD >> "$WHISK_HOME/whisk.properties"
 echo "db.prefix="$DB_PREFIX >> "$WHISK_HOME/whisk.properties"
 echo "db.whisk.actions="$DB_WHISK_ACTIONS >> "$WHISK_HOME/whisk.properties"
 echo "db.whisk.auths="$DB_WHISK_AUTHS >> "$WHISK_HOME/whisk.properties"
+
