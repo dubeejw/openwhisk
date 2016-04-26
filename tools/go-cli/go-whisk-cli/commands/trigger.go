@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
- */
+*/
 
 package commands
 
@@ -220,10 +220,32 @@ var triggerDeleteCmd = &cobra.Command{
 }
 
 var triggerListCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list <namespace string>",
 	Short: "list all triggers",
 
 	Run: func(cmd *cobra.Command, args []string) {
+		var err error
+		qName := qualifiedName{}
+		if len(args) == 1 {
+			qName, err = parseQualifiedName(args[0])
+			if err != nil {
+				fmt.Printf("error: %s", err)
+				return
+			}
+			ns := qName.namespace
+			if len(ns) == 0 {
+				err = errors.New("No valid namespace detected.  Make sure that namespace argument is preceded by a \"/\"")
+				fmt.Printf("error: %s\n", err)
+				return
+			}
+
+			client.Namespace = ns
+
+			if pkg := qName.packageName; len(pkg) > 0 {
+				// todo :: scope call to package
+			}
+		}
+
 		options := &whisk.TriggerListOptions{
 			Skip:  flags.common.skip,
 			Limit: flags.common.limit,

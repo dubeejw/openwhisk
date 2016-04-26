@@ -12,7 +12,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
- */
+*/
 
 package commands
 
@@ -74,7 +74,7 @@ func dockerInstall() error {
 		return err
 	}
 
-	downloadCmd := exec.Command("wget", "--quiet", "--no-check-certificate", "REPLACE WITH URL"+tarFile) // TODO
+	downloadCmd := exec.Command("wget", "--quiet", "--no-check-certificate", "https://"+tarFile)//TODO: replace with server
 
 	if err = downloadCmd.Run(); err != nil {
 		err = errors.New("Download of docker skeleton failed")
