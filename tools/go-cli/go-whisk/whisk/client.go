@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"crypto/tls"
 )
 
 const (
@@ -34,6 +35,7 @@ const (
 type Client struct {
 	client *http.Client
 	*Config
+	Transport *http.Transport
 
 	Sdks        *SdkService
 	Triggers    *TriggerService
@@ -54,6 +56,15 @@ type Config struct {
 }
 
 func NewClient(httpClient *http.Client, config *Config) (*Client, error) {
+
+	// TODO: only disable certificate checking in the dev environment
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+
+	http.DefaultClient.Transport = &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
 
 	if httpClient == nil {
 		httpClient = http.DefaultClient
