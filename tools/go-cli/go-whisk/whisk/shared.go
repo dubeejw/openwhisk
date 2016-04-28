@@ -17,14 +17,19 @@ limitations under the License.
 package whisk
 
 // NOTE :: deprecated
-type KeyValue struct {
+/*type KeyValue struct {
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
+}*/
+
+type KeyValue struct {
+	Key   string `json:"key,omitempty"`
+	Value map[string]interface{} `json:"value,omitempty"`
 }
 
-type Annotations []KeyValue
+//type Annotations []KeyValue
 
-// type Annotations map[string]interface{}
+type Annotations []map[string]interface{}
 
 type Parameters []KeyValue
 

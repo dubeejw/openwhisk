@@ -31,9 +31,9 @@ type Package struct {
 	Version   string `json:"version,omitempty"`
 	Publish   bool   `json:"publish,omitempty"`
 
-	Annotations `json:"annotations"`
-	Parameters  `json:"parameters"`
-	Binding     `json:"binding"`
+	Annotations 	`json:"annotations"`
+	Parameters  	`json:"parameters"`
+	Bindings  bool  `json:"binding"`
 }
 
 type Binding struct {

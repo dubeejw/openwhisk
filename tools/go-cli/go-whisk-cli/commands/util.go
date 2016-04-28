@@ -90,7 +90,7 @@ func parseKeyValueArray(args []string) ([]whisk.KeyValue, error) {
 	for i := 0; i < len(args); i += 2 {
 		keyValue := whisk.KeyValue{
 			Key:   args[i],
-			Value: args[i+1],
+			//Value: (map[string]interface)args[i+1],
 		}
 		parsed = append(parsed, keyValue)
 
@@ -110,11 +110,11 @@ func parseParameters(args []string) (whisk.Parameters, error) {
 
 func parseAnnotations(args []string) (whisk.Annotations, error) {
 	annotations := whisk.Annotations{}
-	parsedArgs, err := parseKeyValueArray(args)
-	if err != nil {
-		return annotations, err
-	}
-	annotations = whisk.Annotations(parsedArgs)
+	//parsedArgs, err := parseKeyValueArray(args)
+	//if err != nil {
+	//	return annotations, err
+	//}
+	//annotations = whisk.Annotations(parsedArgs)
 	return annotations, nil
 }
 
