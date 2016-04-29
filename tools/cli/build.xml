@@ -1,49 +1,29 @@
 <!-- vim: set expandtab ts=4 sw=4 : -->
 
-<!-- targets in this file should be called from the parent directory -->
+<!-- Targets in this file should be called from the parent directory -->
 <project basedir="../..">
     <import file="../../config/config.xml" />
 
-    <!-- build the CLI python package for distribution -->
-    <target name="buildCLI" >
+    <target name="buildCLI">
 
+        <!-- Load properties -->
         <var file="whisk.properties" />
+        <property name="go-cli.src.dir" value="${openwhisk.home}/tools/cli" />
 
-        <!-- generate default.props in source directory.
-             someday this should be nuked - legacy of old process -->
-        <exec executable="/bin/bash" failonerror="true" output="${openwhisk.home}/tools/cli/default.props">
-            <arg line="${openwhisk.home}/tools/cli/generateDefaultProps.sh" />
-            <arg line="${basedir}" />
-        </exec>
-        
-        <!-- copy files needed to build image to a scratch space -->
+        <!-- Make the build directory -->
+        <mkdir dir="${cli.build.dir}" />
+        <copy file="${go-cli.src.dir}/Dockerfile" todir="${cli.build.dir}" />
+
+        <!-- Copy files needed to build image to a scratch space -->
         <mkdir dir="${cli.build.dir}" />
         <copy todir="${cli.build.dir}">
-            <fileset dir="${openwhisk.home}/tools/cli/packagescripts" />
-        </copy>
-        <copy todir="${cli.build.dir}/openwhisk">
-            <fileset dir="${openwhisk.home}/tools/cli">
-                <!--<include name="default.props" />-->
-                <exclude name=".project" />
-                <exclude name="*.pyc" />
-                <exclude name="setup.py" />
-            </fileset>
+            <fileset dir="${openwhisk.home}/tools/cli" />
         </copy>
 
-        <!-- generate default.props -->
-        <exec executable="/bin/bash" failonerror="true" output="${cli.build.dir}/openwhisk/default.props">
-            <arg line="${openwhisk.home}/tools/cli/generateDefaultProps.sh" />
-            <arg line="${basedir}" />
-        </exec>
-
-        <!-- Python packaging expects .py extensions. -->
-        <move file="${cli.build.dir}/openwhisk/wsk" tofile="${cli.build.dir}/openwhisk/wsk.py" />
-        <!-- Need this file in the right place so it looks like a Pyton package. -->
-        <move file="${cli.build.dir}/__init__.py" todir="${cli.build.dir}/openwhisk" />
-        <!-- build package for distribution -->
+        <!-- Build docker image -->
         <exec executable="/bin/bash" failonerror="true">
             <arg line="${openwhisk.home}/tools/docker/dockerWithRetry.sh ${docker.timeout.long}" />
-            <arg line="build -t whisk/cli '${cli.build.dir}'" />
+            <arg line="build -t whisk/cli ${cli.build.dir}" />
         </exec>
         <exec executable="docker" failonerror="false" output="/dev/null" error="/dev/null">
             <arg line="${docker.tls.cmd}" />
@@ -53,9 +33,20 @@
             <arg line="${docker.tls.cmd}" />
             <arg line="run -d --name cli whisk/cli" />
         </exec>
+
+        <!-- Copy binary into open/bin -->
+        <delete dir="${openwhisk.home}/bin/wsk" failonerror="false"/>
         <exec executable="docker" failonerror="true">
             <arg line="${docker.tls.cmd}" />
-            <arg line="cp cli:/cli/dist '${cli.build.dir}'" />
+            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/windows '${openwhisk.home}/bin/windows'" />
+        </exec>
+        <exec executable="docker" failonerror="true">
+            <arg line="${docker.tls.cmd}" />
+            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/mac '${openwhisk.home}/bin/mac'" />
+        </exec>
+        <exec executable="docker" failonerror="true">
+            <arg line="${docker.tls.cmd}" />
+            <arg line="cp cli:/src/github.ibm.com/go-whisk-cli/linux '${openwhisk.home}/bin/linux'" />
         </exec>
         <exec executable="docker" failonerror="false">
             <arg line="${docker.tls.cmd}" />
@@ -64,3 +55,4 @@
     </target>
 
 </project>
+
