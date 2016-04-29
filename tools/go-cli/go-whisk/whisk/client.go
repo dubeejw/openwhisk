@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://openwhisk.ng.bluemix.net/api/"
+	defaultBaseURL = "openwhisk.ng.bluemix.net"
 )
 
 type Client struct {
@@ -50,7 +50,7 @@ type Client struct {
 type Config struct {
 	Namespace string // NOTE :: Default is "_"
 	AuthToken string
-	BaseURL   *url.URL // NOTE :: Default is "https://openwhisk.ng.bluemix.net/api/"
+	BaseURL   *url.URL // NOTE :: Default is "openwhisk.ng.bluemix.net"
 	Version   string
 	Verbose   bool
 }

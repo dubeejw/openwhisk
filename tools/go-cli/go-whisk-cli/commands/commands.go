@@ -36,7 +36,8 @@ func init() {
 		os.Exit(-1)
 	}
 
-	baseURL, err := url.Parse(Properties.APIHost)
+	var apiHostBaseUrl = fmt.Sprintf("https://%s/api/", Properties.APIHost)
+	baseURL, err := url.Parse(apiHostBaseUrl)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)

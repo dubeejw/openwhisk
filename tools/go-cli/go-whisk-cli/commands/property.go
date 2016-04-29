@@ -208,7 +208,7 @@ func init() {
 func setDefaultProperties() {
 	Properties.Auth = ""
 	Properties.Namespace = "_"
-	Properties.APIHost = "https://openwhisk.ng.bluemix.net/api/"
+	Properties.APIHost = "openwhisk.ng.bluemix.net"
 	Properties.APIBuild = ""
 	Properties.APIVersion = "v1"
 	Properties.CLIVersion = ""
