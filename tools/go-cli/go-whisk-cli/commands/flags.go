@@ -34,6 +34,7 @@ var flags struct {
         auth        string
         apihost     string
         apiversion  string
+        insecure    bool
     }
 
     common struct {
@@ -49,17 +50,19 @@ var flags struct {
    }
 
     property struct {
-       auth             bool
-       apihost          bool
-       apiversion       bool
-       namespace        bool
-       cliversion       bool
-       apibuild         bool
-       apibuildno       bool
-       all              bool
-       apihostSet       string
-       apiversionSet    string
-       namespaceSet     string
+        auth            bool
+        apihost         bool
+        apiversion      bool
+        namespace       bool
+        cliversion      bool
+        apibuild        bool
+        apibuildno      bool
+        insecure        bool
+        all             bool
+        apihostSet      string
+        apiversionSet   string
+        namespaceSet    string
+        insecureSet     string
    }
 
     action struct {

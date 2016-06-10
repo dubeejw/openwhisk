@@ -35,6 +35,7 @@ import common.TestUtils.NOT_FOUND
 import common.TestUtils.SUCCESS_EXIT
 import common.TestUtils.TIMEOUT
 import common.TestUtils.UNAUTHORIZED
+import common.TestUtils.ERROR_EXIT
 import common.Wsk
 import common.WskProps
 import common.WskTestHelpers
@@ -62,30 +63,31 @@ class WskBasicTests
 
     it should "show help and usage info" in {
         val stdout = wsk.cli(Seq("-h")).stdout
-        stdout should include("usage:")
-        stdout should include("optional arguments")
-        stdout should include("available commands")
-        stdout should include("-help")
+        println(s"show help and usage:\n$stdout")
+        stdout should include regex ("""(?i)Usage:""")
+        stdout should include regex ("""(?i)Flags""")
+        stdout should include regex ("""(?i)Available commands""")
+        stdout should include regex ("""(?i)--help""")
     }
 
     it should "show cli build version" in {
         val stdout = wsk.cli(Seq("property", "get", "--cliversion")).stdout
-        stdout should include regex ("""whisk CLI version\s+201.*\n""")
+        stdout should include regex ("""(?i)whisk CLI version\s+201.*""")
     }
 
     it should "show api version" in {
         val stdout = wsk.cli(Seq("property", "get", "--apiversion")).stdout
-        stdout should include regex ("""whisk API version\s+v1\n""")
+        stdout should include regex ("""(?i)whisk API version\s+v1""")
     }
 
     it should "show api build version" in {
         val stdout = wsk.cli(wskprops.overrides ++ Seq("property", "get", "--apibuild")).stdout
-        stdout should include regex ("""whisk API build*.*201.*\n""")
+        stdout should include regex ("""(?i)whisk API build\s+201.*""")
     }
 
     it should "show api build number" in {
         val stdout = wsk.cli(wskprops.overrides ++ Seq("property", "get", "--apibuildno")).stdout
-        stdout should include regex ("""whisk API build*.*.*\n""")
+        stdout should include regex ("""(?i)whisk API build.*\s+.*""")
     }
 
     it should "set auth in property file" in {
@@ -165,17 +167,15 @@ class WskBasicTests
     }
 
     it should "reject bad command" in {
-        wsk.cli(Seq("bogus"), expectedExitCode = MISUSE_EXIT).
-            stderr should include("usage:")
+        val result = wsk.cli(Seq("bogus"), expectedExitCode = ERROR_EXIT)
+        result.stderr should include regex ("""(?i)Run 'wsk --help' for usage""")
     }
 
     it should "reject authenticated command when no auth key is given" in {
         // override wsk props file in case it exists
         val wskprops = File.createTempFile("wskprops", ".tmp")
         val env = Map("WSK_CONFIG_FILE" -> wskprops.getAbsolutePath())
-        val stderr = wsk.cli(Seq("list"), env = env, expectedExitCode = MISUSE_EXIT).stderr
-        stderr should include("usage:")
-        stderr should include("--auth is required")
+        val result = wsk.cli(Seq("list"), env = env, expectedExitCode = UNAUTHORIZED)
     }
 
     behavior of "Wsk Package CLI"
@@ -263,8 +263,8 @@ class WskBasicTests
 
     it should "reject create with missing file" in {
         wsk.action.create("missingFile", Some("notfound"),
-            expectedExitCode = MISUSE_EXIT).
-            stdout should include("not a valid file")
+            expectedExitCode = ERROR_EXIT).
+            stdout should include("Unable to parse action")
     }
 
     /**

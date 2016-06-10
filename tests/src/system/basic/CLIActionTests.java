@@ -175,9 +175,9 @@ public class CLIActionTests {
         String payload = "bob";
         String[] cmd = { "action", "invoke", "/whisk.system/samples/helloWorld", payload };
         RunResult rr = wsk.runCmd(cmd);
-        assertTrue("Expect a cli error exit code", rr.exitCode == 2);
-        assertTrue("Expect a cli usage message", rr.stderr.contains("usage: wsk [-h] [-v]"));
-        assertTrue("Expect a cli error message", rr.stderr.contains("wsk: error: unrecognized arguments: " + payload));
+        assertTrue("Expect a cli error exit code", rr.exitCode == 1);
+        assertTrue("Expect a cli usage message", rr.stdout.contains("Run 'wsk --help' for usage."));
+        assertTrue("Expect a cli error message", rr.stdout.contains("error: Invalid argument list."));
     }
 
     @Test(timeout=120*1000)

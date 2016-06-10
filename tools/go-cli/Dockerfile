@@ -24,28 +24,8 @@ RUN cd /src/github.com/go-whisk-cli && /bin/godep restore -v
 RUN cd /src/github.com/go-whisk-cli && echo "Dependencies list requires restructuring the GO CLI packages" > ../../../wsk.deps.out
 
 # Build the Go wsk CLI binaries
-ENV GOOS=windows
-ENV EXEC=wsk.exe
-ENV ARCHS="386 amd64"
-RUN for GOARCH in $ARCHS; do \
-      cd /src/github.com/go-whisk-cli && \
-      go build -ldflags "-X commands.CLI_BUILD_TIME=$BUILDTIME" -v -o $GOOS/$GOARCH/$EXEC main.go && \
-      zip $GOOS/$GOARCH/openwhisk-win-$GOARCH.zip $GOOS/$GOARCH/$EXEC; \
-    done
-
-ENV GOOS=darwin
-ENV ARCHS="386 amd64 arm arm64"
-ENV EXEC=wsk
-RUN for GOARCH in $ARCHS; do \
-      cd /src/github.com/go-whisk-cli && \
-      go build -ldflags "-X commands.CLI_BUILD_TIME=$BUILDTIME" -v -o mac/$GOARCH/$EXEC main.go && \
-      tar -cf mac/$GOARCH/openwhisk-mac-$GOARCH.tar mac/$GOARCH/$EXEC && \
-      gzip < mac/$GOARCH/openwhisk-mac-$GOARCH.tar > mac/$GOARCH/openwhisk-mac-$GOARCH.tar.gz && \
-      rm -f mac/$GOARCH/openwhisk-mac-$GOARCH.tar; \
-    done
-
 ENV GOOS=linux
-ENV ARCHS="386 amd64 arm arm64 ppc64 ppc64le mips64 mips64le"
+ENV ARCHS="amd64"
 ENV EXEC=wsk
 RUN for GOARCH in $ARCHS; do \
       cd /src/github.com/go-whisk-cli && \
@@ -54,3 +34,4 @@ RUN for GOARCH in $ARCHS; do \
       gzip < $GOOS/$GOARCH/openwhisk-$GOOS-$GOARCH.tar > $GOOS/$GOARCH/openwhisk-$GOOS-$GOARCH.tar.gz && \
       rm -f $GOOS/$GOARCH/openwhisk-$GOOS-$GOARCH.tar; \
     done
+

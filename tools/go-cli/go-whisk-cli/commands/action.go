@@ -694,7 +694,6 @@ func parseAction(cmd *cobra.Command, args []string) (*whisk.Action, bool, error)
     action.Limits = limits
 
     // If the action sequence is not already the Parameters value, set it to the --param parameter values
-    //if action.Parameters == nil && len(parameters) > 0 {
     if action.Parameters == nil && parameters != nil {
         action.Parameters = parameters
     }

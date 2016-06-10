@@ -28,14 +28,16 @@ import (
 
 var client *whisk.Client
 
-func init() {
+func setup() (error) {
     var err error
+
 
     err = loadProperties()
     if err != nil {
         whisk.Debug(whisk.DbgError, "loadProperties() error: %s\n", err)
         fmt.Println(err)
-        os.Exit(whisk.EXITCODE_ERR_GENERAL)
+        //os.Exit(whisk.EXITCODE_ERR_GENERAL)
+        return err
     }
 
     var apiHostBaseUrl = fmt.Sprintf("https://%s/api/", Properties.APIHost)
@@ -43,14 +45,16 @@ func init() {
     if err != nil {
         whisk.Debug(whisk.DbgError, "url.Parse(%s) error: %s\n", apiHostBaseUrl, err)
         fmt.Printf("Invalid apiHost value '%s' : %s", Properties.APIHost, err)
-        os.Exit(whisk.EXITCODE_ERR_GENERAL)
+        //os.Exit(whisk.EXITCODE_ERR_GENERAL)
+        return err
     }
 
     clientConfig := &whisk.Config{
-        AuthToken: Properties.Auth,
-        Namespace: Properties.Namespace,
-        BaseURL:   baseURL,
-        Version:   Properties.APIVersion,
+        AuthToken:  Properties.Auth,
+        Namespace:  Properties.Namespace,
+        BaseURL:    baseURL,
+        Version:    Properties.APIVersion,
+        Insecure:   flags.global.insecure || Properties.Insecure,
     }
 
     // Setup client
@@ -58,8 +62,11 @@ func init() {
     if err != nil {
         whisk.Debug(whisk.DbgError, "whisk.NewClient(%#v, %#v) error: %s\n", http.DefaultClient, clientConfig, err)
         fmt.Printf("Unable to initialize server connection: %s", err)
-        os.Exit(whisk.EXITCODE_ERR_GENERAL)
+        //os.Exit(whisk.EXITCODE_ERR_GENERAL)
+        return err
     }
+
+    return nil
 }
 
 func parseArgs(args []string) ([]string, []string, []string, error) {
@@ -73,6 +80,9 @@ func parseArgs(args []string) ([]string, []string, []string, error) {
     i := 0
 
     for i < len(args) {
+        if (args[i] == "-i" || args[i] == "--insecure") {
+            flags.global.insecure = true
+        }
 
         if !parsingAnnot && args[i] == "-p" || args[i] == "--param" {
             parsingParam = true
@@ -138,6 +148,16 @@ func Execute() error {
     if err != nil {
         whisk.Debug(whisk.DbgError, "parseParams(%s) failed: %s\n", os.Args, err)
         errMsg := fmt.Sprintf("Failed to parse arguments: %s", err)
+        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+            whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+        return whiskErr
+    }
+
+    err = setup()
+
+    if err != nil {
+        whisk.Debug(whisk.DbgError, "setup() failed: %s\n", err)
+        errMsg := fmt.Sprintf("Failed to intialize: %s", err)
         whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
             whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
         return whiskErr

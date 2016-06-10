@@ -40,10 +40,11 @@ import common.TestUtils.RunResult;
  */
 public class WskCli {
 
+    private static final String goCLIPath = WhiskProperties.getGoCLIPath();
+    private static final String goCLIDir = WhiskProperties.getGoCLIDir();
     private static final File cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin");
 
     private static final String adminBinaryName = "wskadmin";
-    private final String binaryName;
     private final File binaryPath;
     public String subject;
     public final String authKey;
@@ -65,24 +66,19 @@ public class WskCli {
     }
 
     public WskCli(String authKey) {
-        this("wsk", "default", authKey);
-    }
-
-    public WskCli(String subject, String authKey) {
-        this("wsk", subject, authKey);
+        this("default", authKey);
     }
 
     protected WskCli(File authFile) {
-        this("wsk", "default", authFile);
+        this("default", authFile);
     }
 
-    protected WskCli(String binaryName, String subject, File authFile) {
-        this(binaryName, subject, WhiskProperties.readAuthKey(authFile));
+    public WskCli(String subject, File authFile) {
+        this(subject, WhiskProperties.readAuthKey(authFile));
     }
 
-    protected WskCli(String binaryName, String subject, String authKey) {
-        this.binaryName = binaryName;
-        this.binaryPath = new File(cliDir, binaryName);
+    public WskCli(String subject, String authKey) {
+        this.binaryPath = new File(goCLIPath);
         this.subject = subject;
         this.authKey = authKey;
     }
@@ -96,12 +92,15 @@ public class WskCli {
     }
 
     public boolean checkExists() {
+        File dir;
+
         if (WhiskProperties.useCliDownload()) {
             String binary = getDownloadedCliPath();
             File f = new File(binary);
             assertTrue("did not find " + f, f.exists());
         } else {
-            assertTrue("did not find " + cliDir, cliDir.exists());
+            dir = new File(goCLIDir);
+            assertTrue("did not find " + dir, dir.exists());
             assertTrue("did not find " + binaryPath, binaryPath.exists());
         }
         return true;
@@ -114,7 +113,7 @@ public class WskCli {
     }
 
     public String namespace() throws IOException {
-        String result = cli("namespace", "list", "--auth", authKey).stdout;
+        String result = cli("namespace", "list", "-i", "--auth", authKey).stdout;
         String[] lines = result.split("\n");
         assert (lines.length >= 2);
         return lines[1].trim();
@@ -125,14 +124,14 @@ public class WskCli {
     }
 
     public String pollActivations(int seconds) throws IOException {
-        return cli(SUCCESS_EXIT, "activation", "poll", "--auth", authKey, "--exit", Integer.toString(seconds)).stdout;
+        return cli(SUCCESS_EXIT, "activation", "poll", "-i", "--auth", authKey, "--exit", Integer.toString(seconds)).stdout;
     }
 
     /**
      * Lists all items (not just recent ones).
      */
     public String listAll(Item item) throws IOException {
-        return cli(SUCCESS_EXIT, item.name, "list", "--auth", authKey, "--limit", "0").stdout;
+        return cli(SUCCESS_EXIT, item.name, "list", "-i", "--auth", authKey, "--limit", "0").stdout;
     }
 
     /**
@@ -149,7 +148,7 @@ public class WskCli {
         if (item == Item.Activation) {
             return listActivations(namespace);
         } else {
-            String[] cmd = { item.name, "list", "--auth", authKey };
+            String[] cmd = { item.name, "list", "-i", "--auth", authKey };
             if (namespace != null)
                 cmd = Util.concat(cmd, new String[] { namespace });
             return cli(SUCCESS_EXIT, cmd).stdout;
@@ -168,7 +167,7 @@ public class WskCli {
      */
     public String listActivations(String namespace) throws IOException {
         // bump limit to return all activations
-        String[] cmd = { Item.Activation.name, "list", "--auth", authKey, "--limit", "0" };
+        String[] cmd = { Item.Activation.name, "list", "-i", "--auth", authKey, "--limit", "0" };
         if (namespace != null)
             cmd = Util.concat(cmd, new String[] { namespace });
         return cli(SUCCESS_EXIT, cmd).stdout;
@@ -203,7 +202,7 @@ public class WskCli {
      * @return CLI stdout
      */
     public String get(int expectedExitCode, Item item, String name) throws IOException {
-        return cli(DONTCARE_EXIT, item.name, "get", "--auth", authKey, name).stdout;
+        return cli(DONTCARE_EXIT, item.name, "get", "-i", "--auth", authKey, name).stdout;
     }
 
     /**
@@ -258,7 +257,7 @@ public class WskCli {
                     throw t;
             }
         }
-        return cli(expectedExitCode, item.name, "delete", "--auth", authKey, name).stdout;
+        return cli(expectedExitCode, item.name, "delete", "-i", "--auth", authKey, name).stdout;
     }
 
     public String copyAction(String name, String existingAction) throws IOException {
@@ -321,8 +320,8 @@ public class WskCli {
     }
 
     public String createAction(int expectedCode, String name, String artifact, String library, Map<String, String> params, boolean sequence, boolean update, boolean copy, boolean shared, int timeoutMillis) throws IOException {
-        String[] cmd1 = { "action", "update", "--auth", authKey, name };
-        String[] cmd2 = { "action", "create", "--auth", authKey, name, artifact };
+        String[] cmd1 = { "action", "update", "-i", "--auth", authKey, name };
+        String[] cmd2 = { "action", "create","-i", "--auth", authKey, name, artifact };
         String[] cmd = update ? cmd1 : cmd2;
 
         if (update && artifact != null) {
@@ -353,7 +352,7 @@ public class WskCli {
         }
 
         if (shared) {
-            cmd = Util.concat(cmd, new String[] { "--shared" });
+            cmd = Util.concat(cmd, new String[] { "--shared", "yes"});
         }
 
         RunResult result = cli(expectedCode, cmd);
@@ -380,7 +379,7 @@ public class WskCli {
             op = "update";
         }
 
-        String[] cmd = { "package", op, "--auth", authKey, name };
+        String[] cmd = { "package", op, "-i", "--auth", authKey, name };
         if (params != null) {
             for (String key : params.keySet()) {
                 String value = params.get(key);
@@ -407,7 +406,7 @@ public class WskCli {
     }
 
     public String bindPackage(int expectedCode, String packageName, String name, Map<String, String> params) throws IOException {
-        String[] cmd = { "package", "bind", "--auth", authKey, packageName, name };
+        String[] cmd = { "package", "bind", "-i", "--auth", authKey, packageName, name };
         if (params != null) {
             for (String key : params.keySet()) {
                 String value = params.get(key);
@@ -418,13 +417,13 @@ public class WskCli {
         RunResult result = cli(expectedCode, cmd);
         String stdout = result.stdout;
         if (expectedCode == SUCCESS_EXIT) {
-            assertTrue(stdout, stdout.contains("ok: created binding " + name));
+            assertTrue(stdout, stdout.contains("created binding " + name));
         }
         return expectedCode == SUCCESS_EXIT ? stdout : stdout.concat(result.stderr);
     }
 
     public String refreshPackages(int expectedCode, String namespace) throws IOException {
-        String[] cmd = { "package", "refresh", "--auth", authKey, namespace };
+        String[] cmd = { "package", "refresh", "-i", "--auth", authKey, namespace };
 
         RunResult result = cli(expectedCode, cmd);
         String stdout = result.stdout;
@@ -437,7 +436,7 @@ public class WskCli {
     }
 
     public String createDockerAction(String name, String container, boolean update) throws IOException {
-        String[] cmd = { "action", "create", "--auth", authKey, name, "--docker", container };
+        String[] cmd = { "action", "create", "-i", "--auth", authKey, name, "--docker", container };
         if (update) {
             cmd = Util.concat(cmd, new String[] { "--update" });
         }
@@ -452,7 +451,7 @@ public class WskCli {
     }
 
     public void createTrigger(int expectedCode, String name) throws IOException {
-        String result = cli(expectedCode, "trigger", "create", "--auth", authKey, name).stdout;
+        String result = cli(expectedCode, "trigger", "create", "-i", "--auth", authKey, name).stdout;
         if (expectedCode == SUCCESS_EXIT) {
             assertTrue(result, result.contains("ok: created trigger"));
         }
@@ -463,7 +462,7 @@ public class WskCli {
     }
 
     public void createRule(int expectedCode, String name, String trigger, String action) throws IOException {
-        String result = cli(expectedCode, "rule", "create", "--auth", authKey, name, trigger, action).stdout;
+        String result = cli(expectedCode, "rule", "create", "-i", "--auth", authKey, name, trigger, action).stdout;
         if (expectedCode == SUCCESS_EXIT) {
             assertTrue(result, result.contains("ok: created rule"));
             enableRule(name, 30);
@@ -471,7 +470,7 @@ public class WskCli {
     }
 
     public String enableRule(String name, int timeout) throws IOException {
-        String result = cli("rule", "enable", "--auth", authKey, name).stdout;
+        String result = cli("rule", "enable", "-i", "--auth", authKey, name).stdout;
         assertTrue(result, result.contains("ok:"));
         Boolean b = TestUtils.waitfor(() -> {
             return checkRuleState(name, true);
@@ -485,7 +484,7 @@ public class WskCli {
     }
 
     public String disableRule(int expectedCode, String name, int timeout) throws IOException {
-        String result = cli(expectedCode, "rule", "disable", "--auth", authKey, name).stdout;
+        String result = cli(expectedCode, "rule", "disable", "-i", "--auth", authKey, name).stdout;
         assertTrue(result, result.contains("ok:"));
         Boolean b = TestUtils.waitfor(() -> {
             return checkRuleState(name, false);
@@ -495,7 +494,7 @@ public class WskCli {
     }
 
     private boolean checkRuleState(String name, boolean active) throws IOException {
-        String result = cli("rule", "status", "--auth", authKey, name).stdout;
+        String result = cli("rule", "status", "-i", "--auth", authKey, name).stdout;
         return active ? result.contains("is active") : result.contains("is inactive");
     }
 
@@ -509,7 +508,7 @@ public class WskCli {
      * @return CLI stdout
      */
     public String trigger(String name, String arg) throws IOException {
-        String result = cli("trigger", "fire", "--auth", authKey, name, arg).stdout;
+        String result = cli("trigger", "fire", "-i", "--auth", authKey, name, arg).stdout;
         assertTrue(result, result.contains("ok: triggered"));
         return result;
     }
@@ -518,7 +517,7 @@ public class WskCli {
      * Same as trigger but return result without checking error code.
      */
     public RunResult triggerNoCheck(String name, String arg) throws IOException {
-        return cli(DONTCARE_EXIT, "trigger", "fire", "--auth", authKey, name, arg);
+        return cli(DONTCARE_EXIT, "trigger", "fire", "-i", "--auth", authKey, name, arg);
     }
 
     public RunResult invokeNoCheck(String actionName, Map<String, String> params) throws IOException {
@@ -526,7 +525,7 @@ public class WskCli {
     }
 
     public String invoke(String name, Map<String, String> params) throws IOException {
-        String[] cmd = { "action", "invoke", "--auth", authKey, name };
+        String[] cmd = { "action", "invoke", "-i", "--auth", authKey, name };
         if (params != null) {
             for (String key : params.keySet()) {
                 String value = params.get(key);
@@ -579,7 +578,7 @@ public class WskCli {
     }
 
     public RunResult invoke(int expectedCode, String name, Map<String, String> params, boolean blocking) throws IOException {
-        String[] cmd = new String[] { "action", "invoke", "--auth", authKey, name };
+        String[] cmd = new String[] { "action", "invoke", "-i", "--auth", authKey, name };
         for (String key : params.keySet()) {
             String value = params.get(key);
             cmd = Util.concat(cmd, new String[] { "--param", key, value });
@@ -612,7 +611,7 @@ public class WskCli {
      */
     public List<String> getActivations(String name, int lastN) throws IOException {
         String canonicalName = name;
-        String result = cli(SUCCESS_EXIT, "activation", "list", canonicalName, "--limit", "" + lastN, "--auth", authKey).stdout;
+        String result = cli(SUCCESS_EXIT, "activation", "list", canonicalName, "-i", "--limit", "" + lastN, "--auth", authKey).stdout;
         String[] lines = result.split("\n");
         List<String> activations = new ArrayList<String>();
         for (int i = 1; i < lines.length; i++) {
@@ -664,7 +663,7 @@ public class WskCli {
     }
 
     public RunResult getResult(String activationId) throws IOException {
-        RunResult result = cli(DONTCARE_EXIT, "activation", "result", activationId, "--auth", authKey);
+        RunResult result = cli(DONTCARE_EXIT, "activation", "result", activationId, "-i", "--auth", authKey);
         return result;
     }
 
@@ -672,7 +671,7 @@ public class WskCli {
      * Fetch the logs (stodout, stderr) recorded for a particular activation
      */
     public RunResult getLogsForActivation(String activationId) throws IOException {
-        RunResult result = cli(DONTCARE_EXIT, "activation", "logs", activationId, "--auth", authKey);
+        RunResult result = cli(DONTCARE_EXIT, "activation", "logs", activationId, "-i", "--auth", authKey);
         return result;
     }
 
@@ -968,11 +967,9 @@ public class WskCli {
      * @return RunResult which contains stdout,sterr, exit code
      */
     public RunResult cli(boolean verbose, int expectedExitCode, File workingDir, String... params) throws IllegalArgumentException, IOException {
-        String[] cmd = WhiskProperties.useCliDownload() ? new String[] { getDownloadedCliPath() } : new String[] { WhiskProperties.python, new File(cliDir, binaryName).toString() };
-        String[] args = verbose ? Util.concat(cmd, "--verbose") : cmd;
-        if (binaryName.equals("wsk")) {
-            args = Util.concat(cmd, "--apihost", WhiskProperties.getEdgeHost());
-        }
+        String[] cmd = WhiskProperties.useCliDownload() ? new String[] { getDownloadedCliPath() } : new String[] { new File(goCLIPath).toString() };
+        cmd = verbose ? Util.concat(cmd, "--verbose") : cmd;
+        String[] args = Util.concat(cmd, "--apihost", WhiskProperties.getEdgeHost());
         RunResult rr = TestUtils.runCmd(DONTCARE_EXIT, workingDir, TestUtils.logger, this.env, Util.concat(args, params));
         rr.validateExitCode(expectedExitCode);
         return rr;
@@ -986,9 +983,13 @@ public class WskCli {
      * Since there are many unit tests in Java and some of them need access to
      * WskAdmin, we lightly reflect the admin methods here.
      */
-    public static RunResult admin(String... params) throws IllegalArgumentException, IOException {
+    public RunResult admin(String... params) throws IllegalArgumentException, IOException {
         File workingDir = new File(".");
         String[] cmd = new String[] { WhiskProperties.python, new File(cliDir, adminBinaryName).toString() };
+
+        //if (authKey != null && authKey != "")
+        //    cmd = Util.concat(cmd, "--auth", authKey);
+
         return TestUtils.runCmd(DONTCARE_EXIT, workingDir, TestUtils.logger, null, Util.concat(cmd, params));
     }
 
@@ -996,7 +997,7 @@ public class WskCli {
      * Create a user. The caller is responsible for checking success upon which
      * stdout contains the authKey.
      */
-    public static RunResult createUser(String subject) throws Exception {
+    public RunResult createUser(String subject) throws Exception {
         return admin("user", "create", subject);
     }
 

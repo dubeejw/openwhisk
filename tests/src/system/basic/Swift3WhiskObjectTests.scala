@@ -60,7 +60,7 @@ class Swift3WhiskObjectTests
                     activation.fields("response").asJsObject.fields("success") should be(true.toJson)
 
                     // should have a field named "activationId" which is the date action's activationId
-                    activation.fields("response").asJsObject.fields("result").asJsObject.fields("activationId").toString.length should be >= 32
+                    activation.fields("activationId").toString.length should be >= 32
 
                     // check for "date" field that comes from invoking the date action
                     activation.fieldPathExists("response", "result", "response", "result", "date") should be(true)
@@ -90,7 +90,7 @@ class Swift3WhiskObjectTests
                     activation.fields("response").asJsObject.fields("success") should be(true.toJson)
 
                     // should have a field named "activationId" which is the date action's activationId
-                    activation.fields("response").asJsObject.fields("result").asJsObject.fields("activationId").toString.length should be >= 32
+                    activation.fields("activationId").toString.length should be >= 32
 
                     // should result in an activation for triggerName
                     val triggerActivations = wsk.activation.pollFor(1, Some(triggerName), retries = 20)

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.Properties;
+import java.lang.System.*;
 
 /**
  * Properties that describe a whisk installation
@@ -107,6 +108,20 @@ public class WhiskProperties {
 
         System.out.format("deploy target %s\n", deployTarget != null ? deployTarget : "not defined");
         System.out.format("test router? %s\n", testRouter);
+    }
+
+    /**
+     * The path to the Go CLI executable.
+     */
+    public static String getGoCLIPath() {
+        return getGoCLIDir() + "/wsk";
+    }
+
+    /**
+     * The path to the Go CLI directory.
+     */
+    public static String getGoCLIDir() {
+        return whiskHome + "/bin/go-cli";
     }
 
     public static File getFileRelativeToWhiskHome(String name) {

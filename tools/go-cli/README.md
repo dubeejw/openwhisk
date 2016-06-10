@@ -1,15 +1,9 @@
-To build the wsk CLI run ant buildGoCLI from this directory.
+To build the wsk CLI run the following command from the OpenWhisk home directory
 
-$ cd tools/go-cli
-$ ant buildGoCLI
+$ gradle :tools:go-cli:distDocker
 
-The build will produce the cli in ../bin/go-cli/$platform/$architecture/wsk
-
-The $platform is linux, mac, or windows.
-
-The $architecture is 386, amd64, arm, arm64, etc.
+The build will produce the cli in ../bin/go-cli/wsk
 
 To get the help run wsk --help
 
 The WSK_CLI_DEBUG can to be used set to "true" to provide debug information.
-

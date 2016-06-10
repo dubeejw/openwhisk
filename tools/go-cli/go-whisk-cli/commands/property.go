@@ -29,6 +29,7 @@ import (
     "github.com/spf13/cobra"
 
     "../../go-whisk/whisk"
+    "strconv"
 )
 
 var CLI_BUILD_TIME string = time.Now().Format("2006-01-02T15:04:05-07:00")
@@ -42,6 +43,7 @@ var Properties struct {
     CLIVersion string
     Namespace  string
     PropsFile  string
+    Insecure   bool
 }
 
 const DefaultAuth       string = ""
@@ -51,6 +53,7 @@ const DefaultAPIBuild   string = ""
 const DefaultAPIBuildNo string = ""
 const DefaultNamespace  string = "_"
 const DefaultPropsFile  string = "~/.wskprops"
+const DefaultInsecure   bool = false
 
 var propertyCmd = &cobra.Command{
     Use:   "property",
@@ -118,6 +121,21 @@ var propertySetCmd = &cobra.Command{
 
             props["NAMESPACE"] = namespace
             okMsg = fmt.Sprintf("ok: whisk namespace set to '%s'", namespace)
+        }
+
+        if insecureStr := flags.property.insecureSet; len(insecureStr) > 0 {
+            insecureBool, err := strconv.ParseBool(insecureStr)
+
+            if err != nil {
+                whisk.Debug(whisk.DbgError, "strconv.ParseBool(%s) failed: %s\n", err)
+                errStr := fmt.Sprintf("Insecure must be of type bool: %s", insecureStr, err)
+                werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+                    whisk.NO_DISPLAY_USAGE)
+                return werr
+            }
+
+            props["INSECURE"] = strconv.FormatBool(insecureBool)
+            okMsg = fmt.Sprintf("ok: whisk set to '%t'", insecureBool)
         }
 
         err = writeProps(Properties.PropsFile, props)
@@ -198,6 +216,12 @@ var propertyUnsetCmd = &cobra.Command{
             return werr
         }
 
+        if flags.property.insecure {
+            delete(props, "INSECURE")
+            okMsg = fmt.Sprint("ok: whisk insecure deleted")
+                okMsg += fmt.Sprintf("; the default value of '%t' will be used.\n", DefaultInsecure)
+        }
+
         fmt.Println(okMsg)
         if err = loadProperties(); err != nil {
             whisk.Debug(whisk.DbgError, "loadProperties() failed: %s\n", err)
@@ -262,6 +286,10 @@ var propertyGetCmd = &cobra.Command{
             }
         }
 
+        if flags.property.all || flags.property.insecure {
+            fmt.Printf("whisk insecure\t\t%t\n", Properties.Insecure)
+        }
+
         return nil
     },
 }
@@ -281,17 +309,20 @@ func init() {
     propertyGetCmd.Flags().BoolVar(&flags.property.apibuildno, "apibuildno", false, "whisk API build number")
     propertyGetCmd.Flags().BoolVar(&flags.property.cliversion, "cliversion", false, "whisk CLI version")
     propertyGetCmd.Flags().BoolVar(&flags.property.namespace, "namespace", false, "authorization key")
+    propertyGetCmd.Flags().BoolVar(&flags.property.insecure, "insecure", false, "bypass certificate checking")
     propertyGetCmd.Flags().BoolVar(&flags.property.all, "all", false, "all properties")
 
     propertySetCmd.Flags().StringVarP(&flags.global.auth, "auth", "u", "", "authorization key")
     propertySetCmd.Flags().StringVar(&flags.property.apihostSet, "apihost", "", "whisk API host")
     propertySetCmd.Flags().StringVar(&flags.property.apiversionSet, "apiversion", "", "whisk API version")
     propertySetCmd.Flags().StringVar(&flags.property.namespaceSet, "namespace", "", "whisk namespace")
+    propertySetCmd.Flags().StringVar(&flags.property.insecureSet, "insecure", "", "bypass certificate checking")
 
     propertyUnsetCmd.Flags().BoolVar(&flags.property.auth, "auth", false, "authorization key")
     propertyUnsetCmd.Flags().BoolVar(&flags.property.apihost, "apihost", false, "whisk API host")
     propertyUnsetCmd.Flags().BoolVar(&flags.property.apiversion, "apiversion", false, "whisk API version")
     propertyUnsetCmd.Flags().BoolVar(&flags.property.namespace, "namespace", false, "whisk namespace")
+    propertyUnsetCmd.Flags().BoolVar(&flags.property.insecure, "insecure", false, "bypass certificate checking")
 
 }
 
@@ -304,6 +335,7 @@ func setDefaultProperties() {
     Properties.APIVersion = DefaultAPIVersion
     Properties.CLIVersion = CLI_BUILD_TIME
     Properties.PropsFile = DefaultPropsFile
+    Properties.Insecure = DefaultInsecure
 }
 
 func getPropertiesFilePath() (propsFilePath string, werr error) {
@@ -335,6 +367,8 @@ func loadProperties() error {
     setDefaultProperties()
 
     Properties.PropsFile, err = getPropertiesFilePath()
+
+    // Use default properties if property file not found
     if err != nil {
         return nil
         //whisk.Debug(whisk.DbgError, "getPropertiesFilePath() failed: %s\n", err)
@@ -383,6 +417,15 @@ func loadProperties() error {
         Properties.Namespace = namespace
     }
 
+    if insecureStr, hasProp := props["INSECURE"]; hasProp {
+        insecureBool, err := strconv.ParseBool(insecureStr)
+
+        if err == nil {
+            Properties.Insecure = insecureBool
+        }
+
+    }
+
     return nil
 }
 
@@ -424,8 +467,18 @@ func parseConfigFlags(cmd *cobra.Command, args []string) error {
     if flags.global.debug {
         whisk.SetDebug(true)
     }
+
     if flags.global.verbose {
         whisk.SetVerbose(true)
+    }
+
+    if auth := flags.global.auth; len(auth) > 0 {
+        Properties.Auth = auth
+        client.Config.AuthToken = auth
+    }
+
+    if flags.global.insecure {
+        Properties.Insecure = flags.global.insecure
     }
 
     return nil
