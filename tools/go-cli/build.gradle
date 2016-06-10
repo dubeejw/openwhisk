@@ -1,0 +1,75 @@
+ext.dockerImageName = "whisk/go-cli-test"
+ext.dockerContainerName = "go-cli-test"
+apply from: "../../docker.gradle"
+
+ant.condition(property: "family", value: "linux") {
+    os(family: "unix")
+}
+
+ant.condition(property: "family", value: "mac") {
+    os(family: "mac")
+}
+
+ant.condition(property: "arch", value: "amd64") {
+    os(arch: "amd64")
+}
+
+ant.condition(property: "arch", value: "amd64") {
+    os(arch: "x86_64")
+}
+
+ant.condition(property: "arch", value: "386") {
+    os(arch: "386")
+}
+
+ant.condition(property: "arch", value: "386") {
+    os(arch: "i386")
+}
+
+ant.condition(property: "arch", value: "386") {
+    os(arch: "x86_32")
+}
+
+task removeBinary(type: Delete) {
+    delete "${projectDir}/../../bin/go-cli"
+    delete "${projectDir}/wsk"
+}
+
+task distBinary(dependsOn: [removeBinary, distDocker]) << {
+
+    run(dockerBinary + ["rm", "-f", dockerContainerName], true)
+
+    run(["rm", "-rf", "${projectDir}/../../bin/go-cli/"], true)
+    run(["mkdir", "${projectDir}/../../bin/go-cli/"])
+
+    run(dockerBinary + ["run", "--name", dockerContainerName, dockerImageName + ":" + dockerImageTag])
+
+    if (ant.properties.family == "linux") {
+        if (ant.properties.arch == "amd64") {
+            run(dockerBinary + ["cp", dockerContainerName + ":/src/github.com/go-whisk-cli/linux/amd64/wsk", "${projectDir}/../../bin/go-cli/wsk"])
+        } else if (ant.properties.arch == "386") {
+            run(dockerBinary + [dockerBinary, "cp", dockerContainerName + ":/src/github.com/go-whisk-cli/linux/386/wsk", projectDir + "/../../bin/go-cli/wsk"])
+        }
+    }
+
+    if (ant.properties.family == "mac") {
+        if (ant.properties.arch == "amd64") {
+            run(dockerBinary + [dockerBinary, "cp", dockerContainerName + ":/src/github.com/go-whisk-cli/mac/amd64/wsk", "${projectDir}/../../bin/go-cli/wsk"])
+        } else if (ant.properties.arch == "386") {
+            run(dockerBinary + [dockerBinary, "cp", dockerContainerName + ":/src/github.com/go-whisk-cli/mac/386/wsk", "${projectDir}/../../bin/go-cli/wsk"])
+        }
+    }
+
+    run(dockerBinary + ["rm", "-f", dockerContainerName])
+}
+
+distDocker.finalizedBy(distBinary)
+
+def run(cmd, ignoreError = false) {
+    println("Executing '${cmd.join(" ")}'")
+    def proc = cmd.execute()
+    proc.waitFor()
+    if(!ignoreError && proc.exitValue() != 0) {
+        println("Command '${cmd.join(" ")}' failed with exitCode ${proc.exitValue()}")
+    }
+}

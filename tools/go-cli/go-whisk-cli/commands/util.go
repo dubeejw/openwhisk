@@ -31,6 +31,7 @@ import (
     "compress/gzip"
     "archive/zip"
     "strconv"
+    "encoding/json"
 )
 
 type qualifiedName struct {
@@ -213,7 +214,7 @@ func parseKeyValueArray(args []string) ([]whisk.KeyValue, error) {
 
     return parsed, nil
 }
-
+/*
 func parseParameters(args []string) (whisk.Parameters, error) {
     parameters := whisk.Parameters{}
     parsedArgs, err := parseKeyValueArray(args)
@@ -223,6 +224,126 @@ func parseParameters(args []string) (whisk.Parameters, error) {
     }
     parameters = whisk.Parameters(parsedArgs)
     return parameters, nil
+}*/
+
+
+func isJSON(s string) bool {
+    var js map[string]interface{}
+    return json.Unmarshal([]byte(s), &js) == nil
+
+}
+
+func parseParameters2(args []string) (*json.RawMessage, error) {
+    var res string
+
+    if len(args) == 0 {
+        return nil, nil
+    }
+
+    res = "{"
+
+    if len(args)%2 != 0 {
+        whisk.Debug(whisk.DbgError, "Number of arguments (%d) must be an even number; args: %#v\n", len(args), args)
+        err := whisk.MakeWskError(
+            errors.New("key|value arguments must be submitted in comma-separated pairs; keys or values with spaces must be quoted"),
+            whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE )
+        return nil, err
+    }
+
+    for i := 0; i < len(args); i += 2 {
+        res = res + "\"" + args[i] + "\": "
+
+        if ((len(args[i + 1]) > 0) && (isJSON(args[i + 1]) || (args[i + 1][0] == '[' && args[i + 1][len(args[i + 1]) - 1] == ']') ||
+        (args[i + 1][0] == '"' && args[i + 1][len(args[i + 1]) - 1] == '"'))) {
+            res = res + args[i+1]
+        } else {
+
+            _, err := strconv.Atoi(args[i + 1])
+
+            if err == nil {
+                res = res + args[i + 1]
+            } else {
+                res = res + "\"" + args[i + 1] + "\""
+            }
+
+        }
+
+        if i < len(args) - 3 {
+            res = res + ", "
+        }
+    }
+
+    res = res + "}"
+
+    res = strings.Replace(res, "\n", "\\n", -1)
+
+    data := []byte(res)
+    return (*json.RawMessage)(&data), nil
+    //return []byte(res), nil
+}
+
+func parseParameters3(args []string) (*json.RawMessage, error) {
+    var res string
+
+    if len(args) == 0 {
+        whisk.Debug(whisk.DbgInfo, "parseParameters3: no args\n")
+
+        return nil, nil
+    }
+
+    if len(args)%2 != 0 {
+        whisk.Debug(whisk.DbgError, "Number of arguments (%d) must be an even number; args: %#v\n", len(args), args)
+        err := whisk.MakeWskError(
+            errors.New("key|value arguments must be submitted in comma-separated pairs; keys or values with spaces must be quoted"),
+            whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE )
+        return nil, err
+    }
+
+    for i := 0; i < len(args); i += 2 {
+        res = res + "{\"key\": \"" + args[i] + "\", "
+
+        if ((len(args[i + 1]) > 0) && (isJSON(args[i + 1]) || (args[i + 1][0] == '[' && args[i + 1][len(args[i + 1]) - 1] == ']') ||
+        (args[i + 1][0] == '"' && args[i + 1][len(args[i + 1]) - 1] == '"'))) {
+            res = res + "\"value\": " + args[i+1] + "}"
+        } else {
+            _, err := strconv.Atoi(args[i + 1])
+
+            if err == nil {
+                res = res + "\"value\": " + args[i + 1] + "}"
+            } else {
+                res = res + "\"value\": \"" + args[i + 1] + "\"}"
+            }
+        }
+
+        if i < len(args) - 3 {
+            res = res + ", "
+        }
+    }
+
+    res = "[" + res + "]"
+
+    res = strings.Replace(res, "\n", "\\n", -1)
+
+    /*for i := 0; i < len(args); i += 2 {
+        res = res + "\"key\": \"" + args[i] + "\", "
+
+        if (isJSON(args[i + 1]) || (args[i + 1][0] == '[' && args[i + 1][len(args[i + 1]) - 1] == ']') ||
+        (args[i + 1][0] == '"' && args[i + 1][len(args[i + 1]) - 1] == '"')) {
+            res = res + "\"value\": " + args[i+1]
+        } else {
+            res = res + "\"value\": \"" + args[i + 1] + "\""
+        }
+
+        if i < len(args) - 3 {
+            res = res + ", "
+        }
+    }
+
+    res = res + "}]"*/
+
+    data := []byte(res)
+    return (*json.RawMessage)(&data), nil
+    //return []byte(res), nil
 }
 
 func parseAnnotations(args []string) (whisk.Annotations, error) {

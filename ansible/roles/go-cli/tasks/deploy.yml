@@ -1,0 +1,66 @@
+---
+# Tasks for handling Go CLI customization and publishing
+
+#- name: "Ensure go-cli directory exists"
+#  file:
+#    path: "{{ go_cli_conf_dir }}"
+#    state: directory
+
+#- name: "Remove existing go-cli build directory"
+#  local_action: shell "rm" "-rf" "{{ openwhisk_home }}/bin/go-cli/wsk"
+#  ignore_errors: yes
+
+#- name: "Create go-cli build directory"
+#  local_action: shell "mkdir" "{{ openwhisk_home }}/bin/go-cli/"
+#  ignore_errors: yes
+
+#- name: "Pull the {{ docker_image_tag }} image of go-cli"
+#  shell: "docker pull {{ docker_registry }}whisk/go-cli:{{ docker_image_tag }}"
+#  when: docker_registry != ""
+
+#- name: "Build Docker image"
+#  shell: "{{ openwhisk_home }}/tools/docker/dockerWithRetry.sh 60 build --build-arg BUILDTIME={{ whisk.version.date }} -t whisk/go-cli {{ openwhisk_home }}/tools/go-cli"
+#  shell: "docker build --build-arg BUILDTIME={{ whisk.version.date }} -t {{ docker_registry }}whisk/go-cli:{{ docker_image_tag }} -f {{ openwhisk_home }}/tools/go-cli/Dockerfile {{ openwhisk_home }}/tools/go-cli"
+
+#- name: "Remove go-cli from Docker"
+#  shell: "docker rm -f go-cli"
+#  ignore_errors: yes
+  
+#- name: "Run Docker"
+#  shell: "docker run --name go-cli {{ docker_registry }}whisk/go-cli:{{ docker_image_tag }}"
+
+#- name: "Remove existing go-cli binaries"
+#  local_action: shell "rm" "-rf" "{{ openwhisk_home }}/bin/go-cli"
+
+#- name: "Create go-cli binary directory"
+#  local_action: shell "mkdir" "{{ openwhisk_home }}/bin/go-cli"
+
+#- name: "Copy the go-cli binaries from the Docker container"
+#  shell: "docker cp go-cli:/src/github.com/go-whisk-cli/linux '{{ openwhisk_home }}/bin/go-cli'"
+
+#- name: "Copy go-cli binary to bin folder"
+#  shell: "docker cp go-cli:/src/github.com/go-whisk-cli/linux/amd64/wsk '{{ openwhisk_home }}/bin/go-cli/wsk'"
+#  when: (ansible_os_family == "Debian" and (ansible_userspace_architecture == "amd64" or ansible_userspace_architecture == "x86_64"))
+
+#- name: "Copy go-cli binary to bin folder"
+#  shell: "docker cp go-cli:/src/github.com/go-whisk-cli/linux/386/wsk '{{ openwhisk_home }}/bin/go-cli/wsk'"
+#  when: (ansible_os_family == "Debian" and (ansible_userspace_architecture == "386" or ansible_userspace_architecture == "i386" or ansible_userspace_architecture == "x86_32"))
+
+#- name: "Copy go-cli binary to bin folder"
+#  shell: "docker cp go-cli:/src/github.com/go-whisk-cli/mac/amd64/wsk '{{ openwhisk_home }}/bin/go-cli/wsk'"
+#  when: (ansible_os_family == "Darwin" and (ansible_userspace_architecture == "amd64" or ansible_userspace_architecture == "x86_64"))
+
+#- name: "Copy go-cli binary to bin folder"
+#  shell: "docker cp go-cli:/src/github.com/go-whisk-cli/mac/386/wsk '{{ openwhisk_home }}/bin/go-cli/wsk'"
+#  when: (ansible_os_family == "Darwin" and (ansible_userspace_architecture == "386" or ansible_userspace_architecture == "i386" or ansible_userspace_architecture == "x86_32"))
+
+#- name: "Remove go-cli from Docker"
+#  shell: "docker rm -f go-cli"
+#  ignore_errors: yes
+
+#- name: remove go-cli container after publishing
+#  docker:
+#    name: go-cli
+#    image: "{{ docker_registry }}whisk/go-cli:{{ docker_image_tag }}"
+#    state: absent
+

@@ -38,15 +38,7 @@
         <mkdir dir="${openwhisk.home}/bin/go-cli" />
         <exec executable="docker" failonerror="true">
             <arg line="${docker.tls.cmd}" />
-            <arg line="cp go-cli:/src/github.com/go-whisk-cli/windows '${openwhisk.home}/bin/go-cli/windows'" />
-        </exec>
-        <exec executable="docker" failonerror="true">
-            <arg line="${docker.tls.cmd}" />
-            <arg line="cp go-cli:/src/github.com/go-whisk-cli/mac '${openwhisk.home}/bin/go-cli/mac'" />
-        </exec>
-        <exec executable="docker" failonerror="true">
-            <arg line="${docker.tls.cmd}" />
-            <arg line="cp go-cli:/src/github.com/go-whisk-cli/linux '${openwhisk.home}/bin/go-cli/linux'" />
+            <arg line="cp go-cli:/src/github.com/go-whisk-cli/linux/amd64/wsk '${openwhisk.home}/bin/go-cli/wsk'" />
         </exec>
         <exec executable="docker" failonerror="false">
             <arg line="${docker.tls.cmd}" />
@@ -55,4 +47,3 @@
     </target>
 
 </project>
-

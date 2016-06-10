@@ -719,7 +719,8 @@ trait WaitFor {
 }
 
 object Wsk {
-    private val cliDir = WhiskProperties.getFileRelativeToWhiskHome("bin")
+    private val goCLIPath = WhiskProperties.whiskHome + "/bin/go-cli/wsk"
+    private val goCLIDir = WhiskProperties.whiskHome + "/bin/go-cli"
     private val binaryName = "wsk"
 
     /** What is the path to a downloaded CLI? **/
@@ -733,8 +734,8 @@ object Wsk {
             val f = new File(binary)
             assert(f.exists, s"did not find $f")
         } else {
-            val dir = cliDir
-            val exec = new File(dir, binaryName)
+            val dir = new File(goCLIDir)
+            val exec = new File(goCLIPath)
             assert(dir.exists, s"did not find $dir")
             assert(exec.exists, s"did not find $exec")
         }
@@ -743,7 +744,7 @@ object Wsk {
     def baseCommand = if (WhiskProperties.useCliDownload()) {
         Buffer(getDownloadedCliPath)
     } else {
-        Buffer(WhiskProperties.python, new File(cliDir, binaryName).toString)
+        Buffer(new File(goCLIPath).toString)
     }
 }
 
@@ -767,7 +768,7 @@ sealed trait RunWskCmd {
         val args = baseCommand
         if (verbose) args += "--verbose"
         if (showCmd) println(params.mkString(" "))
-        val rr = TestUtils.runCmd(DONTCARE_EXIT, workingDir, TestUtils.logger, env, args ++ params: _*)
+        val rr = TestUtils.runCmd(DONTCARE_EXIT, workingDir, TestUtils.logger, sys.env ++ env, args ++ params: _*)
         rr.validateExitCode(expectedExitCode)
         rr
     }
