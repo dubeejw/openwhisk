@@ -255,7 +255,6 @@ func (s *ActionService) Delete(actionName string) (*http.Response, error) {
 }
 
 func (s *ActionService) Invoke(actionName string, payload *json.RawMessage, blocking bool) (*Activation, *http.Response, error) {
-
     actionName = strings.Replace(url.QueryEscape(actionName), "+", " ", -1)
     route := fmt.Sprintf("actions/%s?blocking=%t", actionName, blocking)
     Debug(DbgInfo, "HTTP route: %s\n", route)
@@ -269,15 +268,17 @@ func (s *ActionService) Invoke(actionName string, payload *json.RawMessage, bloc
         return nil, nil, whiskErr
     }
 
-    a := new(Activation)
-    resp, err := s.client.Do(req, &a)
+    activation := new(Activation)
+    resp, err := s.client.Do(req, &activation)
+
     if err != nil {
         Debug(DbgError, "s.client.Do() error - HTTP req %s; error '%s'\n", req.URL.String(), err)
         errMsg := fmt.Sprintf("Request failure: %s", err)
         whiskErr := MakeWskErrorFromWskError(errors.New(errMsg), err, EXITCODE_ERR_NETWORK, DISPLAY_MSG,
             NO_DISPLAY_USAGE)
-        return nil, resp, whiskErr
+
+        return activation, resp, whiskErr
     }
 
-    return a, resp, nil
+    return activation, resp, nil
 }

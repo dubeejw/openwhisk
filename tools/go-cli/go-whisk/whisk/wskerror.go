@@ -25,10 +25,12 @@ const EXITCODE_ERR_USAGE        int = 2
 const EXITCODE_ERR_NETWORK      int = 3
 const EXITCODE_ERR_HTTP_RESP    int = 4
 
-const DISPLAY_MSG bool      = true
-const NO_DISPLAY_MSG bool   = false
-const DISPLAY_USAGE bool    = true
-const NO_DISPLAY_USAGE bool = false
+const DISPLAY_MSG       bool = true
+const NO_DISPLAY_MSG    bool = false
+const DISPLAY_USAGE     bool = true
+const NO_DISPLAY_USAGE  bool = false
+const DISPLAY_PREFIX    bool = true
+const NO_DISPLAY_PREFIX bool = false
 
 type WskError struct {
     RootErr         error
@@ -36,53 +38,102 @@ type WskError struct {
     DisplayMsg      bool    // When true, the error message should be displayed to console
     MsgDisplayed    bool    // When true, the error message has already been displayed, don't display it again
     DisplayUsage    bool    // When true, the CLI usage should be displayed before exiting
+    DisplayPrefix   bool    // When true, the error message will be prefixed with "error: "
 }
 
-func (e WskError) Error() string {
-    return fmt.Sprintf("error: %s", e.RootErr.Error())
+func (err WskError) Error() string {
+    if err.DisplayPrefix {
+        return fmt.Sprintf("error: %s", err.RootErr.Error())
+    } else {
+        return fmt.Sprintf(err.RootErr.Error())
+    }
 }
 
-// Instantiate a WskError structure
-// Parameters:
-//  error   - RootErr. object implementing the error interface
-//  int     - ExitCode.  Used if error object does not have an exit code OR if ExitCodeOverride is true
-//  bool    - DisplayMsg.  If true, the error message should be displayed on the console
-//  bool    - DisplayUsage.  If true, the command usage syntax/help should be displayed on the console
-//  bool    - MsgDisplay.  If true, the error message has been displayed on the console
-func MakeWskError (e error, ec int, flags ...bool ) (we *WskError) {
-    we = &WskError{RootErr: e, ExitCode: ec, DisplayMsg: false, DisplayUsage: false, MsgDisplayed: false}
-    if len(flags) > 0 { we.DisplayMsg = flags[0] }
-    if len(flags) > 1 { we.DisplayUsage = flags[1] }
-    if len(flags) > 2 { we.MsgDisplayed = flags[2] }
-    return we
+/*
+Instantiate a WskError structure
+Parameters:
+    error   - RootErr. object implementing the error interface
+    int     - ExitCode.  Used if error object does not have an exit code OR if ExitCodeOverride is true
+    bool    - DisplayMsg.  If true, the error message should be displayed on the console
+    bool    - DisplayUsage.  If true, the command usage syntax/help should be displayed on the console
+    bool    - MsgDisplayed.  If true, the error message has been displayed on the console
+    bool    - DisplayPreview.  If true, the error message will be prefixed with "error: "
+*/
+func MakeWskError (err error, errorCode int, flags ...bool ) (whiskError *WskError) {
+    whiskError = &WskError{
+        RootErr: err,
+        ExitCode: errorCode,
+        DisplayMsg: false,
+        DisplayUsage: false,
+        MsgDisplayed: false,
+        DisplayPrefix: true,
+    }
+
+    if len(flags) > 0 { whiskError.DisplayMsg = flags[0] }
+    if len(flags) > 1 { whiskError.DisplayUsage = flags[1] }
+    if len(flags) > 2 { whiskError.MsgDisplayed = flags[2] }
+    if len(flags) > 3 { whiskError.DisplayPrefix = flags[3] }
+
+    return whiskError
 }
 
-// Instantiate a WskError structure
-// Parameters:
-//  error   - RootErr. object implementing the error interface
-//  WskError -WskError being wrappered.  It's exitcode will be used as this WskError's exitcode.  Ignored if nil
-//  int     - ExitCode.  Used if error object is nil or if the error object is not a WskError
-//  bool    - DisplayMsg.  If true, the error message should be displayed on the console
-//  bool    - DisplayUsage.  If true, the command usage syntax/help should be displayed on the console
-//  bool    - MsgDisplay.  If true, the error message has been displayed on the console
-func MakeWskErrorFromWskError (e error, werr error, ec int, flags ...bool ) (we *WskError) {
-    var exitCode int = ec
+/*
+Instantiate a WskError structure
+Parameters:
+    error   - RootErr. object implementing the error interface
+    WskError -WskError being wrappered.  It's exitcode will be used as this WskError's exitcode.  Ignored if nil
+    int     - ExitCode.  Used if error object is nil or if the error object is not a WskError
+    bool    - DisplayMsg.  If true, the error message should be displayed on the console
+    bool    - DisplayUsage.  If true, the command usage syntax/help should be displayed on the console
+    bool    - MsgDisplayed.  If true, the error message has been displayed on the console
+    bool    - DisplayPrefix.  If true, the error message will be prefixed with "error: "
+*/
+func MakeWskErrorFromWskError (e error, werr error, ec int, flags ...bool) (we *WskError) {
+    exitCode := ec
 
-    // Pull exit code from wsk error if it exists
-    if werr !=nil {
-        // werr can either be a pointer reference
-        if we, ok := werr.(*WskError); ok {
-            exitCode = we.ExitCode
-            flags[1] = we.DisplayUsage || flags[1]  // Display usage syntax if either error requests it
+    // Get the exit code, and flags from the existing Whisk error
+    if werr != nil {
+
+        // Get the Whisk error from the Error object
+        switch errorType := werr.(type) {
+            case *WskError:
+                we = errorType
+            case WskError:
+                we = &errorType
         }
 
-        // ... or a value
-        if we, ok := werr.(WskError); ok {
-            exitCode = we.ExitCode
-            flags[1] = we.DisplayUsage || flags[1]  // Display usage syntax if either error requests it
-        }
+        exitCode, flags = getWhiskErrorProperties(we, flags...)
     }
 
     return MakeWskError(e, exitCode, flags...)
+}
+
+func getWhiskErrorProperties(whiskError *WskError, flags ...bool) (int, []bool) {
+
+    if len(flags) > 0 {
+        flags[0] = whiskError.DisplayMsg
+    } else {
+        flags = append(flags, whiskError.DisplayMsg)
+    }
+
+    if len(flags) > 1 {
+        flags[1] = whiskError.DisplayUsage || flags[1]
+    } else {
+        flags = append(flags, whiskError.DisplayUsage)
+    }
+
+    if len(flags) > 2 {
+        flags[2] = whiskError.MsgDisplayed || flags[2]
+    } else {
+        flags = append(flags, whiskError.MsgDisplayed)
+    }
+
+    if len(flags) > 3 {
+        flags[3] = whiskError.DisplayPrefix || flags[3]
+    } else {
+        flags = append(flags, whiskError.DisplayPrefix)
+    }
+
+    return whiskError.ExitCode, flags
 }
 
