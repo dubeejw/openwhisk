@@ -179,7 +179,7 @@ var triggerCreateCmd = &cobra.Command{
                 return werr
             }
 asdf
-            testsetest
+            testsetestaiurghiuaehrgsergiu
             feedParams = flags.common.param
             fullFeedName = fmt.Sprintf("/%s/%s", feedqName.namespace, feedqName.entityName)
 
