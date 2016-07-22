@@ -178,7 +178,7 @@ var triggerCreateCmd = &cobra.Command{
                 werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
                 return werr
             }
-asdf
+asdfawfasdf
             testsetestaiurghiuaehrgsergiuevwev
             feedParams = flags.common.param
             fullFeedName = fmt.Sprintf("/%s/%s", feedqName.namespace, feedqName.entityName)
