@@ -317,4 +317,11 @@ class WskBasicTests
         wsk.namespace.get(expectedExitCode = SUCCESS_EXIT)(WskProps()).
             stdout should include("default")
     }
+
+    it should "not list entities with an invalid namespace" in {
+        val namespace = "fakeNamespace"
+        val stdout = wsk.namespace.get(Seq(namespace), expectedExitCode = ANY_ERROR_EXIT).stdout
+
+        stdout should include (s"Unable to obtain namespace entities for namespace '${namespace}'")
+    }
 }
