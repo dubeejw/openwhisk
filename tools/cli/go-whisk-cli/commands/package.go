@@ -78,10 +78,10 @@ var packageBindCmd = &cobra.Command{
     // e.g.   --p arg1,arg2 --p arg3,arg4   ->  [arg1, arg2, arg3, arg4]
 
     whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
-    parameters, err := getJSONFromArguments(flags.common.param, true)
+    parameters, err := getJSONFromStrings(flags.common.param, true)
 
     if err != nil {
-      whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.param, err)
+      whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.param, err)
       errStr := fmt.Sprintf(
         wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
           map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
@@ -93,10 +93,10 @@ var packageBindCmd = &cobra.Command{
     // The 1 or more --annotation arguments have all been combined into a single []string
     // e.g.   --a arg1,arg2 --a arg3,arg4   ->  [arg1, arg2, arg3, arg4]
     whisk.Debug(whisk.DbgInfo, "Parsing annotations: %#v\n", flags.common.annotation)
-    annotations, err := getJSONFromArguments(flags.common.annotation, true)
+    annotations, err := getJSONFromStrings(flags.common.annotation, true)
 
     if err != nil {
-      whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.annotation, err)
+      whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.annotation, err)
       errStr := fmt.Sprintf(
         wski18n.T("Invalid annotation argument '{{.annotation}}': {{.err}}",
           map[string]interface{}{"annotation": fmt.Sprintf("%#v",flags.common.annotation), "err": err}))
@@ -111,8 +111,8 @@ var packageBindCmd = &cobra.Command{
 
     p := &whisk.BindingPackage{
       Name:        bindQName.entityName,
-      Annotations: annotations,
-      Parameters:  parameters,
+      Annotations: annotations.(whisk.KeyValueArr),
+      Parameters:  parameters.(whisk.KeyValueArr),
       Binding:     binding,
     }
 
@@ -168,10 +168,10 @@ var packageCreateCmd = &cobra.Command{
     }
 
     whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
-    parameters, err := getJSONFromArguments(flags.common.param, true)
+    parameters, err := getJSONFromStrings(flags.common.param, true)
 
     if err != nil {
-      whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.param, err)
+      whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.param, err)
       errStr := fmt.Sprintf(
         wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
           map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
@@ -180,10 +180,10 @@ var packageCreateCmd = &cobra.Command{
     }
 
     whisk.Debug(whisk.DbgInfo, "Parsing annotations: %#v\n", flags.common.annotation)
-    annotations, err := getJSONFromArguments(flags.common.annotation, true)
+    annotations, err := getJSONFromStrings(flags.common.annotation, true)
 
     if err != nil {
-      whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.annotation, err)
+      whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.annotation, err)
       errStr := fmt.Sprintf(
         wski18n.T("Invalid annotation argument '{{.annotation}}': {{.err}}",
           map[string]interface{}{"annotation": fmt.Sprintf("%#v",flags.common.annotation), "err": err}))
@@ -197,16 +197,16 @@ var packageCreateCmd = &cobra.Command{
         Name:        qName.entityName,
         Namespace:   qName.namespace,
         Publish:     shared,
-        Annotations: annotations,
-        Parameters:  parameters,
+        Annotations: annotations.(whisk.KeyValueArr),
+        Parameters:  parameters.(whisk.KeyValueArr),
       }
     } else {
       p = &whisk.SentPackageNoPublish{
         Name:        qName.entityName,
         Namespace:   qName.namespace,
         Publish:     shared,
-        Annotations: annotations,
-        Parameters:  parameters,
+        Annotations: annotations.(whisk.KeyValueArr),
+        Parameters:  parameters.(whisk.KeyValueArr),
       }
     }
 
@@ -262,10 +262,10 @@ var packageUpdateCmd = &cobra.Command{
     }
 
     whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
-    parameters, err := getJSONFromArguments(flags.common.param, true)
+    parameters, err := getJSONFromStrings(flags.common.param, true)
 
     if err != nil {
-      whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.param, err)
+      whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.param, err)
       errStr := fmt.Sprintf(
         wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
           map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
@@ -274,9 +274,9 @@ var packageUpdateCmd = &cobra.Command{
     }
 
     whisk.Debug(whisk.DbgInfo, "Parsing annotations: %#v\n", flags.common.annotation)
-    annotations, err := getJSONFromArguments(flags.common.annotation, true)
+    annotations, err := getJSONFromStrings(flags.common.annotation, true)
     if err != nil {
-      whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.annotation, err)
+      whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.annotation, err)
       errStr := fmt.Sprintf(
         wski18n.T("Invalid annotation argument '{{.annotation}}': {{.err}}",
           map[string]interface{}{"annotation": fmt.Sprintf("%#v",flags.common.annotation), "err": err}))
@@ -290,16 +290,16 @@ var packageUpdateCmd = &cobra.Command{
         Name:        qName.entityName,
         Namespace:   qName.namespace,
         Publish:     shared,
-        Annotations: annotations,
-        Parameters:  parameters,
+        Annotations: annotations.(whisk.KeyValueArr),
+        Parameters:  parameters.(whisk.KeyValueArr),
       }
     } else {
       p = &whisk.SentPackageNoPublish{
         Name:        qName.entityName,
         Namespace:   qName.namespace,
         Publish:     shared,
-        Annotations: annotations,
-        Parameters:  parameters,
+        Annotations: annotations.(whisk.KeyValueArr),
+        Parameters:  parameters.(whisk.KeyValueArr),
       }
     }
 

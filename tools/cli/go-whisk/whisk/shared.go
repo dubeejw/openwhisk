@@ -18,10 +18,14 @@ package whisk
 
 import "encoding/json"
 
+
+
 type KeyValue struct {
-    Key   string        `json:"key,omitempty"`
-    Value interface{}   `json:"value"`     // Whisk permits empty values, do not add 'omitempty'
+    Key  string         `json:"key"`
+    Value interface{}   `json:"value"`
 }
+
+type KeyValueArr []KeyValue
 
 type KeyValues struct {
     Key     string `json:"key,omitempty"`

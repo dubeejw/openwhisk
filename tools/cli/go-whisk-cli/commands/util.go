@@ -33,6 +33,7 @@ import (
     "archive/zip"
     "encoding/json"
     "net/url"
+    "io/ioutil"
 )
 
 type qualifiedName struct {
@@ -130,145 +131,81 @@ func csvToQualifiedActions(artifacts string) ([]string) {
     return res
 }
 
-func isValidJSON(data string) (isValid bool, err error) {
-    var jsonInterface interface{}
-    err = json.Unmarshal([]byte(data), &jsonInterface)
-    isValid = (err == nil)
+func getJSONFromStrings(content []string, keyValueFormat bool) (interface{}, error) {
+    var keyValueArr whisk.KeyValueArr
+    var data map[string]interface{}
 
-    return isValid, err
-}
+    //fmt.Printf("%v\n", content)
+    for i := 0; i < len(content); i++ {
+        // TODO Change to debug info
+        //fmt.Println("content i:" + content[i])
 
-func getJSONFromArguments(args []string, keyValueFormat bool) (*json.RawMessage, error) {
-    var res string
-
-    if len(args) == 0 {
-        whisk.Debug(whisk.DbgInfo, "getJSONFromArguments(): No arguments provided.\n")
-        return nil, nil
-    }
-
-    if len(args) % 2 != 0 {
-        whisk.Debug(whisk.DbgError, "Number of arguments (%d) must be an even number; args: %#v\n", len(args), args)
-        err := whisk.MakeWskError(
-            errors.New(wski18n.T("Arguments must be comma separated, and must be quoted if they contain spaces.")),
-            whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE )
-        return nil, err
-    }
-
-    for i := 0; i < len(args); i += 2 {
-        key, value, err := getJSONKeyValueFromArguments(args[i], args[i + 1])
-        if (err != nil) {
-            whisk.Debug(whisk.DbgInfo, "The arguments are not valid JSON (key '%s' value '%s'): %s\n", args[i], args[i + 1], err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("Invalid arguments: {{.err}}",
-                    map[string]interface{}{"err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return nil, whiskErr
+        if err := json.Unmarshal([]byte(content[i]), &data); err != nil {
+            return whisk.KeyValueArr{}, err
         }
 
-        // At this point the key is a JSON string (already quoted), and the value is valid JSON
-        // as well (quoted if it's a JSON string)
-        if keyValueFormat {
-            res = res + fmt.Sprintf("{\"key\": %s, \"value\": %s}", key, value)
-        } else {
-            res = res + fmt.Sprintf("%s: %s", key, value)
-        }
-
-        if i < len(args) - 3 {
-            res = fmt.Sprintf("%s, ", res)
-        }
+        // TODO change to debug info
+        //fmt.Printf("data: %+v\n", data)
     }
 
     if keyValueFormat {
-        res = fmt.Sprintf("[%s]", res)
-    } else {
-        res = fmt.Sprintf("{%s}", res)
-    }
+        keys := make([]string, len(data))
+        values := make([]interface{}, len(data))
 
-    data := []byte(res)
+        j := 0
 
-    whisk.Debug(whisk.DbgInfo, "getJSONFromArguments: JSON: %s\n", res)
-    return (*json.RawMessage)(&data), nil
-}
+        for k, v := range data {
+            keys[j] = k
+            values[j] = v
 
-/*
- * Take two strings and ensure they are valid JSON.  Convert as needed
- * key   - Not expected to be valid JSON at all.  This is just a string
- * value - This is expected to be ether a JSON string (without quotes) or
- *         or a valid JSON object, array, quoted string, number, boolean, or null
- */
-func getJSONKeyValueFromArguments(key string, value string) (jsonKey string, jsonVal string, err error) {
-    //key = getEscapedString(key)
-    if jsonKey, err = makeJsonString(key); err != nil {
-        whisk.Debug(whisk.DbgInfo, "The key `%s` is invalid: %s\n", key, err)
-        errMsg := fmt.Sprintf(
-            wski18n.T("The argument `{{.arg}}` is invalid: {{.err}}",
-                map[string]interface{}{"arg": key, "err": err}))
-        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-            whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-        return jsonKey, jsonVal, whiskErr
-    }
+            keyValue := whisk.KeyValue{
+                Key:  keys[j],
+                Value: values[j],
+            }
 
-    isValid, err := isValidJSON(value)
-    if (len(value) == 0 || !isValid) {
-        if (appearsToBeJsonArray(value) || appearsToBeJsonObject(value)) {
-            whisk.Debug(whisk.DbgInfo, "The value `%s` is invalid JSON: %s\n", value, err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("The argument `{{.arg}}` is invalid JSON: {{.err}}",
-                    map[string]interface{}{"arg": value, "err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return jsonKey, jsonVal, whiskErr
-        } else {
-            whisk.Debug(whisk.DbgInfo, "Value '%s' is invalid JSON (err: %s) but does not appear to be JSON object or array, so assuming it is a JSON string\n", value, err)
-            jsonVal = fmt.Sprintf("\"%s\"", value)
+            // TODO change to debug info
+            //p, _ := json.Marshal(keyValue)
+            //s := string(p)
+            //fmt.Printf("JSON object: %s\n", s)
+
+            keyValueArr = append(keyValueArr, keyValue)
+
+            j++
         }
+
+        //fmt.Printf("%+v\n", keyValueArr)
+        return keyValueArr, nil
     } else {
-        jsonVal = value
+        return data, nil
     }
-
-    return jsonKey, jsonVal, nil
 }
 
-/*
- * Best effort attempt to convert a non-JSON string into a JSON string
- * See json.org for JSON string definition
- * 1. Escape all \ characters in the string, even double \\
- * 2. Escape all " (double quote) characters in the string
- * 3. Surround the string in double quotes
- */
-func makeJsonString(nonJsonStr string) (jsonStr string, whiskErr error) {
-    jsonStr = strings.Replace(nonJsonStr, "\\", "\\\\", -1)
-    jsonStr = strings.Replace(jsonStr, "\"", "\\\"", -1)
-    jsonStr = fmt.Sprintf("\"%s\"", jsonStr)
+func getFormattedJSON(key string, value string) (string) {
+    var res string
 
-    // Confirm that this is now a valid JSON string; if not return an error
-    if isValid, err := isValidJSON(jsonStr); !isValid {
-        whisk.Debug(whisk.DbgInfo, "Unable to convert `%s` into JSON string: %s\n", nonJsonStr, err)
-        errMsg := fmt.Sprintf(
-            wski18n.T("The argument `{{.arg}}` is invalid: {{.err}}",
-                map[string]interface{}{"arg": nonJsonStr, "err": err}))
-        whiskErr = whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-        return jsonStr, whiskErr
+    key = getEscapedJSON(key)
+
+    if isValidJSON(value) {
+        res = fmt.Sprintf("{\"%s\": %s}", key, value)
+    } else {
+        res = fmt.Sprintf("{\"%s\": \"%s\"}", key, value)
     }
 
-    return jsonStr, nil
+    return res
 }
 
-func appearsToBeJsonArray(jsonStr string) (isArray bool) {
-    if (len(jsonStr) > 0 && strings.HasPrefix(jsonStr, "[") && strings.HasSuffix(jsonStr, "]")) {
-        isArray = true
-    }
-    return isArray
+func getEscapedJSON(value string) (string) {
+    value = strings.Replace(value, "\\", "\\\\", -1)
+    value = strings.Replace(value, "\"", "\\\"", -1)
+
+    return value
 }
 
-func appearsToBeJsonObject(jsonStr string) (isObject bool) {
-    if (len(jsonStr) > 0 && strings.HasPrefix(jsonStr, "{") && strings.HasSuffix(jsonStr, "}")) {
-        isObject = true
-    }
-    return isObject
+func isValidJSON(value string) (bool) {
+    var jsonInterface interface{}
+    err := json.Unmarshal([]byte(value), &jsonInterface)
+    return err == nil
 }
-
 
 var boldString = color.New(color.Bold).SprintFunc()
 
@@ -401,20 +338,23 @@ func printArrayContents(arrStr []string) {
 
 func printPackageSummary(pkg *whisk.Package) {
     printEntitySummary(fmt.Sprintf("%7s", "package"), getFullName(pkg.Namespace, pkg.Name, ""),
-        getValueFromAnnotations(pkg.Annotations, "description"), getParamNamesFromAnnotations(pkg.Annotations))
+        getValueFromKeyValueArr(pkg.Annotations, "description"),
+        strings.Join(getKeysFromKeyValueArr(pkg.Parameters), ", "))
 
 
     if pkg.Actions != nil {
-        for _, a := range pkg.Actions {
-            printEntitySummary(fmt.Sprintf("%7s", "action"), getFullName(pkg.Namespace, pkg.Name, a.Name),
-                getValueFromAnnotations(a.Annotations, "description"), getParamNamesFromAnnotations(a.Annotations))
+        for _, action := range pkg.Actions {
+            printEntitySummary(fmt.Sprintf("%7s", "action"), getFullName(pkg.Namespace, pkg.Name, action.Name),
+                getValueFromKeyValueArr(action.Annotations, "description"),
+                strings.Join(getKeysFromKeyValueArr(action.Parameters), ", "))
         }
     }
 
     if pkg.Feeds != nil {
-        for _, f := range pkg.Feeds {
-            printEntitySummary(fmt.Sprintf("%7s", "feed  "), getFullName(pkg.Namespace, pkg.Name, f.Name),
-                getValueFromAnnotations(f.Annotations, "description"), getParamNamesFromAnnotations(f.Annotations))
+        for _, feed := range pkg.Feeds {
+            printEntitySummary(fmt.Sprintf("%7s", "feed  "), getFullName(pkg.Namespace, pkg.Name, feed.Name),
+                getValueFromKeyValueArr(feed.Annotations, "description"),
+                strings.Join(getKeysFromKeyValueArr(feed.Parameters), ", "))
         }
     }
 }
@@ -422,15 +362,15 @@ func printPackageSummary(pkg *whisk.Package) {
 func printActionSummary(action *whisk.Action) {
     printEntitySummary(fmt.Sprintf("%6s", "action"),
         getFullName(action.Namespace, "", action.Name),
-        getValueFromAnnotations(action.Annotations, "description"),
-        getParamNamesFromAnnotations(action.Annotations))
+        getValueFromKeyValueArr(action.Annotations, "description"),
+        strings.Join(getKeysFromKeyValueArr(action.Parameters), ", "))
 }
 
 func printTriggerSummary(trigger *whisk.TriggerFromServer) {
     printEntitySummary(fmt.Sprintf("%7s", "trigger"),
         getFullName(trigger.Namespace, "", trigger.Name),
-        getValueFromAnnotations(trigger.Annotations, "description"),
-        getParamNamesFromAnnotations(trigger.Annotations))
+        getValueFromKeyValueArr(trigger.Annotations, "description"),
+        strings.Join(getKeysFromKeyValueArr(trigger.Parameters), ", "))
 }
 
 func printRuleSummary(rule *whisk.Rule) {
@@ -481,54 +421,31 @@ type Param struct {
     Name string
 }
 
-func getParamNamesFromAnnotations(rawJSON *json.RawMessage) (string) {
-    var annotations []KeyRawValue
-    var parameters []Param
+func getKeysFromKeyValueArr(keyValueArr whisk.KeyValueArr) ([]string) {
     var res []string
-    var paramNames string
 
-    paramNames = getValueFromAnnotations(rawJSON, "parameters")
-
-    if len(paramNames) > 0 {
-        res = append(res, getValueFromAnnotations(rawJSON, "parameters"))
+    for i := 0; i < len(keyValueArr); i++ {
+        res = append(res, keyValueArr[i].Key)
     }
 
-    json.Unmarshal([]byte(*rawJSON), &annotations)
+    whisk.Debug(whisk.DbgInfo, "Got keys '%v' from '%v'\n", res, keyValueArr)
 
-    for _, annotation := range annotations {
-        if annotation.Key == "parameters" {
-            json.Unmarshal([]byte(*annotation.Value), &parameters)
-
-            for _, param := range parameters {
-                res = append(res, param.Name)
-            }
-        }
-    }
-
-    paramNames = strings.Join(res, ", ")
-
-    whisk.Debug(whisk.DbgInfo, "Got parameter names '%s' from annotations '%s'\n", paramNames,
-        string(*rawJSON))
-
-    return paramNames
+    return res
 }
 
-func getValueFromAnnotations(rawJSON *json.RawMessage, key string) (string) {
-    var annotations []KeyStringValue
-    var value string
+func getValueFromKeyValueArr(keyValueArr whisk.KeyValueArr, key string) (string) {
+    var res string
 
-    json.Unmarshal([]byte(*rawJSON), &annotations)
-
-    for _, annotation := range annotations {
-        if annotation.Key == key {
-            value = annotation.Value
+    for i := 0; i < len(keyValueArr); i++ {
+        if keyValueArr[i].Key == key {
+            res = keyValueArr[i].Value.(string)
             break
         }
     }
 
-    whisk.Debug(whisk.DbgInfo, "Got value '%s' for key '%s' from annotations '%s'\n", value, key, string(*rawJSON))
+    whisk.Debug(whisk.DbgInfo, "Got value '%v' from '%v'\n", res, keyValueArr)
 
-    return value
+    return res
 }
 
 func logoText() string {
@@ -833,4 +750,31 @@ func getURLBase(host string) (*url.URL, error)  {
     }
 
     return url, err
+}
+
+func readFile(filename string) (string, error) {
+    _, err := os.Stat(filename)
+    if err != nil {
+        whisk.Debug(whisk.DbgError, "os.Stat(%s) error: %s\n", filename, err)
+        errMsg := fmt.Sprintf(
+            wski18n.T("File '{{.name}}' is not a valid file or it does not exist: {{.err}}",
+                map[string]interface{}{"name": filename, "err": err}))
+        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_USAGE,
+            whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+
+        return "", whiskErr
+    }
+
+    file, err := ioutil.ReadFile(filename)
+    if err != nil {
+        whisk.Debug(whisk.DbgError, "os.ioutil.ReadFile(%s) error: %s\n", filename, err)
+        errMsg := fmt.Sprintf(
+            wski18n.T("Unable to read '{{.name}}': {{.err}}",
+                map[string]interface{}{"name": filename, "err": err}))
+        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+            whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+        return "", whiskErr
+    }
+
+    return string(file), nil
 }

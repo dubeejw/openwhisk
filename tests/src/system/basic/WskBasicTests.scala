@@ -117,7 +117,9 @@ class WskBasicTests
             val packageName = "packageName"
             val actionName = "actionName"
             val packageAnnots = Map(
-                "description" -> JsString("Package description"),
+                "description" -> JsString("Package description")
+            )
+            val packageParams = Map(
                 "parameters" -> JsArray(
                     JsObject(
                         "name" -> JsString("paramName1"),
@@ -130,7 +132,9 @@ class WskBasicTests
                 )
             )
             val actionAnnots = Map(
-                "description" -> JsString("Action description"),
+                "description" -> JsString("Action description")
+            )
+            val actionParams = Map(
                 "parameters" -> JsArray(
                     JsObject(
                         "name" -> JsString("paramName1"),
@@ -145,10 +149,11 @@ class WskBasicTests
 
             assetHelper.withCleaner(wsk.pkg, packageName) {
                 (pkg, _) =>
-                    pkg.create(packageName, annotations = packageAnnots)
+                    pkg.create(packageName, parameters = packageParams, annotations = packageAnnots)
             }
 
-            wsk.action.create(packageName + "/" + actionName, defaultAction, annotations = actionAnnots)
+            wsk.action.create(packageName + "/" + actionName, defaultAction, parameters = actionParams,
+                annotations = actionAnnots)
             val stdout = wsk.pkg.get(packageName, summary = true).stdout
             val ns_regex_list = wsk.namespace.list().stdout.trim.replace('\n', '|')
             wsk.action.delete(packageName + "/" + actionName)
@@ -276,7 +281,9 @@ class WskBasicTests
         (wp, assetHelper) =>
             val name = "actionName"
             val annots = Map(
-                "description" -> JsString("Action description"),
+                "description" -> JsString("Action description")
+            )
+            val params = Map(
                 "parameters" -> JsArray(
                     JsObject(
                         "name" -> JsString("paramName1"),
@@ -291,7 +298,7 @@ class WskBasicTests
 
             assetHelper.withCleaner(wsk.action, name) {
                 (action, _) =>
-                    action.create(name, defaultAction, annotations = annots)
+                    action.create(name, defaultAction, parameters = params, annotations = annots)
             }
 
 
@@ -333,7 +340,9 @@ class WskBasicTests
         (wp, assetHelper) =>
             val name = "triggerName"
             val annots = Map(
-                "description" -> JsString("Trigger description"),
+                "description" -> JsString("Trigger description")
+            )
+            val params = Map(
                 "parameters" -> JsArray(
                     JsObject(
                         "name" -> JsString("paramName1"),
@@ -348,7 +357,7 @@ class WskBasicTests
 
             assetHelper.withCleaner(wsk.trigger, name) {
                 (trigger, _) =>
-                    trigger.create(name, annotations = annots)
+                    trigger.create(name, parameters = params, annotations = annots)
             }
 
             val stdout = wsk.trigger.get(name, summary = true).stdout

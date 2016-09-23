@@ -88,11 +88,31 @@ func init() {
 
 func getKeyValueArgs(args []string, argIndex int, parsedArgs []string) ([]string, []string, error) {
     var whiskErr error
+    var key string
+    var value string
 
     if len(args) - 1 >= argIndex + 2 {
-        parsedArgs = append(parsedArgs, args[argIndex + 1])
-        parsedArgs = append(parsedArgs, args[argIndex + 2])
+        key = args[argIndex + 1]
+        value = args[argIndex + 2]
+        parsedArgs = append(parsedArgs, getFormattedJSON(key, value))
         args = append(args[:argIndex], args[argIndex + 3:]...)
+    } else {
+        whisk.Debug(whisk.DbgError, "Arguments for '%s' must be a key/value pair; args: %s", args[argIndex], args)
+        errMsg := wski18n.T("Arguments for '{{.arg}}' must be a key/value pair",
+            map[string]interface{}{"arg": args[argIndex]})
+        whiskErr = whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+            whisk.DISPLAY_USAGE)
+    }
+
+    return parsedArgs, args, whiskErr
+}
+
+func getKeyValueArgs2(args []string, argIndex int, parsedArgs []string) ([]string, []string, error) {
+    var whiskErr error
+
+    if len(args) - 1 >= argIndex + 1 {
+        parsedArgs = append(parsedArgs, args[argIndex + 1])
+        args = append(args[:argIndex], args[argIndex + 2:]...)
     } else {
         whisk.Debug(whisk.DbgError, "Arguments for '%s' must be a key/value pair; args: %s", args[argIndex], args)
         errMsg := wski18n.T("Arguments for '{{.arg}}' must be a key/value pair",
@@ -112,7 +132,41 @@ func parseArgs(args []string) ([]string, []string, []string, error) {
     i := 0
 
     for i < len(args) {
-        if args[i] == "-p" || args[i] == "--param" {
+        if args[i] == "-pf" || args[i] == "paramFile" {
+            paramArgs, args, whiskErr = getKeyValueArgs2(args, i, paramArgs)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "getKeyValueArgs(%#v, %d) failed: %s\n", args, i, whiskErr)
+                errMsg := wski18n.T("The parameter arguments are invalid: {{.err}}",
+                    map[string]interface{}{"err": whiskErr})
+                whiskErr = whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+                    whisk.DISPLAY_USAGE)
+                return nil, nil, nil, whiskErr
+            }
+
+            filename := paramArgs[len(paramArgs) - 1]
+            paramArgs[len(paramArgs) - 1], whiskErr = readFile(filename)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "readFile(%s) error: %s\n", filename, whiskErr)
+                return nil, nil, nil, whiskErr
+            }
+        } else if args[i] == "-af" || args[i] == "annotationFile" {
+            annotArgs, args, whiskErr = getKeyValueArgs2(args, i, annotArgs)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "getKeyValueArgs(%#v, %d) failed: %s\n", args, i, whiskErr)
+                errMsg := wski18n.T("The annotation arguments are invalid: {{.err}}",
+                    map[string]interface{}{"err": whiskErr})
+                whiskErr = whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+                    whisk.DISPLAY_USAGE)
+                return nil, nil, nil, whiskErr
+            }
+
+            filename := annotArgs[len(annotArgs) - 1]
+            annotArgs[len(annotArgs) - 1], whiskErr = readFile(filename)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "readFile(%s) error: %s\n", filename, whiskErr)
+                return nil, nil, nil, whiskErr
+            }
+        } else if args[i] == "-p" || args[i] == "--param" {
             paramArgs, args, whiskErr = getKeyValueArgs(args, i, paramArgs)
             if whiskErr != nil {
                 whisk.Debug(whisk.DbgError, "getKeyValueArgs(%#v, %d) failed: %s\n", args, i, whiskErr)
