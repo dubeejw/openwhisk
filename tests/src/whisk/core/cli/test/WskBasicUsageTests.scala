@@ -261,68 +261,76 @@ class WskBasicUsageTests
             wsk.action.create("updateMissingFile", Some("notfound"), update = true, expectedExitCode = MISUSE_EXIT)
     }
 
-    it should "create, and get an action to verify annotation parsing" in withAssetCleaner(wskprops) {
+    it should "create, and get an action to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
             val name = "actionAnnotations"
-
             val file = Some(TestUtils.getTestActionFilename("hello.js"))
+
             assetHelper.withCleaner(wsk.action, name) {
                 (action, _) =>
-                    action.create(name, file, annotations = getValidJSONTestArgInput)
+                    action.create(name, file, annotations = getValidJSONTestArgInput,
+                        parameters = getValidJSONTestArgInput)
             }
 
             val stdout = wsk.action.get(name).stdout
             assert(stdout.startsWith(s"ok: got action $name\n"))
 
-            wsk.parseJsonString(stdout).fields("annotations") shouldBe getValidJSONTestArgOutput
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
+
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
+            }
     }
 
-    it should "create, and get an action to verify parameter parsing" in withAssetCleaner(wskprops) {
+    it should "create, and get an action to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "actionParameters"
-
+            val name = "actionAnnotAndParamParsing"
             val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            val argInput = Some(TestUtils.getTestActionFilename("argInput.json"))
+
             assetHelper.withCleaner(wsk.action, name) {
                 (action, _) =>
-                    action.create(name, file, parameters = getValidJSONTestArgInput)
+                    action.create(name, file, annotationFile = argInput, parameterFile = argInput)
             }
 
             val stdout = wsk.action.get(name).stdout
             assert(stdout.startsWith(s"ok: got action $name\n"))
 
-            wsk.parseJsonString(stdout).fields("parameters") shouldBe getValidJSONTestArgOutput
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
+
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
+            }
     }
 
-    it should "create an action with the proper parameter escapes" in withAssetCleaner(wskprops) {
+    it should "create an action with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "actionName"
-            val file = TestUtils.getTestActionFilename("hello.js")
+            val name = "actionEscapes"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+
             assetHelper.withCleaner(wsk.action, name) {
                 (action, _) =>
-                    wsk.cli(wskprops.overrides ++ Seq("action", "create", wsk.action.fqn(name), file, "--auth", wp.authKey) ++
-                        getEscapedJSONTestArgInput())
+                    action.create(name, file, parameters = getEscapedJSONTestArgInput,
+                        annotations = getEscapedJSONTestArgInput)
             }
 
             val stdout = wsk.action.get(name).stdout
             assert(stdout.startsWith(s"ok: got action $name\n"))
 
-            wsk.parseJsonString(stdout).fields("parameters") shouldBe getEscapedJSONTestArgOutput
-    }
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
 
-    it should "create an action with the proper annotation escapes" in withAssetCleaner(wskprops) {
-        (wp, assetHelper) =>
-            val name = "actionName"
-            val file = TestUtils.getTestActionFilename("hello.js")
-            assetHelper.withCleaner(wsk.action, name) {
-                (action, _) =>
-                    wsk.cli(wskprops.overrides ++ Seq("action", "create", wsk.action.fqn(name), file, "--auth", wp.authKey) ++
-                        getEscapedJSONTestArgInput(false))
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
             }
-
-            val stdout = wsk.action.get(name).stdout
-            assert(stdout.startsWith(s"ok: got action $name\n"))
-
-            wsk.parseJsonString(stdout).fields("annotations") shouldBe getEscapedJSONTestArgOutput
     }
 
     it should "invoke an action that exits during init and get appropriate error" in withAssetCleaner(wskprops) {
@@ -422,96 +430,121 @@ class WskBasicUsageTests
 
     behavior of "Wsk packages"
 
-    it should "create, and get a package to verify annotation parsing" in withAssetCleaner(wskprops) {
+    it should "create, and get a package to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "packageAnnotations"
+            val name = "packageAnnotAndParamParsing"
 
             assetHelper.withCleaner(wsk.pkg, name) {
                 (pkg, _) =>
-                    pkg.create(name, annotations = getValidJSONTestArgInput)
+                    pkg.create(name, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
             }
 
             val stdout = wsk.pkg.get(name).stdout
             assert(stdout.startsWith(s"ok: got package $name\n"))
 
-            wsk.parseJsonString(stdout).fields("annotations") shouldBe getValidJSONTestArgOutput
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
+
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
+            }
     }
 
-    it should "create, and get a package to verify parameter parsing" in withAssetCleaner(wskprops) {
+    it should "create, and get a package to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "packageParameters"
+            val name = "packageAnnotAndParamFileParsing"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            val argInput = Some(TestUtils.getTestActionFilename("argInput.json"))
 
             assetHelper.withCleaner(wsk.pkg, name) {
                 (pkg, _) =>
-                    pkg.create(name, parameters = getValidJSONTestArgInput)
+                    pkg.create(name, annotationFile = argInput, parameterFile = argInput)
             }
 
             val stdout = wsk.pkg.get(name).stdout
             assert(stdout.startsWith(s"ok: got package $name\n"))
 
-            wsk.parseJsonString(stdout).fields("parameters") shouldBe getValidJSONTestArgOutput
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
+
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
+            }
     }
 
-    it should "create a package with the proper parameter escapes" in withAssetCleaner(wskprops) {
+    it should "create a package with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "packageName"
+            val name = "packageEscapses"
+
             assetHelper.withCleaner(wsk.pkg, name) {
                 (pkg, _) =>
-                    wsk.cli(wskprops.overrides ++ Seq("package", "create", wsk.pkg.fqn(name), "--auth", wp.authKey) ++
-                        getEscapedJSONTestArgInput())
+                    pkg.create(name, parameters = getEscapedJSONTestArgInput,
+                        annotations = getEscapedJSONTestArgInput)
             }
 
             val stdout = wsk.pkg.get(name).stdout
             assert(stdout.startsWith(s"ok: got package $name\n"))
 
-            wsk.parseJsonString(stdout).fields("parameters") shouldBe getEscapedJSONTestArgOutput
-    }
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
 
-    it should "create an package with the proper annotation escapes" in withAssetCleaner(wskprops) {
-        (wp, assetHelper) =>
-            val name = "packageName"
-            assetHelper.withCleaner(wsk.pkg, name) {
-                (pkg, _) =>
-                    wsk.cli(wskprops.overrides ++ Seq("package", "create", wsk.pkg.fqn(name), "--auth", wp.authKey) ++
-                        getEscapedJSONTestArgInput(false))
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
             }
-
-            val stdout = wsk.pkg.get(name).stdout
-            assert(stdout.startsWith(s"ok: got package $name\n"))
-
-            wsk.parseJsonString(stdout).fields("annotations") shouldBe getEscapedJSONTestArgOutput
     }
 
     behavior of "Wsk triggers"
 
-    it should "create, and get a trigger to verify annotation parsing" in withAssetCleaner(wskprops) {
+    it should "create, and get a trigger to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "triggerAnnotations"
+            val name = "triggerAnnotAndParamParsing"
 
             assetHelper.withCleaner(wsk.trigger, name) {
                 (trigger, _) =>
-                    trigger.create(name, annotations = getValidJSONTestArgInput)
+                    trigger.create(name, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
             }
 
             val stdout = wsk.trigger.get(name).stdout
             assert(stdout.startsWith(s"ok: got trigger $name\n"))
 
-            wsk.parseJsonString(stdout).fields("annotations") shouldBe getValidJSONTestArgOutput
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
+
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
+            }
     }
 
-    it should "create, and get a trigger to verify parameter parsing" in withAssetCleaner(wskprops) {
+    it should "create, and get a trigger to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "triggerParameters"
+            val name = "triggerAnnotAndParamFileParsing"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            val argInput = Some(TestUtils.getTestActionFilename("argInput.json"))
 
             assetHelper.withCleaner(wsk.trigger, name) {
                 (trigger, _) =>
-                    trigger.create(name, parameters = getValidJSONTestArgInput)
+                    trigger.create(name, annotationFile = argInput, parameterFile = argInput)
             }
 
             val stdout = wsk.trigger.get(name).stdout
             assert(stdout.startsWith(s"ok: got trigger $name\n"))
 
-            wsk.parseJsonString(stdout).fields("parameters") shouldBe getValidJSONTestArgOutput
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
+
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
+            }
     }
 
     it should "display a trigger summary when --summary flag is used with 'wsk trigger get'" in withAssetCleaner(wskprops) {
@@ -527,34 +560,27 @@ class WskBasicUsageTests
             stdout should include regex (s"(?i)trigger\\s+/${ns_regex_list}/${triggerName}")
     }
 
-    it should "create a trigger with the proper parameter escapes" in withAssetCleaner(wskprops) {
+    it should "create a trigger with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
-            val name = "triggerName"
+            val name = "triggerEscapes"
+
             assetHelper.withCleaner(wsk.trigger, name) {
                 (trigger, _) =>
-                    wsk.cli(wskprops.overrides ++ Seq("trigger", "create", wsk.trigger.fqn(name), "--auth", wp.authKey) ++
-                        getEscapedJSONTestArgInput())
+                    trigger.create(name, parameters = getEscapedJSONTestArgInput,
+                        annotations = getEscapedJSONTestArgInput)
             }
 
             val stdout = wsk.trigger.get(name).stdout
             assert(stdout.startsWith(s"ok: got trigger $name\n"))
 
-            wsk.parseJsonString(stdout).fields("parameters") shouldBe getEscapedJSONTestArgOutput
-    }
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
 
-    it should "create a trigger with the proper annotation escapes" in withAssetCleaner(wskprops) {
-        (wp, assetHelper) =>
-            val name = "triggerName"
-            assetHelper.withCleaner(wsk.trigger, name) {
-                (trigger, _) =>
-                    wsk.cli(wskprops.overrides ++ Seq("trigger", "create", wsk.trigger.fqn(name), "--auth", wp.authKey) ++
-                        getEscapedJSONTestArgInput(false))
+            for (expectedItem <- escapedJSONArr) {
+                receivedParams should contain(expectedItem)
+                receivedAnnots should contain(expectedItem)
             }
-
-            val stdout = wsk.trigger.get(name).stdout
-            assert(stdout.startsWith(s"ok: got trigger $name\n"))
-
-            wsk.parseJsonString(stdout).fields("annotations") shouldBe getEscapedJSONTestArgOutput
     }
 
     it should "not create a trigger when feed fails to initialize" in withAssetCleaner(wskprops) {

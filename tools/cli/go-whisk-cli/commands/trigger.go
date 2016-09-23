@@ -17,7 +17,6 @@
 package commands
 
 import (
-    "encoding/json"
     "errors"
     "fmt"
     "strings"
@@ -43,7 +42,7 @@ var triggerFireCmd = &cobra.Command{
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
         var err error
-        var payloadArg string
+        var parameters interface{}
 
         if whiskErr := checkArgs(args, 1, 2, "Trigger fire",
                 wski18n.T("A trigger name is required. A payload is optional.")); whiskErr != nil {
@@ -65,52 +64,39 @@ var triggerFireCmd = &cobra.Command{
             whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
             errStr := fmt.Sprintf(
                 wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+                whisk.DISPLAY_USAGE)
             return werr
         }
         client.Namespace = qName.namespace
 
-        var payload *json.RawMessage
+        // Add payload to parameters
+        if len(args) == 2 {
+            flags.common.param = append(flags.common.param, getFormattedJSON("payload", args[1]))
+            flags.common.param = append(flags.common.param, flags.common.param...)
+        }
 
         if len(flags.common.param) > 0 {
-            parameters, err := getJSONFromArguments(flags.common.param, false)
+            parameters, err = getJSONFromStrings(flags.common.param, false)
             if err != nil {
-                whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, false) failed: %s\n", flags.common.param, err)
+                whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, false) failed: %s\n", flags.common.param, err)
                 errStr := fmt.Sprintf(
                     wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
                         map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
-                werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+                werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL,
+                    whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
                 return werr
             }
-
-            payload = parameters
         }
 
-        if payload == nil {
-            data := []byte("{}")
-            payload = (*json.RawMessage)(&data)
-        }
-
-        if len(args) == 2 {
-            payloadArg = args[1]
-            reader := strings.NewReader(payloadArg)
-            err = json.NewDecoder(reader).Decode(&payload)
-            if err != nil {
-                tmpPayload := "{\"payload\": \"" + payloadArg + "\"}"
-                data := []byte(tmpPayload)
-                payload = (*json.RawMessage)(&data)
-                whisk.Debug(whisk.DbgError, "json.NewDecoder().Decode() failure decoding '%s': : %s\n", payloadArg, err)
-                whisk.Debug(whisk.DbgWarn, "Defaulting payload to %#v\n", payload)
-            }
-        }
-
-        trigResp, _, err := client.Triggers.Fire(qName.entityName, payload)
+        trigResp, _, err := client.Triggers.Fire(qName.entityName, parameters)
         if err != nil {
-            whisk.Debug(whisk.DbgError, "client.Triggers.Fire(%s, %#v) failed: %s\n", qName.entityName, payload, err)
+            whisk.Debug(whisk.DbgError, "client.Triggers.Fire(%s, %#v) failed: %s\n", qName.entityName, parameters, err)
             errStr := fmt.Sprintf(
                 wski18n.T("Unable to fire trigger '{{.name}}': {{.err}}",
                     map[string]interface{}{"name": qName.entityName, "err": err}))
-            werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+            werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL,
+                whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
             return werr
         }
 
@@ -133,8 +119,9 @@ var triggerCreateCmd = &cobra.Command{
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
         var err error
+        var annotations interface{}
         var feedArgPassed bool = (flags.common.feed != "")
-        var feedParams []string
+        //var feedParams []string
 
         if whiskErr := checkArgs(args, 1, 1, "Trigger create",
                 wski18n.T("A trigger name is required.")); whiskErr != nil {
@@ -160,21 +147,6 @@ var triggerCreateCmd = &cobra.Command{
         }
         client.Namespace = qName.namespace
 
-        // Convert the trigger's list of default parameters from a string into []KeyValue
-        // The 1 or more --param arguments have all been combined into a single []string
-        // e.g.   --p arg1,arg2 --p arg3,arg4   ->  [arg1, arg2, arg3, arg4]
-        whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
-        parameters, err := getJSONFromArguments(flags.common.param, true)
-
-        if err != nil {
-            whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.param, err)
-            errStr := fmt.Sprintf(
-                wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
-                    map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
-            werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return werr
-        }
-
         var fullTriggerName string
         var fullFeedName string
         if feedArgPassed {
@@ -197,37 +169,60 @@ var triggerCreateCmd = &cobra.Command{
                 return werr
             }
 
-            feedParams = flags.common.param
-            fullFeedName = fmt.Sprintf("/%s/%s", feedqName.namespace, feedqName.entityName)
-
-            feedParams = append(feedParams, "lifecycleEvent")
-            feedParams = append(feedParams, "CREATE")
+            flags.common.param = append(flags.common.param, getFormattedJSON("lifecycleEvent", "CREATE"))
 
             fullTriggerName = fmt.Sprintf("/%s/%s", qName.namespace, qName.entityName)
-            feedParams = append(feedParams, "triggerName")
-            feedParams = append(feedParams, fullTriggerName)
+            flags.common.param = append(flags.common.param, getFormattedJSON("triggerName", fullTriggerName))
+
+            flags.common.param = append(flags.common.param, getFormattedJSON("authKey", client.Config.AuthToken))
 
 
-            feedParams = append(feedParams, "authKey")
-            feedParams = append(feedParams, client.Config.AuthToken)
+            //feedParams = flags.common.param
+            fullFeedName = fmt.Sprintf("/%s/%s", feedqName.namespace, feedqName.entityName)
 
-            parameters = nil
-            whisk.Debug(whisk.DbgInfo, "Trigger feed action parameters: %#v\n", feedParams)
+            //feedParams = append(feedParams, "lifecycleEvent")
+            //feedParams = append(feedParams, "CREATE")
+
+
+            //fullTriggerName = fmt.Sprintf("/%s/%s", qName.namespace, qName.entityName)
+            //feedParams = append(feedParams, "triggerName")
+            //feedParams = append(feedParams, fullTriggerName)
+
+
+            //feedParams = append(feedParams, "authKey")
+            //feedParams = append(feedParams, client.Config.AuthToken)
+
+            //parameters = nil
+            //whisk.Debug(whisk.DbgInfo, "Trigger feed action parameters: %#v\n", feedParams)
         }
 
-        var annotations *json.RawMessage
-        if feedArgPassed {
-            feedAnnotations := []string{"feed", flags.common.feed}
-            feedAnnotations = append(feedAnnotations, flags.common.annotation...)
-            whisk.Debug(whisk.DbgInfo, "Parsing trigger feed annotations: %#v\n", feedAnnotations)
-            annotations, err = getJSONFromArguments(feedAnnotations, true)
-        } else {
-            whisk.Debug(whisk.DbgInfo, "Parsing annotations: %#v\n", flags.common.annotation)
-            annotations, err = getJSONFromArguments(flags.common.annotation, true)
-        }
+
+        // Convert the trigger's list of default parameters from a string into []KeyValue
+        // The 1 or more --param arguments have all been combined into a single []string
+        // e.g.   --p arg1,arg2 --p arg3,arg4   ->  [arg1, arg2, arg3, arg4]
+        whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
+        parameters, err := getJSONFromStrings(flags.common.param, !feedArgPassed)
 
         if err != nil {
-            whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.annotation, err)
+            whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.param, err)
+            errStr := fmt.Sprintf(
+                wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
+                    map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
+            werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+            return werr
+        }
+
+        // Add feed to annotations
+        if feedArgPassed {
+            flags.common.annotation = append(flags.common.annotation, getFormattedJSON("feed", flags.common.feed))
+            //flags.common.annotation = append(flags.common.annotation, flags.common.annotation...)
+        }
+
+        whisk.Debug(whisk.DbgInfo, "Parsing annotations: %#v\n", flags.common.annotation)
+        annotations, err = getJSONFromStrings(flags.common.annotation, true)
+
+        if err != nil {
+            whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.annotation, err)
             errStr := fmt.Sprintf(
                 wski18n.T("Invalid annotation argument '{{.annotation}}': {{.err}}",
                     map[string]interface{}{"annotation": fmt.Sprintf("%#v",flags.common.annotation), "err": err}))
@@ -252,9 +247,13 @@ var triggerCreateCmd = &cobra.Command{
 
         trigger := &whisk.Trigger{
             Name:        qName.entityName,
-            Parameters:  parameters,
-            Annotations: annotations,
+            //Parameters:  parameters,
+            Annotations: annotations.(whisk.KeyValueArr),
             Publish:     publish,
+        }
+
+        if !feedArgPassed {
+            trigger.Parameters = parameters.(whisk.KeyValueArr)
         }
 
         _, _, err = client.Triggers.Insert(trigger, false)
@@ -269,9 +268,9 @@ var triggerCreateCmd = &cobra.Command{
 
         // Invoke the specified feed action to configure the trigger feed
         if feedArgPassed {
-            err := createFeed(trigger.Name, fullFeedName, feedParams)
+            err := createFeed(trigger.Name, fullFeedName, parameters)
             if err != nil {
-                whisk.Debug(whisk.DbgError, "createFeed(%s, %s, %+v) failed: %s\n", trigger.Name, flags.common.feed, feedParams, err)
+                //whisk.Debug(whisk.DbgError, "createFeed(%s, %s, %+v) failed: %s\n", trigger.Name, flags.common.feed, feedParams, err)
                 errStr := fmt.Sprintf(
                     wski18n.T("Unable to create trigger '{{.name}}': {{.err}}",
                         map[string]interface{}{"name": trigger.Name, "err": err}))
@@ -332,10 +331,10 @@ var triggerUpdateCmd = &cobra.Command{
         // e.g.   --p arg1,arg2 --p arg3,arg4   ->  [arg1, arg2, arg3, arg4]
 
         whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
-        parameters, err := getJSONFromArguments(flags.common.param, true)
+        parameters, err := getJSONFromStrings(flags.common.param, true)
 
         if err != nil {
-            whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.param, err)
+            whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.param, err)
             errStr := fmt.Sprintf(
                 wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
                     map[string]interface{}{"param": fmt.Sprintf("%#v",flags.common.param), "err": err}))
@@ -344,10 +343,10 @@ var triggerUpdateCmd = &cobra.Command{
         }
 
         whisk.Debug(whisk.DbgInfo, "Parsing annotations: %#v\n", flags.common.annotation)
-        annotations, err := getJSONFromArguments(flags.common.annotation, true)
+        annotations, err := getJSONFromStrings(flags.common.annotation, true)
 
         if err != nil {
-            whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, true) failed: %s\n", flags.common.annotation, err)
+            whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, true) failed: %s\n", flags.common.annotation, err)
             errStr := fmt.Sprintf(
                 wski18n.T("Invalid annotation argument '{{.annotation}}': {{.err}}",
                     map[string]interface{}{"annotation": fmt.Sprintf("%#v",flags.common.annotation), "err": err}))
@@ -378,8 +377,8 @@ var triggerUpdateCmd = &cobra.Command{
 
         trigger := &whisk.Trigger{
             Name:        qName.entityName,
-            Parameters:  parameters,
-            Annotations: annotations,
+            Parameters:  parameters.(whisk.KeyValueArr),
+            Annotations: annotations.(whisk.KeyValueArr),
         }
         if publishSet {
             trigger.Publish = publish
@@ -508,20 +507,18 @@ var triggerDeleteCmd = &cobra.Command{
 
         // Get full feed name from trigger delete request as it is needed to delete the feed
         if retTrigger != nil && retTrigger.Annotations != nil {
-            fullFeedName = getValueFromAnnotations(retTrigger.Annotations, "feed")
+            fullFeedName = getValueFromKeyValueArr(retTrigger.Annotations, "feed")
 
             if len(fullFeedName) > 0 {
-                feedParams = append(feedParams, "lifecycleEvent")
-                feedParams = append(feedParams, "DELETE")
 
+                flags.common.param = append(flags.common.param, getFormattedJSON("lifecycleEvent", "DELETE"))
                 fullTriggerName := fmt.Sprintf("/%s/%s", qName.namespace, qName.entityName)
-                feedParams = append(feedParams, "triggerName")
-                feedParams = append(feedParams, fullTriggerName)
+                flags.common.param = append(flags.common.param, getFormattedJSON("triggerName", fullTriggerName))
+                flags.common.param = append(flags.common.param, getFormattedJSON("authKey", client.Config.AuthToken))
 
-                feedParams = append(feedParams, "authKey")
-                feedParams = append(feedParams, client.Config.AuthToken)
+                parameters, err := getJSONFromStrings(flags.common.param, false)
 
-                err = deleteFeed(qName.entityName, fullFeedName, feedParams)
+                err = deleteFeed(qName.entityName, fullFeedName, parameters)
                 if err != nil {
                     whisk.Debug(whisk.DbgError, "deleteFeed(%s, %s, %+v) failed: %s\n", qName.entityName, flags.common.feed, feedParams, err)
                     errStr := fmt.Sprintf(
@@ -593,12 +590,12 @@ var triggerListCmd = &cobra.Command{
     },
 }
 
-func createFeed (triggerName string, FullFeedName string, parameters []string) error {
+func createFeed (triggerName string, FullFeedName string, parameters interface{}) error {
     var originalParams = flags.common.param
 
     // Invoke the feed action to configure the feed
     feedArgs := []string {FullFeedName}
-    flags.common.param = parameters
+    //flags.common.param = parameters
     flags.common.blocking = true
     err := actionInvokeCmd.RunE(nil, feedArgs)
     if err != nil {
@@ -615,11 +612,11 @@ func createFeed (triggerName string, FullFeedName string, parameters []string) e
     return err
 }
 
-func deleteFeed (triggerName string, FullFeedName string, parameters []string) error {
+func deleteFeed (triggerName string, FullFeedName string, parameters interface{}) error {
     var originalParams = flags.common.param
 
     feedArgs := []string {FullFeedName}
-    flags.common.param = parameters
+    //flags.common.param = parameters
     flags.common.blocking = true
     err := actionInvokeCmd.RunE(nil, feedArgs)
     if err != nil {
