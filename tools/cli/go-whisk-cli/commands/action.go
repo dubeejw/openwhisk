@@ -21,8 +21,6 @@ import (
   "encoding/json"
   "errors"
   "fmt"
-  "io/ioutil"
-  "os"
   "os/exec"
   "path/filepath"
   "strings"
@@ -537,32 +535,13 @@ func parseAction(cmd *cobra.Command, args []string) (*whisk.Action, bool, error)
     action.Exec.Components = csvToQualifiedActions(artifact)
   } else if artifact != "" {
     ext := filepath.Ext(artifact)
-
-    _, err := os.Stat(artifact)
-    if err != nil {
-      whisk.Debug(whisk.DbgError, "os.Stat(%s) error: %s\n", artifact, err)
-      errMsg := fmt.Sprintf(
-        wski18n.T("File '{{.name}}' is not a valid file or it does not exist: {{.err}}",
-          map[string]interface{}{"name": artifact, "err": err}))
-      whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_USAGE,
-        whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-
-      return nil, sharedSet, whiskErr
-    }
-
-    file, err := ioutil.ReadFile(artifact)
-    if err != nil {
-      whisk.Debug(whisk.DbgError, "os.ioutil.ReadFile(%s) error: %s\n", artifact, err)
-      errMsg := fmt.Sprintf(
-        wski18n.T("Unable to read '{{.name}}': {{.err}}",
-          map[string]interface{}{"name": artifact, "err": err}))
-      whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-        whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-      return nil, sharedSet, whiskErr
-    }
-
     action.Exec = new(whisk.Exec)
-    action.Exec.Code = string(file)
+    action.Exec.Code, err = readFile(artifact)
+
+    if err != nil {
+      whisk.Debug(whisk.DbgError, "readFile(%s) error: %s\n", artifact, err)
+      return nil, sharedSet, err
+    }
 
     if flags.action.kind == "swift:3" || flags.action.kind == "swift:3.0" || flags.action.kind == "swift:3.0.0" {
       action.Exec.Kind = "swift:3"
@@ -591,7 +570,7 @@ func parseAction(cmd *cobra.Command, args []string) (*whisk.Action, bool, error)
     } else if ext == ".jar" {
       action.Exec.Code = ""
       action.Exec.Kind = "java"
-      action.Exec.Jar = base64.StdEncoding.EncodeToString([]byte(string(file)))
+      action.Exec.Jar = base64.StdEncoding.EncodeToString([]byte(action.Exec.Code))
       action.Exec.Main, err = findMainJarClass(artifact)
 
       if err != nil {

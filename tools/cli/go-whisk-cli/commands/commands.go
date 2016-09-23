@@ -112,7 +112,41 @@ func parseArgs(args []string) ([]string, []string, []string, error) {
     i := 0
 
     for i < len(args) {
-        if args[i] == "-p" || args[i] == "--param" {
+        if args[i] == "-pf" || args[i] == "paramFile" {
+            paramArgs, args, whiskErr = getKeyValueArgs(args, i, paramArgs)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "getKeyValueArgs(%#v, %d) failed: %s\n", args, i, whiskErr)
+                errMsg := wski18n.T("The parameter arguments are invalid: {{.err}}",
+                    map[string]interface{}{"err": whiskErr})
+                whiskErr = whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+                    whisk.DISPLAY_USAGE)
+                return nil, nil, nil, whiskErr
+            }
+
+            filename := paramArgs[len(paramArgs) - 1]
+            paramArgs[len(paramArgs) - 1], whiskErr = readFile(filename)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "readFile(%s) error: %s\n", filename, whiskErr)
+                return nil, nil, nil, whiskErr
+            }
+        } else if args[i] == "-af" || args[i] == "annotationFile" {
+            annotArgs, args, whiskErr = getKeyValueArgs(args, i, annotArgs)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "getKeyValueArgs(%#v, %d) failed: %s\n", args, i, whiskErr)
+                errMsg := wski18n.T("The annotation arguments are invalid: {{.err}}",
+                    map[string]interface{}{"err": whiskErr})
+                whiskErr = whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG,
+                    whisk.DISPLAY_USAGE)
+                return nil, nil, nil, whiskErr
+            }
+
+            filename := annotArgs[len(annotArgs) - 1]
+            annotArgs[len(annotArgs) - 1], whiskErr = readFile(filename)
+            if whiskErr != nil {
+                whisk.Debug(whisk.DbgError, "readFile(%s) error: %s\n", filename, whiskErr)
+                return nil, nil, nil, whiskErr
+            }
+        } else if args[i] == "-p" || args[i] == "--param" {
             paramArgs, args, whiskErr = getKeyValueArgs(args, i, paramArgs)
             if whiskErr != nil {
                 whisk.Debug(whisk.DbgError, "getKeyValueArgs(%#v, %d) failed: %s\n", args, i, whiskErr)
