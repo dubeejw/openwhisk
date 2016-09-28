@@ -187,8 +187,8 @@ var actionInvokeCmd = &cobra.Command{
         whisk.Debug(whisk.DbgError, "client.Actions.Invoke(%s, %s, %t) error: %s\n", qName.entityName, payload,
           flags.common.blocking, err)
         errMsg := fmt.Sprintf(
-          wski18n.T("Unable to invoke action '{{.name}}': {{.err}}",
-            map[string]interface{}{"name": qName.entityName, "err": err}))
+          wski18n.T("Unable to invoke action '{{.namespace}}/{{.name}}': {{.err}}",
+            map[string]interface{}{"namespace": qName.namespace, "name": qName.entityName, "err": err}))
         whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
           whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
         return whiskErr

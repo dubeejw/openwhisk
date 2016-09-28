@@ -108,8 +108,8 @@ var triggerFireCmd = &cobra.Command{
         if err != nil {
             whisk.Debug(whisk.DbgError, "client.Triggers.Fire(%s, %#v) failed: %s\n", qName.entityName, payload, err)
             errStr := fmt.Sprintf(
-                wski18n.T("Unable to fire trigger '{{.name}}': {{.err}}",
-                    map[string]interface{}{"name": qName.entityName, "err": err}))
+                wski18n.T("Unable to fire trigger '{{.namespace}}/{{.name}}': {{.err}}",
+                    map[string]interface{}{"namespace": qName.namespace, "name": qName.entityName, "err": err}))
             werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
             return werr
         }

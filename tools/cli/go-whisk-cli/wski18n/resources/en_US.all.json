@@ -590,8 +590,8 @@
     "translation": "fire trigger event"
   },
   {
-    "id": "Unable to fire trigger '{{.name}}': {{.err}}",
-    "translation": "Unable to fire trigger '{{.name}}': {{.err}}"
+    "id": "Unable to fire trigger '{{.namespace}}/{{.name}}': {{.err}}",
+    "translation": "Unable to fire trigger '{{.namespace}}/{{.name}}': {{.err}}"
   },
   {
     "id": "{{.ok}} triggered /{{.namespace}}/{{.name}} with id {{.id}}\n",
@@ -796,8 +796,8 @@
     "translation": "invoke action"
   },
   {
-    "id": "Unable to invoke action '{{.name}}': {{.err}}",
-    "translation": "Unable to invoke action '{{.name}}': {{.err}}"
+    "id": "Unable to invoke action '{{.namespace}}/{{.name}}': {{.err}}",
+    "translation": "Unable to invoke action '{{.namespace}}/{{.name}}': {{.err}}"
   },
   {
     "id": "{{.ok}} invoked /{{.namespace}}/{{.name}} with id {{.id}}\n",
