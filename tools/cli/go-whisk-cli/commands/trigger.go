@@ -27,6 +27,7 @@ import (
 
     "github.com/spf13/cobra"
     "github.com/fatih/color"
+    "github.com/mattn/go-colorable"
 )
 
 // triggerCmd represents the trigger command
@@ -217,7 +218,7 @@ var triggerCreateCmd = &cobra.Command{
 
         // Invoke the specified feed action to configure the trigger feed
         if feedArgPassed {
-            err := createFeed(trigger.Name, fullFeedName, feedParams)
+            err := configureFeed(trigger.Name, fullFeedName, feedParams)
             if err != nil {
                 whisk.Debug(whisk.DbgError, "createFeed(%s, %s, %+v) failed: %s\n", trigger.Name, flags.common.feed, feedParams, err)
                 errStr := fmt.Sprintf(
@@ -225,11 +226,27 @@ var triggerCreateCmd = &cobra.Command{
                         map[string]interface{}{"name": trigger.Name, "err": err}))
                 werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
 
-                // Delete trigger that was created for this feed
-                delerr := deleteTrigger(args[0])
-                if delerr != nil {
-                    whisk.Debug(whisk.DbgWarn, "Ignoring deleteTrigger(%s) failure: %s\n", args[0], delerr)
+
+                whiskErr, isWhiskErr := err.(*whisk.WskError)
+
+                if (isWhiskErr && whiskErr.ApplicationError == true) || !isWhiskErr {
+                    // Delete trigger that was created for this feed
                 }
+
+                // Failed to create the feed so delete just the trigger
+                qName := parseQualifiedName(args[0])
+                client.Namespace = qName.namespace
+                _, _, err = client.Triggers.Delete(qName.entityName)
+
+                if err != nil {
+                    whisk.Debug(whisk.DbgError, "client.Triggers.Delete(%s) failed: %s\n", qName.entityName, err)
+                    errStr := fmt.Sprintf(
+                        wski18n.T("Unable to delete trigger '{{.name}}': {{.err}}",
+                            map[string]interface{}{"name": qName.entityName, "err": err}))
+                    werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+                    return werr
+                }
+
                 return werr
             }
         }
@@ -400,7 +417,11 @@ var triggerDeleteCmd = &cobra.Command{
         }
 
         // Get full feed name from trigger delete request as it is needed to delete the feed
-        if retTrigger != nil && retTrigger.Annotations != nil {
+
+        //data2 := []byte("[]")
+        //test := (*json.RawMessage)(&data2)
+
+        if retTrigger != nil && (retTrigger.Annotations != nil) { // TODO
             fullFeedName = getValueFromAnnotations(retTrigger.Annotations, "feed")
 
             if len(fullFeedName) > 0 {
@@ -414,7 +435,7 @@ var triggerDeleteCmd = &cobra.Command{
                 feedParams = append(feedParams, "authKey")
                 feedParams = append(feedParams, client.Config.AuthToken)
 
-                err = deleteFeed(qName.entityName, fullFeedName, feedParams)
+                err = configureFeed(qName.entityName, fullFeedName, feedParams)
                 if err != nil {
                     whisk.Debug(whisk.DbgError, "deleteFeed(%s, %s, %+v) failed: %s\n", qName.entityName, flags.common.feed, feedParams, err)
                     errStr := fmt.Sprintf(
@@ -465,6 +486,93 @@ var triggerListCmd = &cobra.Command{
         printList(triggers)
         return nil
     },
+}
+
+func configureFeed(triggerName string, FullFeedName string, parameters []string) error {
+
+    //feedArgs := []string {FullFeedName}
+    flags.common.param = parameters
+    flags.common.blocking = true
+
+    var payload *json.RawMessage
+
+    qualifiedName := parseQualifiedName(FullFeedName)
+    client.Namespace = qualifiedName.namespace
+
+    if len(flags.common.param) > 0 {
+        whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
+
+        parameters, err := getJSONFromArguments(flags.common.param, false)
+        if err != nil {
+            whisk.Debug(whisk.DbgError, "getJSONFromArguments(%#v, false) failed: %s\n", flags.common.param, err)
+            errMsg := fmt.Sprintf(
+                wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
+                    map[string]interface{}{"param": fmt.Sprintf("%#v", flags.common.param), "err": err}))
+            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+                whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+            return whiskErr
+        }
+
+        payload = parameters
+    }
+
+    if payload == nil {
+        data := []byte("{}")
+        payload = (*json.RawMessage)(&data)
+    }
+
+    activation, _, err := client.Actions.Invoke(qualifiedName.entityName, payload, flags.common.blocking)
+    if err != nil {
+
+        //dubee (master) $ ./core/pythonAction/cli/wsk   trigger create 2messedUpParamNamAeas --feed /whisk.system/alarms/alarm -p crons '*/8 * * * * *' -p trigger_payload '{"name":"Mork", "place":"Ork"}'
+//error: failed to create trigger feed 2messedUpParamNamAeas
+        /*
+      {
+   "activationId": "73be723838454301aac61a45e894c0a0",
+   "annotations": [],
+   "end": 1475184698515,
+   "logs": [],
+   "name": "alarm",
+   "namespace": "jwdubee@us.ibm.com",
+   "publish": false,
+   "response": {
+       "result": {
+           "error": "no cron provided"
+       },
+       "status": "application error",
+       "success": false
+   },
+   "start": 1475184698502,
+   "subject": "jwdubee@us.ibm.com",
+   "version": "0.0.75"
+}
+
+        */
+        outputStream := colorable.NewColorableStderr()
+
+        fmt.Fprintf(color.Output,
+            wski18n.T("{{.ok}} invoked /{{.namespace}}/{{.name}} with id {{.id}}\n",
+                map[string]interface{}{
+                    "ok": color.GreenString("ok:"),
+                    "namespace": boldString(qualifiedName.namespace),
+                    "name": boldString(qualifiedName.entityName),
+                    "id": boldString(activation.ActivationID)}))
+
+        //fmt.Fprintf(outputStream, "error: failed to create trigger feed %s", triggerName)
+        printJSON(activation, outputStream)
+
+
+        whisk.Debug(whisk.DbgError, "client.Actions.Invoke(%s, %s, %t) error: %s\n", triggerName, payload,
+            flags.common.blocking, err)
+        errMsg := fmt.Sprintf(
+            wski18n.T("Unable to invoke action '{{.name}}': {{.err}}",
+                map[string]interface{}{"name": triggerName, "err": err}))
+        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+            whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+        return whiskErr
+    }
+
+    return nil
 }
 
 func createFeed (triggerName string, FullFeedName string, parameters []string) error {
