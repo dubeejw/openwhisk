@@ -71,8 +71,6 @@ type Log struct {
 }
 
 func (s *ActivationService) List(options *ActivationListOptions) ([]Activation, *http.Response, error) {
-    // TODO :: for some reason /activations only works with "_" as namespace
-    s.client.Namespace = "_"
     route := "activations"
     routeUrl, err := addRouteOptions(route, options)
     if err != nil {
@@ -106,9 +104,6 @@ func (s *ActivationService) List(options *ActivationListOptions) ([]Activation, 
 }
 
 func (s *ActivationService) Get(activationID string) (*Activation, *http.Response, error) {
-    // TODO :: for some reason /activations/:id only works with "_" as namespace
-    s.client.Namespace = "_"
-
     // Encode resource name as a path (with no query params) before inserting it into the URI
     // This way any '?' chars in the name won't be treated as the beginning of the query params
     activationID = (&url.URL{Path: activationID}).String()
@@ -136,8 +131,6 @@ func (s *ActivationService) Get(activationID string) (*Activation, *http.Respons
 }
 
 func (s *ActivationService) Logs(activationID string) (*Activation, *http.Response, error) {
-    // TODO :: for some reason /activations/:id/logs only works with "_" as namespace
-    s.client.Namespace = "_"
     // Encode resource name as a path (with no query params) before inserting it into the URI
     // This way any '?' chars in the name won't be treated as the beginning of the query params
     activationID = (&url.URL{Path: activationID}).String()
@@ -165,8 +158,6 @@ func (s *ActivationService) Logs(activationID string) (*Activation, *http.Respon
 }
 
 func (s *ActivationService) Result(activationID string) (*Response, *http.Response, error) {
-    // TODO :: for some reason /activations only works with "_" as namespace
-    s.client.Namespace = "_"
     // Encode resource name as a path (with no query params) before inserting it into the URI
     // This way any '?' chars in the name won't be treated as the beginning of the query params
     activationID = (&url.URL{Path: activationID}).String()

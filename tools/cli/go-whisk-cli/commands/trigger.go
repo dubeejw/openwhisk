@@ -42,7 +42,6 @@ var triggerFireCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        var err error
         var payloadArg string
 
         if whiskErr := checkArgs(args, 1, 2, "Trigger fire",
@@ -50,24 +49,7 @@ var triggerFireCmd = &cobra.Command{
             return whiskErr
         }
 
-        qName, err := parseQualifiedName(args[0])
-        if err != nil {
-            whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                    map[string]interface{}{"name": args[0], "err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-
-            return whiskErr
-        }
-        if len(qName.namespace) == 0 {
-            whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-            errStr := fmt.Sprintf(
-                wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return werr
-        }
+        qName := parseQualifiedName(args[0])
         client.Namespace = qName.namespace
 
         var payload *json.RawMessage
@@ -94,7 +76,7 @@ var triggerFireCmd = &cobra.Command{
         if len(args) == 2 {
             payloadArg = args[1]
             reader := strings.NewReader(payloadArg)
-            err = json.NewDecoder(reader).Decode(&payload)
+            err := json.NewDecoder(reader).Decode(&payload)
             if err != nil {
                 tmpPayload := "{\"payload\": \"" + payloadArg + "\"}"
                 data := []byte(tmpPayload)
@@ -132,7 +114,6 @@ var triggerCreateCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        var err error
         var feedArgPassed bool = (flags.common.feed != "")
         var feedParams []string
 
@@ -141,23 +122,7 @@ var triggerCreateCmd = &cobra.Command{
             return whiskErr
         }
 
-        qName, err := parseQualifiedName(args[0])
-        if err != nil {
-            whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                    map[string]interface{}{"name": args[0], "err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-            return whiskErr
-        }
-        if len(qName.namespace) == 0 {
-            whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-            errStr := fmt.Sprintf(
-                wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return werr
-        }
+        qName := parseQualifiedName(args[0])
         client.Namespace = qName.namespace
 
         // Convert the trigger's list of default parameters from a string into []KeyValue
@@ -179,24 +144,7 @@ var triggerCreateCmd = &cobra.Command{
         var fullFeedName string
         if feedArgPassed {
             whisk.Debug(whisk.DbgInfo, "Trigger has a feed\n")
-            feedqName, err := parseQualifiedName(flags.common.feed)
-            if err != nil {
-                whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", flags.common.feed, err)
-                errMsg := fmt.Sprintf(
-                    wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                        map[string]interface{}{"name": flags.common.feed, "err": err}))
-                whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                    whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-                return whiskErr
-            }
-            if len(feedqName.namespace) == 0 {
-                whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", flags.common.feed)
-                errStr := fmt.Sprintf(
-                    wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-                werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-                return werr
-            }
-
+            feedqName := parseQualifiedName(flags.common.feed)
             feedParams = flags.common.param
             fullFeedName = fmt.Sprintf("/%s/%s", feedqName.namespace, feedqName.entityName)
 
@@ -300,31 +248,12 @@ var triggerUpdateCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        var err error
-
         if whiskErr := checkArgs(args, 1, 1, "Trigger update",
                 wski18n.T("A trigger name is required.")); whiskErr != nil {
             return whiskErr
         }
 
-        qName, err := parseQualifiedName(args[0])
-        if err != nil {
-            whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                    map[string]interface{}{"name": args[0], "err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-
-            return whiskErr
-        }
-        if len(qName.namespace) == 0 {
-            whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-            errStr := fmt.Sprintf(
-                wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return werr
-        }
+        qName := parseQualifiedName(args[0])
         client.Namespace = qName.namespace
 
         // Convert the trigger's list of default parameters from a string into []KeyValue
@@ -410,33 +339,14 @@ var triggerGetCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        var err error
-
         if whiskErr := checkArgs(args, 1, 1, "Trigger get", wski18n.T("A trigger name is required.")); whiskErr != nil {
             return whiskErr
         }
 
-        qName, err := parseQualifiedName(args[0])
-        if err != nil {
-            whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                    map[string]interface{}{"name": args[0], "err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-
-            return whiskErr
-        }
-        if len(qName.namespace) == 0 {
-            whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-            errStr := fmt.Sprintf(
-                wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return werr
-        }
+        qName := parseQualifiedName(args[0])
         client.Namespace = qName.namespace
-
         retTrigger, _, err := client.Triggers.Get(qName.entityName)
+
         if err != nil {
             whisk.Debug(whisk.DbgError, "client.Triggers.Get(%s) failed: %s\n", qName.entityName, err)
             errStr := fmt.Sprintf(
@@ -476,27 +386,10 @@ var triggerDeleteCmd = &cobra.Command{
             return whiskErr
         }
 
-        qName, err := parseQualifiedName(args[0])
-        if err != nil {
-            whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-            errMsg := fmt.Sprintf(
-                wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                    map[string]interface{}{"name": args[0], "err": err}))
-            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-                whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-
-            return whiskErr
-        }
-        if len(qName.namespace) == 0 {
-            whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-            errStr := fmt.Sprintf(
-                wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-            werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-            return werr
-        }
+        qName := parseQualifiedName(args[0])
         client.Namespace = qName.namespace
-
         retTrigger, _, err = client.Triggers.Delete(qName.entityName)
+
         if err != nil {
             whisk.Debug(whisk.DbgError, "client.Triggers.Delete(%s) failed: %s\n", qName.entityName, err)
             errStr := fmt.Sprintf(
@@ -548,28 +441,9 @@ var triggerListCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        var err error
-        qName := qualifiedName{}
         if len(args) == 1 {
-            qName, err = parseQualifiedName(args[0])
-            if err != nil {
-                whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-                errStr := fmt.Sprintf(
-                    wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-                        map[string]interface{}{"name": args[0], "err": err}))
-                werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-                return werr
-            }
-            ns := qName.namespace
-            if len(ns) == 0 {
-                whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-                errStr := fmt.Sprintf(
-                    wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-                werr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-                return werr
-            }
-            client.Namespace = ns
-            whisk.Debug(whisk.DbgInfo, "Using namespace '%s' from argument '%s''\n", ns, args[0])
+            qName := parseQualifiedName(args[0])
+            client.Namespace = qName.entityName
         } else if whiskErr := checkArgs(args, 0, 1, "Trigger list",
                 wski18n.T("An optional namespace is the only valid argument.")); whiskErr != nil {
             return whiskErr

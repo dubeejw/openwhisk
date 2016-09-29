@@ -51,7 +51,6 @@ var actionCreateCmd = &cobra.Command{
   SilenceErrors: true,
   PreRunE:       setupClientConfig,
   RunE: func(cmd *cobra.Command, args []string) error {
-
     if whiskErr := checkArgs(args, 2, 2, "Action create",
             wski18n.T("An action name and action are required.")); whiskErr != nil {
       return whiskErr
@@ -93,7 +92,6 @@ var actionUpdateCmd = &cobra.Command{
   SilenceErrors: true,
   PreRunE:       setupClientConfig,
   RunE: func(cmd *cobra.Command, args []string) error {
-
     if whiskErr := checkArgs(args, 1, 2, "Action update",
         wski18n.T("An action name is required. An action is optional.")); whiskErr != nil {
       return whiskErr
@@ -135,22 +133,11 @@ var actionInvokeCmd = &cobra.Command{
   SilenceErrors: true,
   PreRunE:       setupClientConfig,
   RunE: func(cmd *cobra.Command, args []string) error {
-    var err error
-
     if whiskErr := checkArgs(args, 1, 1, "Action invoke", wski18n.T("An action name is required.")); whiskErr != nil {
       return whiskErr
     }
 
-    qName, err := parseQualifiedName(args[0])
-    if err != nil {
-      whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-      errMsg := fmt.Sprintf(
-        wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-          map[string]interface{}{"name": args[0], "err": err}))
-      whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-        whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-      return whiskErr
-    }
+    qName := parseQualifiedName(args[0])
     client.Namespace = qName.namespace
 
     var payload *json.RawMessage
@@ -229,24 +216,12 @@ var actionGetCmd = &cobra.Command{
   SilenceErrors: true,
   PreRunE:       setupClientConfig,
   RunE: func(cmd *cobra.Command, args []string) error {
-    var err error
-
     if whiskErr := checkArgs(args, 1, 1, "Action get", wski18n.T("An action name is required.")); whiskErr != nil {
       return whiskErr
     }
 
-    qName, err := parseQualifiedName(args[0])
-    if err != nil {
-      whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-      errMsg := fmt.Sprintf(
-        wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-          map[string]interface{}{"name": args[0], "err": err}))
-      whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-        whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-      return whiskErr
-    }
+    qName := parseQualifiedName(args[0])
     client.Namespace = qName.namespace
-
     action, _, err := client.Actions.Get(qName.entityName)
     if err != nil {
       whisk.Debug(whisk.DbgError, "client.Actions.Get(%s) error: %s\n", qName.entityName, err)
@@ -278,24 +253,14 @@ var actionDeleteCmd = &cobra.Command{
   SilenceErrors: true,
   PreRunE:       setupClientConfig,
   RunE: func(cmd *cobra.Command, args []string) error {
-
     if whiskErr := checkArgs(args, 1, 1, "Action delete", wski18n.T("An action name is required.")); whiskErr != nil {
       return whiskErr
     }
 
-    qName, err := parseQualifiedName(args[0])
-    if err != nil {
-      whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-      errMsg := fmt.Sprintf(
-        wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-          map[string]interface{}{"name": args[0], "err": err}))
-      whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-        whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-      return whiskErr
-    }
+    qName := parseQualifiedName(args[0])
     client.Namespace = qName.namespace
+    _, err := client.Actions.Delete(qName.entityName)
 
-    _, err = client.Actions.Delete(qName.entityName)
     if err != nil {
       whisk.Debug(whisk.DbgError, "client.Actions.Delete(%s) error: %s\n", qName.entityName, err)
       errMsg := fmt.Sprintf(
@@ -320,29 +285,10 @@ var actionListCmd = &cobra.Command{
   SilenceErrors: true,
   PreRunE:       setupClientConfig,
   RunE: func(cmd *cobra.Command, args []string) error {
-    var qName qualifiedName
-    var err error
+    var qName QualifiedName
 
     if len(args) == 1 {
-      qName, err = parseQualifiedName(args[0])
-      if err != nil {
-        whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-        errMsg := fmt.Sprintf(
-          wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-            map[string]interface{}{"name": args[0], "err": err}))
-        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-          whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-        return whiskErr
-      }
-
-      if len(qName.namespace) == 0 {
-        whisk.Debug(whisk.DbgError, "Namespace is missing from '%s'\n", args[0])
-        errMsg := fmt.Sprintf(
-          wski18n.T("No valid namespace detected. Run 'wsk property set --namespace' or ensure the name argument is preceded by a \"/\""))
-        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-          whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
-        return whiskErr
-      }
+      qName := parseQualifiedName(args[0])
       client.Namespace = qName.namespace
     } else if whiskErr := checkArgs(args, 0, 1, "Action list",
         wski18n.T("An optional namespace is the only valid argument.")); whiskErr != nil {
@@ -354,6 +300,7 @@ var actionListCmd = &cobra.Command{
       Limit: flags.common.limit,
     }
 
+    // TODO
     actions, _, err := client.Actions.List(qName.entityName, options)
     if err != nil {
       whisk.Debug(whisk.DbgError, "client.Actions.List(%s, %#v) error: %s\n", qName.entityName, options, err)
@@ -431,17 +378,8 @@ func parseAction(cmd *cobra.Command, args []string) (*whisk.Action, bool, error)
   var artifact string
   var limits *whisk.Limits
 
-  qName := qualifiedName{}
-  qName, err = parseQualifiedName(args[0])
-  if err != nil {
-    whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
-    errMsg := fmt.Sprintf(
-      wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-        map[string]interface{}{"name": args[0], "err": err}))
-    whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-      whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-    return nil, sharedSet, whiskErr
-  }
+  qName := QualifiedName{}
+  qName = parseQualifiedName(args[0])
   client.Namespace = qName.namespace
 
   if len(args) == 2 {
@@ -504,19 +442,9 @@ func parseAction(cmd *cobra.Command, args []string) (*whisk.Action, bool, error)
     action.Exec.Image = artifact
     action.Exec.Kind = "blackbox"
   } else if flags.action.copy {
-    qNameCopy := qualifiedName{}
-    qNameCopy, err = parseQualifiedName(args[1])
-    if err != nil {
-      whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[1], err)
-      errMsg := fmt.Sprintf(
-        wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
-          map[string]interface{}{"name": args[1], "err": err}))
-      whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
-        whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-      return nil, sharedSet, whiskErr
-    }
+    qNameCopy := QualifiedName{}
+    qNameCopy = parseQualifiedName(args[1])
     client.Namespace = qNameCopy.namespace
-
     existingAction, _, err := client.Actions.Get(qNameCopy.entityName)
     if err != nil {
       whisk.Debug(whisk.DbgError, "client.Actions.Get(%s) error: %s\n", qName.entityName, err)
