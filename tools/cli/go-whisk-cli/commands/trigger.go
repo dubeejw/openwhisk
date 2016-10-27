@@ -26,6 +26,7 @@ import (
 
     "github.com/spf13/cobra"
     "github.com/fatih/color"
+    "github.com/mattn/go-colorable"
 )
 
 // triggerCmd represents the trigger command
@@ -241,11 +242,34 @@ var triggerCreateCmd = &cobra.Command{
                         map[string]interface{}{"name": trigger.Name, "err": err}))
                 werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
 
-                // Delete trigger that was created for this feed
-                delerr := deleteTrigger(args[0])
-                if delerr != nil {
-                    whisk.Debug(whisk.DbgWarn, "Ignoring deleteTrigger(%s) failure: %s\n", args[0], delerr)
+                whiskErr, isWhiskErr := err.(*whisk.WskError)
+                if (isWhiskErr && whiskErr.ApplicationError == true) || !isWhiskErr {
+                    // Delete trigger that was created for this feed
                 }
+
+                // Failed to create the feed so delete just the trigger
+                qName, err := parseQualifiedName(args[0])
+                if err != nil {
+                    whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", args[0], err)
+                    errMsg := fmt.Sprintf(
+                        wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
+                            map[string]interface{}{"name": args[0], "err": err}))
+                    whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+                        whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+                    return whiskErr
+                }
+
+                client.Namespace = qName.namespace
+                _, _, err = client.Triggers.Delete(qName.entityName)
+
+                if err != nil {
+                    whisk.Debug(whisk.DbgError, "client.Triggers.Delete(%s) failed: %s\n", qName.entityName, err)
+                    errStr := fmt.Sprintf(wski18n.T("Unable to delete trigger '{{.name}}': {{.err}}",
+                        map[string]interface{}{"name": qName.entityName, "err": err}))
+                    werr := whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+                   return werr
+                }
+
                 return werr
             }
         }
@@ -534,32 +558,60 @@ var triggerListCmd = &cobra.Command{
     },
 }
 
-func configureFeed(triggerName string, FullFeedName string) error {
-    feedArgs := []string {FullFeedName}
+func configureFeed(triggerName string, fullFeedName string) error {
+    var parameters interface{}
+
     flags.common.blocking = true
-    err := actionInvokeCmd.RunE(nil, feedArgs)
+    qualifiedName, err := parseQualifiedName(fullFeedName)
     if err != nil {
-        whisk.Debug(whisk.DbgError, "Invoke of action '%s' failed: %s\n", FullFeedName, err)
-        errStr := fmt.Sprintf(
-            wski18n.T("Unable to invoke trigger '{{.trigname}}' feed action '{{.feedname}}'; feed is not configured: {{.err}}",
-                map[string]interface{}{"trigname": triggerName, "feedname": FullFeedName, "err": err}))
-        err = whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
-    } else {
-        whisk.Debug(whisk.DbgInfo, "Successfully configured trigger feed via feed action '%s'\n", FullFeedName)
+        whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", fullFeedName, err)
+        errMsg := fmt.Sprintf(
+            wski18n.T("'{{.name}}' is not a valid qualified name: {{.err}}",
+                map[string]interface{}{"name": fullFeedName, "err": err}))
+        whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+            whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+        return whiskErr
+    }
+    client.Namespace = qualifiedName.namespace
+
+    if len(flags.common.param) > 0 {
+        whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", flags.common.param)
+
+        parameters, err = getJSONFromStrings(flags.common.param, false)
+        if err != nil {
+            whisk.Debug(whisk.DbgError, "getJSONFromStrings(%#v, false) failed: %s\n", flags.common.param, err)
+            errMsg := fmt.Sprintf(
+                wski18n.T("Invalid parameter argument '{{.param}}': {{.err}}",
+                    map[string]interface{}{"param": fmt.Sprintf("%#v", flags.common.param), "err": err}))
+            whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+                whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+            return whiskErr
+        }
+
     }
 
-    return err
-}
-
-func deleteTrigger(triggerName string) error {
-    args := []string {triggerName}
-    err := triggerDeleteCmd.RunE(nil, args)
+    activation, _, err := client.Actions.Invoke(qualifiedName.entityName, parameters, flags.common.blocking)
     if err != nil {
-        whisk.Debug(whisk.DbgError, "Trigger '%s' delete failed: %s\n", triggerName, err)
-        errStr := fmt.Sprintf(
-            wski18n.T("Unable to delete trigger '{{.name}}': {{.err}}",
+
+        outputStream := colorable.NewColorableStderr()
+        fmt.Fprintf(color.Output,
+              wski18n.T("{{.ok}} invoked /{{.namespace}}/{{.name}} with id {{.id}}\n",
+                  map[string]interface{}{
+                      "ok": color.GreenString("ok:"),
+                      "namespace": boldString(qualifiedName.namespace),
+                      "name": boldString(qualifiedName.entityName),
+                      "id": boldString(activation.ActivationID)}))
+        printJSON(activation, outputStream)
+
+
+        whisk.Debug(whisk.DbgError, "client.Actions.Invoke(%s, %s, %t) error: %s\n", triggerName, parameters,
+            flags.common.blocking, err)
+        errMsg := fmt.Sprintf(
+            wski18n.T("Unable to invoke action '{{.name}}': {{.err}}",
                 map[string]interface{}{"name": triggerName, "err": err}))
-        err = whisk.MakeWskErrorFromWskError(errors.New(errStr), err, whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+         whiskErr := whisk.MakeWskErrorFromWskError(errors.New(errMsg), err, whisk.EXITCODE_ERR_GENERAL,
+            whisk.DISPLAY_MSG, whisk.NO_DISPLAY_USAGE)
+        return whiskErr
     }
 
     return err
