@@ -56,7 +56,8 @@ private case class Context(
     def metadata(user: Option[Identity]): Map[String, JsValue] = {
         Map("__ow_meta_verb" -> method.value.toLowerCase.toJson,
             "__ow_meta_headers" -> headers.map(h => h.lowercaseName -> h.value).toMap.toJson,
-            "__ow_meta_path" -> path.toJson) ++
+            "__ow_meta_path" -> path.toJson,
+            "__ow_meta_body" -> body.toJson) ++
             user.map(u => "__ow_meta_namespace" -> u.namespace.asString.toJson)
     }
 }
@@ -73,7 +74,8 @@ protected[core] object WhiskMetaApi extends Directives {
         "__ow_meta_verb",
         "__ow_meta_headers",
         "__ow_meta_path",
-        "__ow_meta_namespace")
+        "__ow_meta_namespace",
+        "__ow_meta_body")
 
     val mediaTranscoders = {
         // extensions are expected to contain only [a-z]
@@ -150,6 +152,8 @@ protected[core] object WhiskMetaApi extends Directives {
                     case _ => throw new Throwable("Illegal code")
                 } getOrElse (OK)
 
+                // TODO need to store the body in __ow_meta_body
+                //val body =
                 fields.get("body") map {
                     case JsString(str) => interpretHttpResponse(code, headers, str, transid)
                     case _             => terminate(BadRequest, Messages.httpContentTypeError)(transid)
@@ -235,7 +239,7 @@ trait WhiskMetaApi
     private val anonymousInvokePrefix = pathPrefix(anonymousInvokePath)
 
     /** Allowed verbs. */
-    private lazy val allowedOperations = get | delete | post | put
+    private lazy val allowedOperations = get | delete | post | put | head | options
 
     private lazy val validNameSegment = pathPrefix(EntityName.REGEX.r)
     private lazy val packagePrefix = pathPrefix("default".r | EntityName.REGEX.r)
