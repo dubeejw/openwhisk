@@ -235,7 +235,7 @@ trait WhiskMetaApi
     private val anonymousInvokePrefix = pathPrefix(anonymousInvokePath)
 
     /** Allowed verbs. */
-    private lazy val allowedOperations = get | delete | post | put
+    private lazy val allowedOperations = get | delete | post | put | head | options
 
     private lazy val validNameSegment = pathPrefix(EntityName.REGEX.r)
     private lazy val packagePrefix = pathPrefix("default".r | EntityName.REGEX.r)
