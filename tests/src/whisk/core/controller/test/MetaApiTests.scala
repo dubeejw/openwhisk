@@ -19,23 +19,10 @@ package whisk.core.controller.test
 import java.time.Instant
 import java.util.Base64
 
-import scala.concurrent.Await
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
-
+import jdk.internal.org.objectweb.asm.tree.MethodNode
 import org.junit.runner.RunWith
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.junit.JUnitRunner
-
-import spray.http.FormData
-import spray.http.HttpMethods
-import spray.http.MediaTypes
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
-import spray.json._
-import spray.json.DefaultJsonProtocol._
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.controller.Context
@@ -110,7 +97,9 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
             annotations = Parameters("meta", JsBoolean(true)) ++
                 Parameters("get", JsString("getApi")) ++
                 Parameters("post", JsString("createRoute")) ++
-                Parameters("delete", JsString("deleteApi"))),
+                Parameters("delete", JsString("deleteApi")) ++
+                Parameters("options", JsString("optionsApi")) ++
+                Parameters("head", JsString("headApi"))),
         WhiskPackage(
             EntityPath(systemId.asString),
             EntityName("partialmeta"),
@@ -271,7 +260,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
 
     it should "reject access to unknown package or missing package action" in {
         implicit val tid = transid()
-        val methods = Seq(Get, Post, Delete)
+        val methods = Seq(Get, Post, Delete, Options, Head)
 
         methods.foreach { m =>
             m(s"/$routePath") ~> sealRoute(routes(creds)) ~> check {
@@ -300,12 +289,14 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         Get(s"/$routePath/publicmeta") ~> sealRoute(routes(creds)) ~> check {
             status should be(InternalServerError)
         }
+        // TODO: OPTIONS, HEAD
     }
 
     it should "invoke action for allowed verbs on meta handler" in {
         implicit val tid = transid()
 
-        val methods = Seq((Get, "getApi"), (Post, "createRoute"), (Delete, "deleteApi"))
+        // TODO: Test won't work for HEAD
+        val methods = Seq((Get, "getApi"), (Post, "createRoute"), (Delete, "deleteApi"), (Options, "optionsApi"), (Head, "headApi"))
         methods.foreach {
             case (m, name) =>
                 m(s"/$routePath/heavymeta?a=b&c=d&namespace=xyz") ~> sealRoute(routes(creds)) ~> check {
@@ -322,7 +313,8 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
     it should "invoke action for allowed verbs on meta handler with partial mapping" in {
         implicit val tid = transid()
 
-        val methods = Seq((Get, OK), (Post, MethodNotAllowed), (Delete, MethodNotAllowed))
+        // TODO: Test won't work for HEAD
+        val methods = Seq((Get, OK), (Post, MethodNotAllowed), (Delete, MethodNotAllowed), (Options, MethodNotAllowed), (Delete, MethodNotAllowed))
         methods.foreach {
             case (m, code) =>
                 m(s"/$routePath/partialmeta?a=b&c=d") ~> sealRoute(routes(creds)) ~> check {
@@ -338,6 +330,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         }
     }
 
+    // TODO: OPTIONS, HEAD
     it should "invoke action for allowed verbs on meta handler and pass unmatched path to action" in {
         implicit val tid = transid()
 
@@ -356,6 +349,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         }
     }
 
+    // TODO: OPTIONS, HEAD
     it should "invoke action that times out and provide a code" in {
         implicit val tid = transid()
 
@@ -367,6 +361,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         }
     }
 
+    // TODO: OPTIONS, HEAD
     it should "invoke action that errors and response with error and code" in {
         implicit val tid = transid()
 
@@ -378,6 +373,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         }
     }
 
+    // TODO: OPTIONS, HEAD
     it should "merge package parameters with action, query params and content payload" in {
         implicit val tid = transid()
         val body = JsObject("foo" -> "bar".toJson)
@@ -400,7 +396,8 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
     it should "reject request that defined reserved properties" in {
         implicit val tid = transid()
 
-        val methods = Seq(Get, Post, Delete)
+        // TODO: Test won't work for HEAD
+        val methods = Seq(Get, Post, Delete, Options, Head)
 
         methods.foreach { m =>
             WhiskMetaApi.reservedProperties.foreach { p =>
@@ -431,6 +428,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         }
     }
 
+    // TODO: OPTIONS, HEAD
     it should "invoke action and ignore invoke parameters that are immutable" in {
         implicit val tid = transid()
         val contentX = JsObject("x" -> "overriden".toJson)
@@ -493,6 +491,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         }
     }
 
+    // TODO: OPTIONS
     it should "warn if meta package is public" in {
         implicit val tid = transid()
 
@@ -520,6 +519,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
 
     }
 
+    // TODO: OPTIONS, HEAD
     it should "allow anonymous acccess to fully qualified name" in {
         implicit val tid = transid()
         val exports = s"/$routePath/$anonymousInvokePath"
@@ -532,6 +532,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
                 }
             }
 
+        // TODO: OPTIONS, HEAD
         // the first of these fails in the identity lookup,
         // the second in the package lookup (does not exist),
         // the third and fourth fail the annotation check
@@ -547,6 +548,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
                 }
             }
 
+        // TODO: OPTIONS, HEAD
         // both of these should produce full result objects (trailing slash is ok)
         // action name starting with export_ will have required annotation
         Seq(s"$systemId/proxy/export_c.json", s"$systemId/proxy/export_c.json/").
@@ -562,6 +564,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
                 }
             }
 
+        // TODO: OPTIONS
         // these should match action in default package
         Seq(s"$systemId/default/export_c.json").
             foreach { path =>
@@ -575,6 +578,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
                 }
             }
 
+        // TODO: OPTIONS
         // these should project a field from the result object
         Seq(s"$systemId/proxy/export_c.json/content").
             foreach { path =>
@@ -585,6 +589,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
                 }
             }
 
+        // TODO: OPTIONS
         // these project a result which does not match expected type
         Seq(s"$systemId/proxy/export_c.json/a").
             foreach { path =>
