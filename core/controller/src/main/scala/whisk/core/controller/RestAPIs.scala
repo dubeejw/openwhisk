@@ -94,6 +94,21 @@ protected[controller] object RestAPIVersion_v1 {
 }
 
 /**
+  * A singleton object which defines properties needed to instantiate a service for v2
+  * of the REST API.
+  */
+protected[controller] object RestAPIVersion_v2 {
+    def requiredProperties =
+        WhiskConfig.whiskVersion ++
+                WhiskAuthStore.requiredProperties ++
+                WhiskEntityStore.requiredProperties ++
+                WhiskActivationStore.requiredProperties ++
+                WhiskConfig.consulServer ++
+                Authenticate.requiredProperties ++
+                Collection.requiredProperties
+}
+
+/**
  * A trait for wrapping routes with headers to include in response.
  * Useful for CORS.
  */
@@ -174,7 +189,7 @@ protected[controller] class RestAPIVersion_v1(
     private val rules = new RulesApi(apipath, apiversion)
     private val activations = new ActivationsApi(apipath, apiversion)
     private val packages = new PackagesApi(apipath, apiversion)
-    private val meta = new MetasApi(apipath, apiversion)
+    private val meta = new MetasApi(apipath, apiversion, "experimental/web")
 
     class NamespacesApi(
         val apipath: String,
@@ -261,7 +276,8 @@ protected[controller] class RestAPIVersion_v1(
 
     class MetasApi(
         override val apipath: String,
-        override val apiversion: String)(
+        override val apiversion: String,
+        override val webInvokePath: String)(
             implicit override val authStore: AuthStore,
             implicit val entityStore: EntityStore,
             override val activationStore: ActivationStore,
@@ -290,3 +306,72 @@ protected[controller] class RestAPIVersion_v1(
     }
 
 }
+
+/**
+  * An object which creates the Routes that define v2 of the whisk REST API.
+  */
+protected[controller] class RestAPIVersion_v2(
+    config: WhiskConfig,
+    implicit val actorSystem: ActorSystem,
+    implicit val logging: Logging)
+    extends RestAPIVersion("v2", config(whiskVersionDate), config(whiskVersionBuildno))
+    with Authenticate
+    with AuthenticatedRoute
+    with RespondWithHeaders {
+
+    implicit val executionContext = actorSystem.dispatcher
+
+    /**
+      * Here is the key method: it defines the Route (route tree) which implement v2 of the REST API.
+      *
+      * @Idioglossia This relies on the spray routing DSL.
+      * @see http://spray.io/documentation/1.2.2/spray-routing/
+      */
+    override def routes(implicit transid: TransactionId): Route = {
+        pathPrefix(apipath / apiversion) {
+            sendCorsHeaders {
+                (pathEndOrSingleSlash & get) {
+                    complete(OK, info)
+                } ~ {
+                    meta.routes()
+                }
+            }
+        }
+    }
+
+    // initialize datastores
+    protected implicit val authStore = WhiskAuthStore.datastore(config)
+    protected implicit val entityStore = WhiskEntityStore.datastore(config)
+    protected implicit val activationStore = WhiskActivationStore.datastore(config)
+
+    // initialize backend services
+    protected implicit val consulServer = config.consulServer
+    protected implicit val loadBalancer = new LoadBalancerService(config)
+    protected implicit val entitlementService = new LocalEntitlementProvider(config, loadBalancer)
+    protected implicit val activationId = new ActivationIdGenerator {}
+
+    // register collections and set verbosities on datastores and backend services
+    Collection.initialize(entityStore)
+
+    private val meta = new MetasApi(apipath, apiversion, "web")
+
+    class MetasApi(
+        override val apipath: String,
+        override val apiversion: String,
+        override val webInvokePath: String)(
+            implicit override val authStore: AuthStore,
+            implicit val entityStore: EntityStore,
+            override val activationStore: ActivationStore,
+            override val entitlementProvider: EntitlementProvider,
+            override val activationIdFactory: ActivationIdGenerator,
+            override val loadBalancer: LoadBalancerService,
+            override val consulServer: String,
+            override val actorSystem: ActorSystem,
+            override val executionContext: ExecutionContext,
+            override val logging: Logging)
+        extends WhiskMetaApi with WhiskServices {
+        override val whiskConfig = config
+    }
+
+}
+

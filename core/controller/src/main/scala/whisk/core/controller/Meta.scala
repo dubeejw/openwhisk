@@ -210,18 +210,17 @@ trait WhiskMetaApi
     with PostActionActivation {
     services: WhiskServices =>
 
-    /** API path and version for posting activations directly through the host. */
+    /** API path, version, and invocation path for posting activations directly through the host. */
     val apipath: String
     val apiversion: String
+    val webInvokePath: String
 
     /** Store for identities. */
     protected val authStore: AuthStore
 
     /** The prefix for web invokes e.g., /experimental/web. */
-    protected val webInvokePath = "web"
-
     private val webRoutePrefix = pathPrefix(webInvokePath)
-
+    
     /** Allowed verbs. */
     private lazy val allowedOperations = get | delete | post | put
 
