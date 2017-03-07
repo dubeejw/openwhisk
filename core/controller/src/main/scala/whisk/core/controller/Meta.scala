@@ -217,13 +217,10 @@ trait WhiskMetaApi
     /** Store for identities. */
     protected val authStore: AuthStore
 
-    /** The route prefix e.g., /experimental. */
-    protected val routePath = "experimental"
-
     /** The prefix for web invokes e.g., /experimental/web. */
     protected val webInvokePath = "web"
 
-    private val webRoutePrefix = pathPrefix(routePath / webInvokePath)
+    private val webRoutePrefix = pathPrefix(webInvokePath)
 
     /** Allowed verbs. */
     private lazy val allowedOperations = get | delete | post | put

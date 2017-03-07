@@ -62,7 +62,7 @@ class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val requestPath = host + s"/api/v1/experimental/web/$namespace/default/webaction.text/a?a="
+            val requestPath = host + s"/api/v1/web/$namespace/default/webaction.text/a?a="
             val padAmount = MAX_URL_LENGTH - requestPath.length
             Seq(("A", 200),
                 ("A" * padAmount, 200),
@@ -101,7 +101,7 @@ class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.text/__ow_meta_namespace"
+            val url = host + s"/api/v1/web/$namespace/default/webaction.text/__ow_meta_namespace"
 
             val unauthorizedResponse = RestAssured.given().config(sslconfig).get(url)
             unauthorizedResponse.statusCode shouldBe 401

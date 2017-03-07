@@ -227,7 +227,7 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         error.fields.get("code").get shouldBe an[JsNumber]
     }
 
-    val testRoutePath = s"/$routePath/$webInvokePath"
+    val testRoutePath = s"/$webInvokePath"
 
     Seq(None, Some(WhiskAuth(Subject(), AuthKey()).toIdentity)).foreach { creds =>
 

@@ -1,8 +1,8 @@
-# Web Actions (Experimental)
+# Web Actions
 
 Web actions are OpenWhisk actions annotated to quickly enable you to build web based applications. This allows you to program backend logic which your web application can access anonymously without requiring an OpenWhisk authentication key. It is up to the action developer to implement their own desired authentication and authorization (i.e. OAuth flow).
 
-Web action activations will be associated with the user that created the action. This actions defers the cost of an action activation from the caller to the owner of the action. **Note**: This feature is currently an experimental offering that enables users an early opportunity to try it out and provide feedback.
+Web action activations will be associated with the user that created the action. This actions defers the cost of an action activation from the caller to the owner of the action.
 
 Let's take the following JavaScript action `hello.js`,
 ```javascript
@@ -22,11 +22,11 @@ $ wsk package create demo
 $ wsk action create /guest/demo/hello hello.js -a web-export true
 ```
 
-The `web-export` annotation allows the action to be accessible as a web action via a new REST interface. The URL that is structured as follows: `https://{APIHOST}/api/v1/experimental/web/{QUALIFIED ACTION NAME}.{EXT}`. The fully qualified name of an action consists of three parts: the namespace, the package name, and the action name. An example is `guest/demo/hello`. The last part of the URI called the `extension` which is typically `.http` although other values are permitted as described later. The web action API path may be used with `curl` or `wget` without an API key. It may even be entered directly in your browser.
+The `web-export` annotation allows the action to be accessible as a web action via a new REST interface. The URL that is structured as follows: `https://{APIHOST}/api/v1/web/{QUALIFIED ACTION NAME}.{EXT}`. The fully qualified name of an action consists of three parts: the namespace, the package name, and the action name. An example is `guest/demo/hello`. The last part of the URI called the `extension` which is typically `.http` although other values are permitted as described later. The web action API path may be used with `curl` or `wget` without an API key. It may even be entered directly in your browser.
 
-Try opening [https://${APIHOST}/api/v1/experimental/web/guest/demo/hello.http?name=Jane](https://${APIHOST}/api/v1/experimental/web/guest/demo/hello.http?name=Jane) in your web browser. Or try invoking the action via `curl`:
+Try opening [https://${APIHOST}/api/v1/web/guest/demo/hello.http?name=Jane](https://${APIHOST}/api/v1/web/guest/demo/hello.http?name=Jane) in your web browser. Or try invoking the action via `curl`:
 ```
-$ curl https://${APIHOST}/api/v1/experimental/web/guest/demo/hello.http?name=Jane
+$ curl https://${APIHOST}/api/v1/web/guest/demo/hello.http?name=Jane
 ```
 
 Here is an example of a web action that performs an HTTP redirect:
@@ -117,7 +117,7 @@ function main(params) {
 ```
 and invoking the action with a query parameter `name`, using the `.json` extension to indicate a JSON response, and projecting the field `/response` will yield the following HTTP response:
 ```bash
-$ curl https://${APIHOST}/api/v1/experimental/web/guest/demo/hello.json/response?name=Jane
+$ curl https://${APIHOST}/api/v1/web/guest/demo/hello.json/response?name=Jane
 {
     "name": "Jane"
     "__ow_meta_verb": "get",
@@ -150,7 +150,7 @@ The result of these changes is that the `name` is bound to `Jane` and may not be
 
 ## Disabling web actions
 
-To disable a web action from being invoked via the new API (`https://APIHOST/api/v1/experimental/web/`), it’s enough to remove the annotation or set it to `false`.
+To disable a web action from being invoked via the new API (`https://APIHOST/api/v1/web/`), it’s enough to remove the annotation or set it to `false`.
 
 ```bash
 $ wsk action update /guest/demo/hello hello.js \
@@ -169,9 +169,9 @@ should return an HTTP response, for example: `{error: { code: 400 }`. Failing to
 
 ## Vanity URL
 
-Web actions may be accessed via an alternate URL which treats the OpenWhisk namespace as a subdomain to the API host. This is suitable for developing web actions that use cookies or local storage so that data is not inadvertently made visible to other web actions in other namespaces. The namespaces must match the regular expression `[\w@-]+` for the edge router to rewrite the subdomain to the corresponding URI. For a conforming namespace, the URL `https://guest.openwhisk.host/public/index.html` becomes a alias for `https://openwhisk.host/api/v1/experimental/web/guest/public/index.html`.
+Web actions may be accessed via an alternate URL which treats the OpenWhisk namespace as a subdomain to the API host. This is suitable for developing web actions that use cookies or local storage so that data is not inadvertently made visible to other web actions in other namespaces. The namespaces must match the regular expression `[\w@-]+` for the edge router to rewrite the subdomain to the corresponding URI. For a conforming namespace, the URL `https://guest.openwhisk.host/public/index.html` becomes a alias for `https://openwhisk.host/api/v1/web/guest/public/index.html`.
 
-For added convenience, and to provide the equivalent of an `index.html`, the edge router will also proxy `https://guest.openwhisk.host` to `https://openwhisk.host/api/v1/experimental/web/guest/public/index.html` where `/guest/public/index.html` (i.e., action is called `index` in a package called `public`) is a web action that responds with HTML content. If the action does not exist, the API host will respond with 404 Not Found.
+For added convenience, and to provide the equivalent of an `index.html`, the edge router will also proxy `https://guest.openwhisk.host` to `https://openwhisk.host/api/v1/web/guest/public/index.html` where `/guest/public/index.html` (i.e., action is called `index` in a package called `public`) is a web action that responds with HTML content. If the action does not exist, the API host will respond with 404 Not Found.
 
 For a local deployment, you will need to provide name resolution for the vanity URL to work. The easiest solution is to add an entry in `/etc/host` for `<namespace>.openwhisk.host`. Here is an example:
 ```bash
