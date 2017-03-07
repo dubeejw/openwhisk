@@ -35,6 +35,7 @@ import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import spray.json._
 import spray.json.DefaultJsonProtocol._
+import spray.routing.PathMatcher
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.controller.Context
@@ -64,16 +65,13 @@ import whisk.http.Messages
  * "using Specification DSL to write unit tests, as in should, must, not, be"
  * "using Specs2RouteTest DSL to chain HTTP requests for unit testing, as in ~>"
  */
-@RunWith(classOf[JUnitRunner])
-class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAndAfterEach {
 
-    override val apipath = "api"
-    override val apiversion = "v1"
-
+abstract class MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with WhiskMetaApi {
     val systemId = Subject()
     val systemKey = AuthKey()
     val systemIdentity = Future.successful(Identity(systemId, EntityName(systemId.asString), systemKey, Privilege.ALL))
     override lazy val entitlementProvider = new TestingEntitlementProvider(whiskConfig, loadBalancer)
+    protected val testRoutePath: String
 
     /** Meta API tests */
     behavior of "Meta API"
@@ -226,8 +224,6 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         error.fields.get("code") shouldBe defined
         error.fields.get("code").get shouldBe an[JsNumber]
     }
-
-    val testRoutePath = s"/$routePath/$webInvokePath"
 
     Seq(None, Some(WhiskAuth(Subject(), AuthKey()).toIdentity)).foreach { creds =>
 
@@ -830,4 +826,24 @@ class MetaApiTests extends ControllerTestCommon with WhiskMetaApi with BeforeAnd
         protected override def entitled(subject: Subject, right: Privilege, resource: Resource)(
             implicit transid: TransactionId) = ???
     }
+
+}
+
+@RunWith(classOf[JUnitRunner])
+class MetaApiTestsV1 extends MetaApiTests {
+    override lazy val apipath = "api"
+    override lazy val apiversion = "v1"
+    override lazy val webInvokePath = "experimental" / "web"
+    override val testRoutePath = "/experimental/web"
+}
+
+@RunWith(classOf[JUnitRunner])
+class MetaApiTestsV2 extends MetaApiTests {
+    override lazy val apipath = "api"
+    override lazy val apiversion = "v2"
+    override lazy val webInvokePath = {
+        val path: PathMatcher[shapeless.HNil] = "web"
+        path
+    }
+    override val testRoutePath = "/web"
 }
