@@ -34,6 +34,7 @@ import spray.json.DefaultJsonProtocol._
 import spray.routing.Directives
 import spray.routing.RequestContext
 import spray.routing.Route
+import spray.routing.PathMatcher
 import whisk.common.TransactionId
 import whisk.core.controller.actions.BlockingInvokeTimeout
 import whisk.core.controller.actions.PostActionActivation
@@ -210,20 +211,16 @@ trait WhiskMetaApi
     with PostActionActivation {
     services: WhiskServices =>
 
-    /** API path and version for posting activations directly through the host. */
-    val apipath: String
-    val apiversion: String
+    /** API path, version, and invocation path for posting activations directly through the host. */
+    protected lazy val apipath: String = "api"
+    protected lazy val apiversion: String = "v2"
+    protected lazy val webInvokePath: PathMatcher[shapeless.HNil] = "web"
 
     /** Store for identities. */
     protected val authStore: AuthStore
 
-    /** The route prefix e.g., /experimental. */
-    protected val routePath = "experimental"
-
     /** The prefix for web invokes e.g., /experimental/web. */
-    protected val webInvokePath = "web"
-
-    private val webRoutePrefix = pathPrefix(routePath / webInvokePath)
+    private val webRoutePrefix = pathPrefix(webInvokePath)
 
     /** Allowed verbs. */
     private lazy val allowedOperations = get | delete | post | put

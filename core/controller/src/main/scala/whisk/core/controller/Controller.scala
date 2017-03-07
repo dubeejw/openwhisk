@@ -49,9 +49,12 @@ import whisk.http.BasicRasService
 class Controller(
     config: WhiskConfig,
     instance: Int,
-    val logging: Logging)
+    implicit val logging: Logging)
     extends BasicRasService
     with Actor {
+
+    protected implicit val actorSystem = context.system
+    protected val loadBalancer = new LoadBalancerService(config)
 
     // each akka Actor has an implicit context
     override def actorRefFactory: ActorContext = context
@@ -67,15 +70,15 @@ class Controller(
         // handleRejections wraps the inner Route with a logical error-handler for
         // unmatched paths
         handleRejections(customRejectionHandler) {
-            super.routes ~ apiv1.routes
+            super.routes ~ apiv1.routes ~ apiv2.routes
         }
     }
 
     logging.info(this, s"starting controller instance ${instance}")
 
     /** The REST APIs. */
-    private val apiv1 = new RestAPIVersion_v1(config, context.system, logging)
-
+    private val apiv1 = new RestAPIVersion_v1(config, actorSystem, logging, loadBalancer)
+    private val apiv2 = new RestAPIVersion_v2(config, actorSystem, logging, loadBalancer)
 }
 
 /**
@@ -88,6 +91,7 @@ object Controller {
     // no default value specified, so it must appear in the properties file
     def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
         RestAPIVersion_v1.requiredProperties ++
+        RestAPIVersion_v2.requiredProperties ++
         LoadBalancerService.requiredProperties ++
         EntitlementProvider.requiredProperties
 
