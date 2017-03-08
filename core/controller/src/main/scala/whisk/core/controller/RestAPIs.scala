@@ -120,15 +120,42 @@ protected[controller] trait RespondWithHeaders extends Directives {
     val sendCorsHeaders = respondWithHeaders(allowOrigin, allowHeaders)
 }
 
-/**
- * An object which creates the Routes that define v1 of the whisk REST API.
- */
-protected[controller] class RestAPIVersion_v1(
+protected[controller] class WhiskRestAPI(
     config: WhiskConfig,
     implicit val actorSystem: ActorSystem,
     implicit val logging: Logging)
-    extends RestAPIVersion("v1", config(whiskVersionDate), config(whiskVersionBuildno))
+        extends RestAPIVersion("v1", config(whiskVersionDate), config(whiskVersionBuildno))
     with Authenticate
+    with AuthenticatedRoute
+    with RespondWithHeaders {
+    implicit val executionContext = actorSystem.dispatcher
+    protected implicit val loadBalancer = new LoadBalancerService(config)
+
+    private val apiv2 = new RestAPIVersion_v2(config, actorSystem, logging, loadBalancer)
+
+    private val apiv1 = new RestAPIVersion_v1(config, actorSystem, logging, loadBalancer)
+    protected implicit val authStore = WhiskAuthStore.datastore(config)
+
+
+    /**
+      * Here is the key method: it defines the Route (route tree) which implement v1 of the REST API.
+      *
+      * @Idioglossia This relies on the spray routing DSL.
+      * @see http://spray.io/documentation/1.2.2/spray-routing/
+      */
+    override def routes(implicit transid: TransactionId): Route = {
+        apiv1.routes(transid) ~ apiv2.routes(transid)
+    }
+}
+/**
+ * An object which creates the Routes that define v1 of the whisk REST API.
+ */
+protected class RestAPIVersion_v1(
+    config: WhiskConfig,
+    implicit val actorSystem: ActorSystem,
+    implicit val logging: Logging,
+    implicit val loadBalancer: LoadBalancerService)
+    extends Authenticate
     with AuthenticatedRoute
     with RespondWithHeaders {
 
@@ -140,7 +167,20 @@ protected[controller] class RestAPIVersion_v1(
      * @Idioglossia This relies on the spray routing DSL.
      * @see http://spray.io/documentation/1.2.2/spray-routing/
      */
-    override def routes(implicit transid: TransactionId): Route = {
+
+    val apipath = "api"
+    val apiversion = "v1"
+    def info = {
+        JsObject(
+            "openwhisk" -> "hello".toJson,
+            "version" -> apiversion.toJson,
+            "build" -> "build".toJson,
+            "buildno" -> "buildno".toJson)
+    }
+    protected val swaggeruipath = "docs"
+    protected val swaggerdocpath = "api-docs"
+
+    def routes(implicit transid: TransactionId): Route = {
         pathPrefix(apipath / apiversion) {
             sendCorsHeaders {
                 (pathEndOrSingleSlash & get) {
@@ -148,13 +188,13 @@ protected[controller] class RestAPIVersion_v1(
                 } ~ authenticate(basicauth) {
                     user =>
                         namespaces.routes(user) ~
-                            pathPrefix(Collection.NAMESPACES) {
-                                actions.routes(user) ~
-                                    triggers.routes(user) ~
-                                    rules.routes(user) ~
-                                    activations.routes(user) ~
-                                    packages.routes(user)
-                            } ~ meta.routes(user)
+                                pathPrefix(Collection.NAMESPACES) {
+                                    actions.routes(user) ~
+                                            triggers.routes(user) ~
+                                            rules.routes(user) ~
+                                            activations.routes(user) ~
+                                            packages.routes(user)
+                                } ~ meta.routes(user)
                 } ~ {
                     meta.routes()
                 } ~ pathPrefix(swaggeruipath) {
@@ -168,7 +208,17 @@ protected[controller] class RestAPIVersion_v1(
                 }
             }
         } ~ internalInvokerHealth
+
+        /*~ pathPrefix(apipath / "v2") {
+            sendCorsHeaders {
+                (pathEndOrSingleSlash & get) {
+                    complete(OK, info)
+                } ~ meta2.routes()
+            }
+        }*/
     }
+
+
 
     // initialize datastores
     protected implicit val authStore = WhiskAuthStore.datastore(config)
@@ -177,7 +227,7 @@ protected[controller] class RestAPIVersion_v1(
 
     // initialize backend services
     protected implicit val consulServer = config.consulServer
-    protected implicit val loadBalancer = new LoadBalancerService(config)
+    //protected implicit val loadBalancer = new LoadBalancerService(config)
     protected implicit val entitlementService = new LocalEntitlementProvider(config, loadBalancer)
     protected implicit val activationId = new ActivationIdGenerator {}
 
@@ -191,6 +241,7 @@ protected[controller] class RestAPIVersion_v1(
     private val activations = new ActivationsApi(apipath, apiversion)
     private val packages = new PackagesApi(apipath, apiversion)
     private val meta = new MetasApi(apipath, apiversion, "experimental" / "web")
+    private val meta2 = new MetasApi(apipath, "v2", "web")
 
     class NamespacesApi(
         val apipath: String,
@@ -275,25 +326,27 @@ protected[controller] class RestAPIVersion_v1(
         override val whiskConfig = config
     }
 
-    class MetasApi(val api: String,
+
+    class MetasApi(
+        val api: String,
         val version: String,
         val path: PathMatcher[shapeless.HNil])(
-            implicit override val authStore: AuthStore,
-            implicit val entityStore: EntityStore,
-            override val activationStore: ActivationStore,
-            override val entitlementProvider: EntitlementProvider,
-            override val activationIdFactory: ActivationIdGenerator,
-            override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val actorSystem: ActorSystem,
-            override val executionContext: ExecutionContext,
-            override val logging: Logging)
+        implicit override val authStore: AuthStore,
+        implicit val entityStore: EntityStore,
+        override val activationStore: ActivationStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val activationIdFactory: ActivationIdGenerator,
+        override val loadBalancer: LoadBalancerService,
+        override val consulServer: String,
+        override val actorSystem: ActorSystem,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging)
         extends WhiskMetaApi with WhiskServices {
-        override val whiskConfig = config
-        override lazy val apipath = "api"
-        override lazy val apiversion = "v1"
-        override lazy val webInvokePath = "experimental" / "web"
-    }
+            override val whiskConfig = config
+            override lazy val apipath = api
+            override lazy val apiversion = version
+            override lazy val webInvokePath = path
+        }
 
     /**
      * Handles GET /invokers URI.
@@ -311,18 +364,29 @@ protected[controller] class RestAPIVersion_v1(
 }
 
 /**
-  * An object which creates the Routes that define v2 of the whisk REST API.
-  */
-protected[controller] class RestAPIVersion_v2(
-    config: WhiskConfig,
-    implicit val actorSystem: ActorSystem,
-    implicit val logging: Logging)
-    extends RestAPIVersion("v2", config(whiskVersionDate), config(whiskVersionBuildno))
-    with Authenticate
-    with AuthenticatedRoute
-    with RespondWithHeaders {
+* An object which creates the Routes that define v2 of the whisk REST API.
+*/
+protected class RestAPIVersion_v2(
+                                                     config: WhiskConfig,
+                                                     implicit val actorSystem: ActorSystem,
+                                                     implicit val logging: Logging,
+                                                     implicit val loadBalancer: LoadBalancerService
+                                 )
+        extends  Authenticate
+                with AuthenticatedRoute
+                with RespondWithHeaders {
 
     implicit val executionContext = actorSystem.dispatcher
+
+    val apipath = "api"
+    val apiversion = "v2"
+    def info = {
+        JsObject(
+            "openwhisk" -> "hello".toJson,
+            "version" -> apiversion.toJson,
+            "build" -> "build".toJson,
+            "buildno" -> "buildno".toJson)
+    }
 
     /**
       * Here is the key method: it defines the Route (route tree) which implement v2 of the REST API.
@@ -330,7 +394,7 @@ protected[controller] class RestAPIVersion_v2(
       * @Idioglossia This relies on the spray routing DSL.
       * @see http://spray.io/documentation/1.2.2/spray-routing/
       */
-    override def routes(implicit transid: TransactionId): Route = {
+    def routes(implicit transid: TransactionId): Route = {
         pathPrefix(apipath / apiversion) {
             sendCorsHeaders {
                 (pathEndOrSingleSlash & get) {
@@ -340,14 +404,16 @@ protected[controller] class RestAPIVersion_v2(
         }
     }
 
+
     // initialize datastores
     protected implicit val authStore = WhiskAuthStore.datastore(config)
     protected implicit val entityStore = WhiskEntityStore.datastore(config)
     protected implicit val activationStore = WhiskActivationStore.datastore(config)
 
     // initialize backend services
-    protected implicit val consulServer = config.consulServer
-    protected implicit val loadBalancer = new LoadBalancerService(config)
+
+    protected implicit val consulServer = config.consulServer   // host and port
+    //protected implicit val loadBalancer = new LoadBalancerService(config)
     protected implicit val entitlementService = new LocalEntitlementProvider(config, loadBalancer)
     protected implicit val activationId = new ActivationIdGenerator {}
 
@@ -357,20 +423,20 @@ protected[controller] class RestAPIVersion_v2(
     private val meta = new MetasApi(apipath, apiversion, "web")
 
     class MetasApi(
-        val api: String,
-        val version: String,
-        val path: PathMatcher[shapeless.HNil])(
-            implicit override val authStore: AuthStore,
-            implicit val entityStore: EntityStore,
-            override val activationStore: ActivationStore,
-            override val entitlementProvider: EntitlementProvider,
-            override val activationIdFactory: ActivationIdGenerator,
-            override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val actorSystem: ActorSystem,
-            override val executionContext: ExecutionContext,
-            override val logging: Logging)
-        extends WhiskMetaApi with WhiskServices {
+                          val api: String,
+                          val version: String,
+                          val path: PathMatcher[shapeless.HNil])(
+                          implicit override val authStore: AuthStore,
+                          implicit val entityStore: EntityStore,
+                          override val activationStore: ActivationStore,
+                          override val entitlementProvider: EntitlementProvider,
+                          override val activationIdFactory: ActivationIdGenerator,
+                          override val loadBalancer: LoadBalancerService,
+                          override val consulServer: String,
+                          override val actorSystem: ActorSystem,
+                          override val executionContext: ExecutionContext,
+                          override val logging: Logging)
+            extends WhiskMetaApi with WhiskServices {
         override val whiskConfig = config
         override lazy val apipath = api
         override lazy val apiversion = version
@@ -378,4 +444,3 @@ protected[controller] class RestAPIVersion_v2(
     }
 
 }
-
