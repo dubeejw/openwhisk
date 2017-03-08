@@ -124,16 +124,21 @@ protected[controller] trait RespondWithHeaders extends Directives {
  * An object which creates the Routes that define v1 of the whisk REST API.
  */
 protected[controller] class RestAPIVersion_v1(
-    config: WhiskConfig,
-    implicit val actorSystem: ActorSystem,
-    implicit val logging: Logging,
-    implicit val loadBalancer: LoadBalancerService)
+    config: WhiskConfig)(
+         implicit val authStore: AuthStore,
+         implicit val entityStore: EntityStore,
+         implicit val activationStore: ActivationStore,
+         implicit val entitlementProvider: EntitlementProvider,
+         implicit val activationIdFactory: ActivationIdGenerator,
+         implicit val loadBalancer: LoadBalancerService,
+         implicit val consulServer: String,
+         implicit val actorSystem: ActorSystem,
+         implicit val executionContext: ExecutionContext,
+         implicit val logging: Logging)
     extends RestAPIVersion("v1", config(whiskVersionDate), config(whiskVersionBuildno))
     with Authenticate
     with AuthenticatedRoute
     with RespondWithHeaders {
-
-    implicit val executionContext = actorSystem.dispatcher
 
     /**
      * Here is the key method: it defines the Route (route tree) which implement v1 of the REST API.
@@ -170,19 +175,6 @@ protected[controller] class RestAPIVersion_v1(
             }
         } ~ internalInvokerHealth
     }
-
-    // initialize datastores
-    protected implicit val authStore = WhiskAuthStore.datastore(config)
-    protected implicit val entityStore = WhiskEntityStore.datastore(config)
-    protected implicit val activationStore = WhiskActivationStore.datastore(config)
-
-    // initialize backend services
-    protected implicit val consulServer = config.consulServer
-    protected implicit val entitlementService = new LocalEntitlementProvider(config, loadBalancer)
-    protected implicit val activationId = new ActivationIdGenerator {}
-
-    // register collections and set verbosities on datastores and backend services
-    Collection.initialize(entityStore)
 
     private val namespaces = new NamespacesApi(apipath, apiversion)
     private val actions = new ActionsApi(apipath, apiversion)
@@ -314,16 +306,21 @@ protected[controller] class RestAPIVersion_v1(
   * An object which creates the Routes that define v2 of the whisk REST API.
   */
 protected[controller] class RestAPIVersion_v2(
-    config: WhiskConfig,
-    implicit val actorSystem: ActorSystem,
-    implicit val logging: Logging,
-    implicit val loadBalancer: LoadBalancerService)
+    config: WhiskConfig)(
+        implicit val authStore: AuthStore,
+        implicit val entityStore: EntityStore,
+        implicit val activationStore: ActivationStore,
+        implicit val entitlementProvider: EntitlementProvider,
+        implicit val activationIdFactory: ActivationIdGenerator,
+        implicit val loadBalancer: LoadBalancerService,
+        implicit val consulServer: String,
+        implicit val actorSystem: ActorSystem,
+        implicit val executionContext: ExecutionContext,
+        implicit val logging: Logging)
     extends RestAPIVersion("v2", config(whiskVersionDate), config(whiskVersionBuildno))
     with Authenticate
     with AuthenticatedRoute
     with RespondWithHeaders {
-
-    implicit val executionContext = actorSystem.dispatcher
 
     /**
       * Here is the key method: it defines the Route (route tree) which implement v2 of the REST API.
@@ -340,19 +337,6 @@ protected[controller] class RestAPIVersion_v2(
             }
         }
     }
-
-    // initialize datastores
-    protected implicit val authStore = WhiskAuthStore.datastore(config)
-    protected implicit val entityStore = WhiskEntityStore.datastore(config)
-    protected implicit val activationStore = WhiskActivationStore.datastore(config)
-
-    // initialize backend services
-    protected implicit val consulServer = config.consulServer
-    protected implicit val entitlementService = new LocalEntitlementProvider(config, loadBalancer)
-    protected implicit val activationId = new ActivationIdGenerator {}
-
-    // register collections and set verbosities on datastores and backend services
-    Collection.initialize(entityStore)
 
     private val meta = new MetasApi(apipath, apiversion, "web")
 

@@ -30,6 +30,9 @@ import whisk.core.entitlement.EntitlementProvider
 import whisk.core.loadBalancer.LoadBalancerService
 import whisk.http.BasicHttpService
 import whisk.http.BasicRasService
+import whisk.core.entity._
+import whisk.core.entitlement._
+import whisk.core.entity.ActivationId.ActivationIdGenerator
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.
@@ -53,9 +56,6 @@ class Controller(
     extends BasicRasService
     with Actor {
 
-    protected implicit val actorSystem = context.system
-    protected val loadBalancer = new LoadBalancerService(config)
-
     // each akka Actor has an implicit context
     override def actorRefFactory: ActorContext = context
 
@@ -76,9 +76,26 @@ class Controller(
 
     logging.info(this, s"starting controller instance ${instance}")
 
+    // initialize datastores
+    implicit val actorSystem = context.system
+    implicit val executionContext = actorSystem.dispatcher
+    implicit val whiskConfig = config
+    implicit val authStore = WhiskAuthStore.datastore(whiskConfig)
+    implicit val entityStore = WhiskEntityStore.datastore(whiskConfig)
+    implicit val activationStore = WhiskActivationStore.datastore(whiskConfig)
+
+    // initialize backend services
+    implicit val loadBalancer = new LoadBalancerService(whiskConfig)
+    implicit val consulServer = whiskConfig.consulServer
+    implicit val entitlementProvider = new LocalEntitlementProvider(whiskConfig, loadBalancer)
+    implicit val activationIdFactory = new ActivationIdGenerator {}
+
+    // register collections and set verbosities on datastores and backend services
+    Collection.initialize(entityStore)
+
     /** The REST APIs. */
-    private val apiv1 = new RestAPIVersion_v1(config, actorSystem, logging, loadBalancer)
-    private val apiv2 = new RestAPIVersion_v2(config, actorSystem, logging, loadBalancer)
+    private val apiv1 = new RestAPIVersion_v1(config)
+    private val apiv2 = new RestAPIVersion_v2(config)
 }
 
 /**
