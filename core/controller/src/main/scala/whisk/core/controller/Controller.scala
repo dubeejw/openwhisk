@@ -94,8 +94,8 @@ class Controller(
     Collection.initialize(entityStore)
 
     /** The REST APIs. */
-    private val apiv1 = new RestAPIVersion_v1(config)
-    private val apiv2 = new RestAPIVersion_v2(config)
+    private val apiv1 = new RestAPIVersion_v1
+    private val apiv2 = new RestAPIVersion_v2
 }
 
 /**

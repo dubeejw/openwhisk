@@ -123,8 +123,7 @@ protected[controller] trait RespondWithHeaders extends Directives {
 /**
  * An object which creates the Routes that define v1 of the whisk REST API.
  */
-protected[controller] class RestAPIVersion_v1(
-    config: WhiskConfig)(
+protected[controller] class RestAPIVersion_v1()(
          implicit val authStore: AuthStore,
          implicit val entityStore: EntityStore,
          implicit val activationStore: ActivationStore,
@@ -134,8 +133,9 @@ protected[controller] class RestAPIVersion_v1(
          implicit val consulServer: String,
          implicit val actorSystem: ActorSystem,
          implicit val executionContext: ExecutionContext,
-         implicit val logging: Logging)
-    extends RestAPIVersion("v1", config(whiskVersionDate), config(whiskVersionBuildno))
+         implicit val logging: Logging,
+         implicit val whiskConfig: WhiskConfig)
+    extends RestAPIVersion("v1", whiskConfig(whiskVersionDate), whiskConfig(whiskVersionBuildno))
     with Authenticate
     with AuthenticatedRoute
     with RespondWithHeaders {
@@ -205,11 +205,11 @@ protected[controller] class RestAPIVersion_v1(
             override val loadBalancer: LoadBalancerService,
             override val consulServer: String,
             override val executionContext: ExecutionContext,
-            override val logging: Logging)
+            override val logging: Logging,
+            override val whiskConfig: WhiskConfig)
         extends WhiskActionsApi with WhiskServices {
-        override val whiskConfig = config
-        logging.info(this, s"actionSequenceLimit '${config.actionSequenceLimit}'")
-        assert(config.actionSequenceLimit.toInt > 0)
+        logging.info(this, s"actionSequenceLimit '${whiskConfig.actionSequenceLimit}'")
+        assert(whiskConfig.actionSequenceLimit.toInt > 0)
     }
 
     class TriggersApi(
@@ -223,9 +223,9 @@ protected[controller] class RestAPIVersion_v1(
             override val loadBalancer: LoadBalancerService,
             override val consulServer: String,
             override val executionContext: ExecutionContext,
-            override val logging: Logging)
+            override val logging: Logging,
+            override val whiskConfig: WhiskConfig)
         extends WhiskTriggersApi with WhiskServices {
-        override val whiskConfig = config
     }
 
     class RulesApi(
@@ -238,9 +238,9 @@ protected[controller] class RestAPIVersion_v1(
             override val loadBalancer: LoadBalancerService,
             override val consulServer: String,
             override val executionContext: ExecutionContext,
-            override val logging: Logging)
+            override val logging: Logging,
+            override val whiskConfig: WhiskConfig)
         extends WhiskRulesApi with WhiskServices {
-        override val whiskConfig = config
     }
 
     class ActivationsApi(
@@ -262,29 +262,9 @@ protected[controller] class RestAPIVersion_v1(
             override val loadBalancer: LoadBalancerService,
             override val consulServer: String,
             override val executionContext: ExecutionContext,
-            override val logging: Logging)
+            override val logging: Logging,
+            override val whiskConfig: WhiskConfig)
         extends WhiskPackagesApi with WhiskServices {
-        override val whiskConfig = config
-    }
-
-    class MetasApi(val api: String,
-        val version: String,
-        val path: PathMatcher[shapeless.HNil])(
-            implicit override val authStore: AuthStore,
-            implicit val entityStore: EntityStore,
-            override val activationStore: ActivationStore,
-            override val entitlementProvider: EntitlementProvider,
-            override val activationIdFactory: ActivationIdGenerator,
-            override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val actorSystem: ActorSystem,
-            override val executionContext: ExecutionContext,
-            override val logging: Logging)
-        extends WhiskMetaApi with WhiskServices {
-        override val whiskConfig = config
-        override lazy val apipath = "api"
-        override lazy val apiversion = "v1"
-        override lazy val webInvokePath = "experimental" / "web"
     }
 
     /**
@@ -305,8 +285,7 @@ protected[controller] class RestAPIVersion_v1(
 /**
   * An object which creates the Routes that define v2 of the whisk REST API.
   */
-protected[controller] class RestAPIVersion_v2(
-    config: WhiskConfig)(
+protected[controller] class RestAPIVersion_v2()(
         implicit val authStore: AuthStore,
         implicit val entityStore: EntityStore,
         implicit val activationStore: ActivationStore,
@@ -316,8 +295,9 @@ protected[controller] class RestAPIVersion_v2(
         implicit val consulServer: String,
         implicit val actorSystem: ActorSystem,
         implicit val executionContext: ExecutionContext,
-        implicit val logging: Logging)
-    extends RestAPIVersion("v2", config(whiskVersionDate), config(whiskVersionBuildno))
+        implicit val logging: Logging,
+        implicit val whiskConfig: WhiskConfig)
+    extends RestAPIVersion("v2", whiskConfig(whiskVersionDate), whiskConfig(whiskVersionBuildno))
     with Authenticate
     with AuthenticatedRoute
     with RespondWithHeaders {
@@ -339,27 +319,25 @@ protected[controller] class RestAPIVersion_v2(
     }
 
     private val meta = new MetasApi(apipath, apiversion, "web")
-
-    class MetasApi(
-        val api: String,
-        val version: String,
-        val path: PathMatcher[shapeless.HNil])(
-            implicit override val authStore: AuthStore,
-            implicit val entityStore: EntityStore,
-            override val activationStore: ActivationStore,
-            override val entitlementProvider: EntitlementProvider,
-            override val activationIdFactory: ActivationIdGenerator,
-            override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val actorSystem: ActorSystem,
-            override val executionContext: ExecutionContext,
-            override val logging: Logging)
-        extends WhiskMetaApi with WhiskServices {
-        override val whiskConfig = config
-        override lazy val apipath = api
-        override lazy val apiversion = version
-        override lazy val webInvokePath = path
-    }
-
 }
 
+class MetasApi(
+    val api: String,
+    val version: String,
+    val path: PathMatcher[shapeless.HNil])(
+        implicit override val authStore: AuthStore,
+        implicit val entityStore: EntityStore,
+        override val activationStore: ActivationStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val activationIdFactory: ActivationIdGenerator,
+        override val loadBalancer: LoadBalancerService,
+        override val consulServer: String,
+        override val actorSystem: ActorSystem,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging,
+        override val whiskConfig: WhiskConfig)
+    extends WhiskMetaApi with WhiskServices {
+    override lazy val apipath = api
+    override lazy val apiversion = version
+    override lazy val webInvokePath = path
+}
