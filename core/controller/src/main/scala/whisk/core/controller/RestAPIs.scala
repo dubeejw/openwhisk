@@ -78,35 +78,20 @@ abstract protected[controller] class RestAPIVersion(
 }
 
 /**
- * A singleton object which defines properties needed to instantiate a service for v1
+ * A singleton object which defines properties needed to instantiate a service for v1 or v2
  * of the REST API.
  */
-protected[controller] object RestAPIVersion_v1 {
+protected[controller] object RestAPIProperties {
     def requiredProperties =
         WhiskConfig.whiskVersion ++
-            WhiskAuthStore.requiredProperties ++
-            WhiskEntityStore.requiredProperties ++
-            WhiskActivationStore.requiredProperties ++
-            WhiskConfig.consulServer ++
-            EntitlementProvider.requiredProperties ++
-            WhiskActionsApi.requiredProperties ++
-            Authenticate.requiredProperties ++
-            Collection.requiredProperties
-}
-
-/**
-  * A singleton object which defines properties needed to instantiate a service for v2
-  * of the REST API.
-  */
-protected[controller] object RestAPIVersion_v2 {
-    def requiredProperties =
-        WhiskConfig.whiskVersion ++
-                WhiskAuthStore.requiredProperties ++
-                WhiskEntityStore.requiredProperties ++
-                WhiskActivationStore.requiredProperties ++
-                WhiskConfig.consulServer ++
-                Authenticate.requiredProperties ++
-                Collection.requiredProperties
+        WhiskAuthStore.requiredProperties ++
+        WhiskEntityStore.requiredProperties ++
+        WhiskActivationStore.requiredProperties ++
+        WhiskConfig.consulServer ++
+        EntitlementProvider.requiredProperties ++
+        WhiskActionsApi.requiredProperties ++
+        Authenticate.requiredProperties ++
+        Collection.requiredProperties
 }
 
 /**

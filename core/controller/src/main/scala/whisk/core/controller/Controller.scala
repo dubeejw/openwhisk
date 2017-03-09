@@ -107,8 +107,7 @@ object Controller {
     // a value, and whose values are default values.   A null value in the Map means there is
     // no default value specified, so it must appear in the properties file
     def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
-        RestAPIVersion_v1.requiredProperties ++
-        RestAPIVersion_v2.requiredProperties ++
+        RestAPIProperties.requiredProperties ++
         LoadBalancerService.requiredProperties ++
         EntitlementProvider.requiredProperties
 
