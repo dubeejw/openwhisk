@@ -62,7 +62,7 @@ abstract class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val requestPath = host + s"/$testRoutePath/$namespace/default/webaction.text/a?a="
+            val requestPath = host + s"$testRoutePath/$namespace/default/webaction.text/a?a="
             val padAmount = MAX_URL_LENGTH - requestPath.length
             Seq(("A", 200),
                 ("A" * padAmount, 200),
@@ -101,7 +101,7 @@ abstract class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val url = host + s"/$testRoutePath/$namespace/default/webaction.text/__ow_meta_namespace"
+            val url = host + s"$testRoutePath/$namespace/default/webaction.text/__ow_meta_namespace"
 
             val unauthorizedResponse = RestAssured.given().config(sslconfig).get(url)
             unauthorizedResponse.statusCode shouldBe 401
@@ -112,7 +112,7 @@ abstract class WskWebActionsTests
                 .auth().preemptive().basic(wskprops.authKey.split(":")(0), wskprops.authKey.split(":")(1))
                 .get(url)
 
-            if (testRoutePath == "api/v1/experimental/web") {
+            if (testRoutePath == "/api/v1/experimental/web") {
                 authorizedResponse.statusCode shouldBe 200
                 authorizedResponse.body().asString() shouldBe namespace
             } else {
@@ -123,10 +123,10 @@ abstract class WskWebActionsTests
 
 @RunWith(classOf[JUnitRunner])
 class WskWebActionsTestsV1 extends WskWebActionsTests {
-    override val testRoutePath = "api/v1/experimental/web"
+    override val testRoutePath = "/api/v1/experimental/web"
 }
 
 @RunWith(classOf[JUnitRunner])
 class WskWebActionsTestsV2 extends WskWebActionsTests {
-    override val testRoutePath = "api/v2/web"
+    override val testRoutePath = "/api/v2/web"
 }

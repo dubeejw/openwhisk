@@ -217,7 +217,7 @@ trait WhiskMetaApi
     protected val authStore: AuthStore
 
     /** The prefix for web invokes e.g., /web. */
-    private val webRoutePrefix = {
+    private lazy val webRoutePrefix = {
         pathPrefix(webInvokePathSegments.map(segmentStringToPathMatcher(_)).reduceLeft(_ / _))
     }
 

@@ -65,12 +65,22 @@ import whisk.http.Messages
  * "using Specs2RouteTest DSL to chain HTTP requests for unit testing, as in ~>"
  */
 
-abstract class MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with WhiskMetaApi {
+@RunWith(classOf[JUnitRunner])
+class MetaApiTestsV1 extends MetaApiTests {
+    override lazy val webInvokePathSegments = Seq("experimental", "web")
+}
+
+@RunWith(classOf[JUnitRunner])
+class MetaApiTestsV2 extends MetaApiTests {
+    override lazy val webInvokePathSegments = Seq("web")
+}
+
+trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with WhiskMetaApi {
     val systemId = Subject()
     val systemKey = AuthKey()
     val systemIdentity = Future.successful(Identity(systemId, EntityName(systemId.asString), systemKey, Privilege.ALL))
     override lazy val entitlementProvider = new TestingEntitlementProvider(whiskConfig, loadBalancer)
-    protected val testRoutePath: String
+    protected val testRoutePath = webInvokePathSegments.mkString("/", "/", "")
 
     /** Meta API tests */
     behavior of "Meta API"
@@ -261,7 +271,7 @@ abstract class MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach
             Seq((Head, MethodNotAllowed), (Patch, MethodNotAllowed)).
                 foreach {
                     case (m, code) =>
-                        m(s"$systemId/proxy/export_c.json") ~> sealRoute(routes(creds)) ~> check {
+                        m(s"$testRoutePath/$systemId/proxy/export_c.json") ~> sealRoute(routes(creds)) ~> check {
                             status should be(code)
                         }
                 }
@@ -826,16 +836,4 @@ abstract class MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach
             implicit transid: TransactionId) = ???
     }
 
-}
-
-@RunWith(classOf[JUnitRunner])
-class MetaApiTestsV1 extends MetaApiTests {
-    override lazy val webInvokePathSegments = Seq("experimental","web")
-    override val testRoutePath = "/experimental/web"
-}
-
-@RunWith(classOf[JUnitRunner])
-class MetaApiTestsV2 extends MetaApiTests {
-    override lazy val webInvokePathSegments = Seq("web")
-    override val testRoutePath = "/web"
 }
