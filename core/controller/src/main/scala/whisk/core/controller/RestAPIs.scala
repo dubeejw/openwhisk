@@ -295,11 +295,9 @@ protected[controller] class RestAPIVersion_v2()(
       */
     override def routes(implicit transid: TransactionId): Route = {
         pathPrefix(apipath / apiversion) {
-            sendCorsHeaders {
-                (pathEndOrSingleSlash & get) {
-                    complete(OK, info)
-                } ~ meta.routes()
-            }
+            (pathEndOrSingleSlash & get) {
+                complete(OK, info)
+            } ~ meta.routes()
         }
     }
 
