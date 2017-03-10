@@ -262,20 +262,18 @@ trait WhiskMetaApi
      */
     def routes(user: Option[Identity])(implicit transid: TransactionId): Route = {
         webRoutePrefix {
-            allowedOperations {
-                validNameSegment { namespace =>
-                    packagePrefix { pkg =>
-                        pathPrefix(Segment) {
-                            _ match {
-                                case WhiskMetaApi.extensionSplitter(action, extension) =>
-                                    if (WhiskMetaApi.supportedMediaTypes.contains(extension)) {
-                                        val pkgName = if (pkg == "default") None else Some(EntityName(pkg))
-                                        handleMatch(EntityName(namespace), pkgName, EntityName(action), extension, user)
-                                    } else {
-                                        terminate(NotAcceptable, Messages.contentTypeNotSupported)
-                                    }
-                                case _ => terminate(NotAcceptable, Messages.contentTypeNotSupported)
-                            }
+            validNameSegment { namespace =>
+                packagePrefix { pkg =>
+                    pathPrefix(Segment) {
+                        _ match {
+                            case WhiskMetaApi.extensionSplitter(action, extension) =>
+                                if (WhiskMetaApi.supportedMediaTypes.contains(extension)) {
+                                    val pkgName = if (pkg == "default") None else Some(EntityName(pkg))
+                                    handleMatch(EntityName(namespace), pkgName, EntityName(action), extension, user)
+                                } else {
+                                    terminate(NotAcceptable, Messages.contentTypeNotSupported)
+                                }
+                            case _ => terminate(NotAcceptable, Messages.contentTypeNotSupported)
                         }
                     }
                 }
@@ -324,12 +322,14 @@ trait WhiskMetaApi
             }
         }
 
-        extract(_.request.entity.data.length) { length =>
-            validateSize(isWhithinRange(length))(transid) {
-                entity(as[Option[JsObject]]) {
-                    body => process(body)
-                } ~ entity(as[FormData]) {
-                    form => process(Some(form.fields.toMap.toJson.asJsObject))
+        allowedOperations {
+            extract(_.request.entity.data.length) { length =>
+                validateSize(isWhithinRange(length))(transid) {
+                    entity(as[Option[JsObject]]) {
+                        body => process(body)
+                    } ~ entity(as[FormData]) {
+                        form => process(Some(form.fields.toMap.toJson.asJsObject))
+                    }
                 }
             }
         }
