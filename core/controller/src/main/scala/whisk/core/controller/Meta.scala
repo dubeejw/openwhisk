@@ -44,6 +44,7 @@ import whisk.core.entity.types._
 import whisk.http.ErrorResponse.terminate
 import whisk.http.Messages
 import whisk.utils.JsHelpers._
+import spray.routing.Directive
 
 private case class Context(
     method: HttpMethod,
@@ -211,16 +212,16 @@ trait WhiskMetaApi
     with PostActionActivation {
     services: WhiskServices =>
 
-    /** API path, version, and invocation path for posting activations directly through the host. */
-    protected lazy val apipath: String = "api"
-    protected lazy val apiversion: String = "v2"
-    protected lazy val webInvokePath: PathMatcher[shapeless.HNil] = "web"
+    /** API path invocation path for posting activations directly through the host. */
+    protected val webInvokePathSegments: Seq[String]
 
     /** Store for identities. */
     protected val authStore: AuthStore
 
-    /** The prefix for web invokes e.g., /experimental/web. */
-    private val webRoutePrefix = pathPrefix(webInvokePath)
+    /** The prefix for web invokes e.g., /web. */
+    private val webRoutePrefix = {
+        pathPrefix(webInvokePathSegments.map(segmentStringToPathMatcher(_)).reduceLeft(_ / _))
+    }
 
     /** Allowed verbs. */
     private lazy val allowedOperations = get | delete | post | put
@@ -260,19 +261,21 @@ trait WhiskMetaApi
      * Actions may be exposed to this web proxy by adding an annotation ("export" -> true).
      */
     def routes(user: Option[Identity])(implicit transid: TransactionId): Route = {
-        (allowedOperations & webRoutePrefix) {
-            validNameSegment { namespace =>
-                packagePrefix { pkg =>
-                    pathPrefix(Segment) {
-                        _ match {
-                            case WhiskMetaApi.extensionSplitter(action, extension) =>
-                                if (WhiskMetaApi.supportedMediaTypes.contains(extension)) {
-                                    val pkgName = if (pkg == "default") None else Some(EntityName(pkg))
-                                    handleMatch(EntityName(namespace), pkgName, EntityName(action), extension, user)
-                                } else {
-                                    terminate(NotAcceptable, Messages.contentTypeNotSupported)
-                                }
-                            case _ => terminate(NotAcceptable, Messages.contentTypeNotSupported)
+        webRoutePrefix {
+            allowedOperations {
+                validNameSegment { namespace =>
+                    packagePrefix { pkg =>
+                        pathPrefix(Segment) {
+                            _ match {
+                                case WhiskMetaApi.extensionSplitter(action, extension) =>
+                                    if (WhiskMetaApi.supportedMediaTypes.contains(extension)) {
+                                        val pkgName = if (pkg == "default") None else Some(EntityName(pkg))
+                                        handleMatch(EntityName(namespace), pkgName, EntityName(action), extension, user)
+                                    } else {
+                                        terminate(NotAcceptable, Messages.contentTypeNotSupported)
+                                    }
+                                case _ => terminate(NotAcceptable, Messages.contentTypeNotSupported)
+                            }
                         }
                     }
                 }

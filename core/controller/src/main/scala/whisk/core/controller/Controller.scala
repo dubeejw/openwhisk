@@ -20,19 +20,22 @@ import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.actor.ActorSystem
 import akka.japi.Creator
+import spray.httpx.SprayJsonSupport._
+import spray.json._
+import spray.json.DefaultJsonProtocol._
 import spray.routing.Directive.pimpApply
 import spray.routing.Route
 import whisk.common.AkkaLogging
 import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
+import whisk.core.entitlement._
 import whisk.core.entitlement.EntitlementProvider
+import whisk.core.entity._
+import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.loadBalancer.LoadBalancerService
 import whisk.http.BasicHttpService
 import whisk.http.BasicRasService
-import whisk.core.entity._
-import whisk.core.entitlement._
-import whisk.core.entity.ActivationId.ActivationIdGenerator
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.
@@ -50,8 +53,8 @@ import whisk.core.entity.ActivationId.ActivationIdGenerator
  * @param executionContext Scala runtime support for concurrent operations
  */
 class Controller(
-    config: WhiskConfig,
     instance: Int,
+    implicit val whiskConfig: WhiskConfig,
     implicit val logging: Logging)
     extends BasicRasService
     with Actor {
@@ -67,28 +70,26 @@ class Controller(
      * @see http://spray.io/documentation/1.2.3/spray-routing/key-concepts/routes/#composing-routes
      */
     override def routes(implicit transid: TransactionId): Route = {
-        // handleRejections wraps the inner Route with a logical error-handler for
-        // unmatched paths
+        // handleRejections wraps the inner Route with a logical error-handler for unmatched paths
         handleRejections(customRejectionHandler) {
             super.routes ~ apiv1.routes ~ apiv2.routes
-        }
+        } ~ internalInvokerHealth
     }
 
     logging.info(this, s"starting controller instance ${instance}")
 
     // initialize datastores
-    implicit val actorSystem = context.system
-    implicit val executionContext = actorSystem.dispatcher
-    implicit val whiskConfig = config
-    implicit val authStore = WhiskAuthStore.datastore(whiskConfig)
-    implicit val entityStore = WhiskEntityStore.datastore(whiskConfig)
-    implicit val activationStore = WhiskActivationStore.datastore(whiskConfig)
+    private implicit val actorSystem = context.system
+    private implicit val executionContext = actorSystem.dispatcher
+    private implicit val authStore = WhiskAuthStore.datastore(whiskConfig)
+    private implicit val entityStore = WhiskEntityStore.datastore(whiskConfig)
+    private implicit val activationStore = WhiskActivationStore.datastore(whiskConfig)
 
     // initialize backend services
-    implicit val loadBalancer = new LoadBalancerService(whiskConfig)
-    implicit val consulServer = whiskConfig.consulServer
-    implicit val entitlementProvider = new LocalEntitlementProvider(whiskConfig, loadBalancer)
-    implicit val activationIdFactory = new ActivationIdGenerator {}
+    private implicit val loadBalancer = new LoadBalancerService(whiskConfig)
+    private implicit val consulServer = whiskConfig.consulServer
+    private implicit val entitlementProvider = new LocalEntitlementProvider(whiskConfig, loadBalancer)
+    private implicit val activationIdFactory = new ActivationIdGenerator {}
 
     // register collections and set verbosities on datastores and backend services
     Collection.initialize(entityStore)
@@ -96,6 +97,19 @@ class Controller(
     /** The REST APIs. */
     private val apiv1 = new RestAPIVersion_v1
     private val apiv2 = new RestAPIVersion_v2
+
+    /**
+     * Handles GET /invokers URI.
+     *
+     * @return JSON of invoker health
+     */
+    private val internalInvokerHealth = {
+        (path("invokers") & get) {
+            complete {
+                loadBalancer.invokerHealth.map(_.mapValues(_.asString).toJson.asJsObject)
+            }
+        }
+    }
 }
 
 /**
@@ -107,7 +121,7 @@ object Controller {
     // a value, and whose values are default values.   A null value in the Map means there is
     // no default value specified, so it must appear in the properties file
     def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
-        RestAPIProperties.requiredProperties ++
+        RestApiCommons.requiredProperties ++
         LoadBalancerService.requiredProperties ++
         EntitlementProvider.requiredProperties
 
@@ -115,7 +129,7 @@ object Controller {
 
     // akka-style factory to create a Controller object
     private class ServiceBuilder(config: WhiskConfig, instance: Int, logging: Logging) extends Creator[Controller] {
-        def create = new Controller(config, instance, logging)
+        def create = new Controller(instance, config, logging)
     }
 
     def main(args: Array[String]): Unit = {

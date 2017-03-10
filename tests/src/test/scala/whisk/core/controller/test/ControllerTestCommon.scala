@@ -37,7 +37,7 @@ import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.connector.ActivationMessage
 import whisk.core.controller.WhiskServices
-import whisk.core.controller.RestAPIProperties
+import whisk.core.controller.RestApiCommons
 import whisk.core.database.DocumentFactory
 import whisk.core.database.test.DbUtils
 import whisk.core.entitlement._
@@ -64,7 +64,7 @@ protected trait ControllerTestCommon
     implicit val actorSystem = system // defined in ScalatestRouteTest
     val executionContext = actorSystem.dispatcher
 
-    override val whiskConfig = new WhiskConfig(RestAPIProperties.requiredProperties)
+    override val whiskConfig = new WhiskConfig(RestApiCommons.requiredProperties)
     assert(whiskConfig.isValid)
 
     override val loadBalancer = new DegenerateLoadBalancerService(whiskConfig)

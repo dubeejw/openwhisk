@@ -831,19 +831,12 @@ abstract class MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach
 
 @RunWith(classOf[JUnitRunner])
 class MetaApiTestsV1 extends MetaApiTests {
-    override lazy val apipath = "api"
-    override lazy val apiversion = "v1"
-    override lazy val webInvokePath = "experimental" / "web"
+    override lazy val webInvokePathSegments = Seq("experimental","web")
     override val testRoutePath = "/experimental/web"
 }
 
 @RunWith(classOf[JUnitRunner])
 class MetaApiTestsV2 extends MetaApiTests {
-    override lazy val apipath = "api"
-    override lazy val apiversion = "v2"
-    override lazy val webInvokePath = {
-        val path: PathMatcher[shapeless.HNil] = "web"
-        path
-    }
+    override lazy val webInvokePathSegments = Seq("web")
     override val testRoutePath = "/web"
 }
