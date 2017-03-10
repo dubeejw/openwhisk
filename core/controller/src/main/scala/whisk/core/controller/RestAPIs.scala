@@ -29,7 +29,6 @@ import spray.json.DefaultJsonProtocol._
 import spray.routing.Directive.pimpApply
 import spray.routing.Directives
 import spray.routing.Route
-import spray.routing.PathMatcher
 import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig

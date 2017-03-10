@@ -35,7 +35,6 @@ import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import spray.json._
 import spray.json.DefaultJsonProtocol._
-import spray.routing.PathMatcher
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.controller.Context

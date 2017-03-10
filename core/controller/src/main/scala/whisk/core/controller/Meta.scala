@@ -34,7 +34,6 @@ import spray.json.DefaultJsonProtocol._
 import spray.routing.Directives
 import spray.routing.RequestContext
 import spray.routing.Route
-import spray.routing.PathMatcher
 import whisk.common.TransactionId
 import whisk.core.controller.actions.BlockingInvokeTimeout
 import whisk.core.controller.actions.PostActionActivation
@@ -44,7 +43,6 @@ import whisk.core.entity.types._
 import whisk.http.ErrorResponse.terminate
 import whisk.http.Messages
 import whisk.utils.JsHelpers._
-import spray.routing.Directive
 
 private case class Context(
     method: HttpMethod,
