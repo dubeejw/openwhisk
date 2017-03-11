@@ -979,6 +979,19 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     }
                 }
         }
+
+        it should s"reject invocation of web action with invalid accept header (auth? ${creds.isDefined})" in {
+            implicit val tid = transid()
+
+            Seq(s"$systemId/proxy/export_c.http").
+                foreach { path =>
+                    actionResult = Some(JsObject("body" -> "Plain text".toJson))
+                    Get(s"$testRoutePath/$path") ~> addHeader("Accept", "application/json") ~> sealRoute(routes(creds)) ~> check {
+                        status should be(BadRequest)
+                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.invalidAcceptType(MediaTypes.`text/html`)))
+                    }
+                }
+        }
     }
 
     class TestingEntitlementProvider(

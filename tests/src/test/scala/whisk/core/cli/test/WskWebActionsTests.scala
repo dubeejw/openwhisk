@@ -145,7 +145,7 @@ abstract class WskWebActionsTests
                 }
 
                 val host = getServiceURL()
-                val url = host + s"/api/v2/web/$namespace/default/webaction.http"
+                val url = host + s"$testRoutePath/$namespace/default/webaction.http"
 
                 val response = RestAssured.given().config(sslconfig).options(url)
                 response.statusCode shouldBe 200
@@ -165,7 +165,7 @@ abstract class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.text"
+            val url = host + s"$testRoutePath/$namespace/default/webaction.text"
             val response = RestAssured.given().contentType("text/html").param("key1", "value1").config(sslconfig).post(url)
             response.statusCode shouldBe 400
             response.body().asString() should include(Messages.contentTypeNotSupported)
@@ -182,7 +182,7 @@ abstract class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.http"
+            val url = host + s"$testRoutePath/$namespace/default/webaction.http"
             val response = RestAssured.given().header("accept", "application/json").config(sslconfig).get(url)
             response.statusCode shouldBe 400
             response.body().asString() should include(Messages.invalidAcceptType(MediaTypes.`text/html`))
@@ -200,7 +200,7 @@ abstract class WskWebActionsTests
             }
 
             val host = getServiceURL()
-            val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.json"
+            val url = host + s"$testRoutePath/$namespace/default/webaction.json"
             val response = RestAssured.given().header("x-ow-raw-http", "TruE").contentType("text/html").body(bodyContent).config(sslconfig).post(url)
             response.statusCode shouldBe 200
             response.body.asString.parseJson.asJsObject.fields("__ow_meta_body") shouldBe JsString(bodyContent)
