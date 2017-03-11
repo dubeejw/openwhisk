@@ -55,9 +55,9 @@ protected[controller] class WebApiDirectives private (
     val path: String = fields("path")
     val namespace: String = fields("namespace")
 
-    val query: Option[String] = fields.get("query")
-    val body: Option[String] = fields.get("body")
-    val env: Option[String] = fields.get("env")
+    val query: String = fields("query")
+    val body: String = fields("body")
+    val env: String = fields("env")
 
     val statusCode = fields("statusCode")
 
@@ -80,25 +80,23 @@ protected[controller] object WebApiDirectives {
 
     // field names for /web
     val web = {
-        val exclude = List("query", "body", "env") // these are merged and promoted
-        val fields = (rawFieldMapping -- exclude).map {
+        val fields = rawFieldMapping.map {
             case (k, v) if (k == "statusCode") => k -> v
             case (k, v)                        => k -> s"__ow_$v"
         }
-        val reserved = fields.keySet - "statusCode"
-        new WebApiDirectives(fields, reserved)
+
+        new WebApiDirectives(fields, reserved = fields.keySet - "statusCode")
     }
 
     // field names used for /experimental/web
     val exp = {
-        val exclude = List("query", "body", "env") // these are merged and promoted
-        val fields = (rawFieldMapping -- exclude).map {
+        val fields = rawFieldMapping.map {
             case (k, v) if (k == "method")     => k -> "__ow_meta_verb"
             case (k, v) if (k == "statusCode") => k -> "code"
             case (k, v)                        => k -> s"__ow_meta_$v"
         }
-        val reserved = fields.keySet - "statusCode"
-        new WebApiDirectives(fields, reserved, enforceExtension = true)
+
+        new WebApiDirectives(fields, reserved = fields.keySet - "statusCode", enforceExtension = true)
     }
 }
 
@@ -377,10 +375,21 @@ trait WhiskMetaApi
 
     private def handleMatch(namespace: EntityName, pkg: Option[EntityName], action: EntityName, extension: MediaExtension, onBehalfOf: Option[Identity])(
         implicit transid: TransactionId) = {
-        def process(body: Option[JsObject]) = {
+        def process(data: Either[JsString, Option[JsObject]]) = {
             requestMethodParamsAndPath { r =>
-                val context = r.withBody(body)
-                if (context.overrides.isEmpty) {
+                // the left context computes overrides before it sets the body because the body will appear as a conflict otherwise
+                def leftContext(s: JsString) = {
+                    (r.overrides.isEmpty, r.withBody(Some(JsObject(webApiDirectives.body -> s))))
+                }
+
+                // the right context computes overrides after it sets the body
+                def rightContext(b: Option[JsObject]) = {
+                    val c = r.withBody(b)
+                    (c.overrides.isEmpty, c)
+                }
+
+                val (noOverrides, context) = data.fold(leftContext, rightContext)
+                if (noOverrides) {
                     val fullname = namespace.addPath(pkg).addPath(action).toFullyQualifiedEntityName
                     processRequest(fullname, context, extension, onBehalfOf)
                 } else {
@@ -392,10 +401,17 @@ trait WhiskMetaApi
         extract(_.request.entity.data.length) { length =>
             validateSize(isWhithinRange(length))(transid) {
                 entity(as[Option[JsObject]]) {
-                    body => process(body)
+                    body => process(Right(body)) ~ terminate(InternalServerError)
                 } ~ entity(as[FormData]) {
-                    form => process(Some(form.fields.toMap.toJson.asJsObject))
-                } ~ terminate(BadRequest, Messages.contentTypeNotSupported)
+                    form => process(Right(Some(form.fields.toMap.toJson.asJsObject))) ~ terminate(InternalServerError)
+                } ~ extract(_.request.entity.data) { data =>
+                    def getBytes = Future(JsString(Base64.getEncoder.encodeToString(data.toByteArray)))
+
+                    onComplete(getBytes) {
+                        case Success(bytes) => process(Left(bytes)) ~ terminate(InternalServerError)
+                        case Failure(t)     => terminate(BadRequest, t.getMessage)
+                    }
+                }
             }
         }
     }
