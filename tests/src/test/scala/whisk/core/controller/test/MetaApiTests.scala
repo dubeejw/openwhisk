@@ -269,10 +269,13 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 }
         }
 
-        ignore should s"reject unsupported http verbs (auth? ${creds.isDefined})" in {
+        /*
+        All of the verbs supported by Spray have been added to Web Actions, so comment this test out
+
+        it should s"reject unsupported http verbs (auth? ${creds.isDefined})" in {
             implicit val tid = transid()
 
-            Seq((Patch, MethodNotAllowed)).
+            Seq()
                 foreach {
                     case (m, code) =>
                         m(s"$testRoutePath/$systemId/proxy/export_c.json") ~> sealRoute(routes(creds)) ~> check {
@@ -280,6 +283,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                         }
                 }
         }
+        */
 
         it should s"reject requests when identity, package or action lookup fail or missing annotation (auth? ${creds.isDefined})" in {
             implicit val tid = transid()
@@ -299,7 +303,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
 
                         m(s"$testRoutePath/$path") ~> sealRoute(routes(creds)) ~> check {
                             status should be(NotAcceptable)
-                            confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeNotSupported))
+                            confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeExtentionNotSupported))
                         }
                     }
                 }
@@ -758,7 +762,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     allowedMethods.foreach { m =>
                         m(s"$testRoutePath/$path") ~> sealRoute(routes(creds)) ~> check {
                             status should be(NotAcceptable)
-                            confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeNotSupported))
+                            confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeExtentionNotSupported))
                         }
                     }
                 }
@@ -930,7 +934,8 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 foreach { path =>
                     actionResult = Some(JsObject("text" -> "Something".toJson))
                     Post(s"$testRoutePath/$path", "This is the body") ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
-                        status should be(UnsupportedMediaType)
+                        status should be(BadRequest)
+                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeNotSupported))
                     }
                 }
         }
@@ -942,9 +947,22 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 foreach { path =>
                     actionResult = Some(JsObject("text" -> "Something".toJson))
                     Post(s"$testRoutePath/$path", "This is the body") ~> addHeader("x-ow-raw-http", "false") ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
-                        status should be(UnsupportedMediaType)
+                        status should be(BadRequest)
+                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeNotSupported))
                     }
                 }
+        }
+
+        it should s"invoke a web action using the x-ow-raw-http header (auth? ${creds.isDefined})" in {
+            implicit val tid = transid()
+
+            Seq(s"$systemId/proxy/export_c.text").
+                    foreach { path =>
+                        actionResult = Some(JsObject("text" -> "Something".toJson))
+                        Post(s"$testRoutePath/$path", "This is the body") ~>  addHeader("x-ow-raw-http", "TruE") ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
+                            status should be(OK)
+                        }
+                    }
         }
 
         it should s"fail to invoke web action with an unsupported content type when an non-boolean value is passed to the x-ow-raw-http header (auth? ${creds.isDefined})" in {
@@ -954,7 +972,8 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 foreach { path =>
                     actionResult = Some(JsObject("text" -> "Something".toJson))
                     Post(s"$testRoutePath/$path", "This is the body") ~> addHeader("x-ow-raw-http", "Not a boolean") ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
-                        status should be(UnsupportedMediaType)
+                        status should be(BadRequest)
+                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.contentTypeNotSupported))
                     }
                 }
         }

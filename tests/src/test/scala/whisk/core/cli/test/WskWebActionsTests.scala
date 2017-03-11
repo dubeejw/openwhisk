@@ -133,23 +133,25 @@ abstract class WskWebActionsTests
             }
     }
 
-    it should "ensure that CORS header is preserved" in withAssetCleaner(wskprops) {
-        (wp, assetHelper) =>
-            val name = "webaction"
-            val file = Some(TestUtils.getTestActionFilename("corsHeaderMod.js"))
+    if (testRoutePath == "/api/v2/web") {
+        it should "ensure that CORS header is preserved" in withAssetCleaner(wskprops) {
+            (wp, assetHelper) =>
+                val name = "webaction"
+                val file = Some(TestUtils.getTestActionFilename("corsHeaderMod.js"))
 
-            assetHelper.withCleaner(wsk.action, name) {
-                (action, _) =>
-                    action.create(name, file, annotations = Map("web-export" -> true.toJson))
-            }
+                assetHelper.withCleaner(wsk.action, name) {
+                    (action, _) =>
+                        action.create(name, file, annotations = Map("web-export" -> true.toJson))
+                }
 
-            val host = getServiceURL()
-            val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.http"
+                val host = getServiceURL()
+                val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.http"
 
-            val response = RestAssured.given().config(sslconfig).options(url)
-            response.statusCode shouldBe 200
-            response.header("Access-Control-Allow-Origin") shouldBe "Origin set from Web Action"
-            response.header("Access-Control-Allow-Headers")  shouldBe "Headers set from Web Action"
+                val response = RestAssured.given().config(sslconfig).options(url)
+                response.statusCode shouldBe 200
+                response.header("Access-Control-Allow-Origin") shouldBe "Origin set from Web Action"
+                response.header("Access-Control-Allow-Headers") shouldBe "Headers set from Web Action"
+        }
     }
 
     it should "reject invocation of web action with unsupported content-type" in withAssetCleaner(wskprops) {
