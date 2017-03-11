@@ -53,6 +53,9 @@ import whisk.core.entity.size._
 import whisk.core.loadBalancer.LoadBalancer
 import whisk.http.ErrorResponse
 import whisk.http.Messages
+import akka.http.scaladsl.model.headers.HttpChallenge
+import spray.http.HttpCharset
+import spray.http.HttpCharsets
 
 /**
  * Tests Meta API.
@@ -106,7 +109,7 @@ class MetaApiTestsV2 extends MetaApiTests {
 @RunWith(classOf[JUnitRunner])
 class MetaApiCommonTests extends FlatSpec with Matchers {
     "extension splitter" should "split action name and extension" in {
-        Seq(".http", ".json", ".text", ".html").foreach { ext =>
+        Seq(".http", ".json", ".text", ".html", ".svg").foreach { ext =>
             Seq(s"t$ext", s"tt$ext", s"t.wxyz$ext", s"tt.wxyz$ext").foreach { s =>
                 Seq(true, false).foreach { enforce =>
                     val (n, e) = WhiskMetaApi.mediaTranscoderForName(s, enforce)
@@ -587,11 +590,13 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
             Seq(s"$systemId/proxy/export_c.text").
                 foreach { path =>
                     allowedMethods.foreach { m =>
-                        actionResult = Some(JsObject("text" -> JsString("default text")))
+                        val text = "default text"
+                        actionResult = Some(JsObject("text" -> JsString(text)))
                         m(s"$testRoutePath/$path") ~> sealRoute(routes(creds)) ~> check {
                             status should be(OK)
+                            contentType shouldBe MediaTypes.`text/plain`.withCharset(HttpCharsets.`UTF-8`)
                             val response = responseAs[String]
-                            response shouldBe "default text"
+                            response shouldBe text
                         }
                     }
                 }
@@ -611,11 +616,27 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
             Seq(s"$systemId/proxy/export_c.html").
                 foreach { path =>
                     allowedMethods.foreach { m =>
-                        actionResult = Some(JsObject("html" -> JsString("<html>hi</htlml>")))
+                        val html = "<html>hi</htlml>"
+                        actionResult = Some(JsObject("html" -> JsString(html)))
                         m(s"$testRoutePath/$path") ~> sealRoute(routes(creds)) ~> check {
                             status should be(OK)
+                            contentType shouldBe MediaTypes.`text/html`.withCharset(HttpCharsets.`UTF-8`)
                             val response = responseAs[String]
-                            response shouldBe "<html>hi</htlml>"
+                            response shouldBe html
+                        }
+                    }
+                }
+
+            Seq(s"$systemId/proxy/export_c.svg").
+                foreach { path =>
+                    allowedMethods.foreach { m =>
+                        val svg = """<svg><circle cx="3" cy="3" r="3" fill="blue"/></svg>"""
+                        actionResult = Some(JsObject("svg" -> JsString(svg)))
+                        m(s"$testRoutePath/$path") ~> sealRoute(routes(creds)) ~> check {
+                            status should be(OK)
+                            contentType shouldBe MediaTypes.`image/svg+xml`.withCharset(HttpCharsets.`UTF-8`)
+                            val response = responseAs[String]
+                            response shouldBe svg
                         }
                     }
                 }

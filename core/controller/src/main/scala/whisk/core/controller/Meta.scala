@@ -124,32 +124,27 @@ protected[core] object WhiskMetaApi extends Directives {
 
     private val mediaTranscoders = {
         // extensions are expected to contain only [a-z]
-        Seq(MediaExtension(".html", Some(List("html")), true, resultAsHtml _),
-            MediaExtension(".text", Some(List("text")), true, resultAsText _),
+        Seq(MediaExtension(".http", None, false, resultAsHttp _),
             MediaExtension(".json", None, true, resultAsJson _),
-            MediaExtension(".http", None, false, resultAsHttp _))
-            .map(e => e.extension -> e).toMap
+            MediaExtension(".html", Some(List("html")), true, resultAsHtml _),
+            MediaExtension(".svg", Some(List("svg")), true, resultAsSvg _),
+            MediaExtension(".text", Some(List("text")), true, resultAsText _))
     }
 
-    private val defaultMediaTranscoder = mediaTranscoders(".http")
-    private val extensionLength = 5 // all extensions are the same length
+    private val defaultMediaTranscoder = mediaTranscoders.find(_.extension == ".http").get
 
     /**
      * Splits string into a base name plus optional extension.
      * If name ends with ".xxxx" which matches a known extension, accept it as the extension.
-     * Otherwise, the extension is ".http" by definition.
+     * Otherwise, the extension is ".http" by definition unless enforcing the presence of an extension.
      */
     def mediaTranscoderForName(name: String, enforceExtension: Boolean): (String, Option[MediaExtension]) = {
-        if (name.length > extensionLength) {
-            // treat extension match as case insensitive
-            val ext = name.takeRight(extensionLength).toLowerCase
-            mediaTranscoders.get(ext).map { mt =>
-                val base = name.dropRight(extensionLength)
-                (base, Some(mt))
-            }.getOrElse {
-                (name, if (enforceExtension) None else Some(defaultMediaTranscoder))
-            }
-        } else (name, if (enforceExtension) None else Some(defaultMediaTranscoder))
+        mediaTranscoders.find(mt => name.endsWith(mt.extension)).map { mt =>
+            val base = name.dropRight(mt.extensionLength)
+            (base, Some(mt))
+        }.getOrElse {
+            (name, if (enforceExtension) None else Some(defaultMediaTranscoder))
+        }
     }
 
     /**
@@ -163,11 +158,18 @@ protected[core] object WhiskMetaApi extends Directives {
         extension: String,
         defaultProjection: Option[List[String]],
         projectionAllowed: Boolean,
-        transcoder: (JsValue, TransactionId, WebApiDirectives) => RequestContext => Unit)
+        transcoder: (JsValue, TransactionId, WebApiDirectives) => RequestContext => Unit) {
+        val extensionLength = extension.length
+    }
 
     private def resultAsHtml(result: JsValue, transid: TransactionId, rp: WebApiDirectives): RequestContext => Unit = result match {
         case JsString(html) => respondWithMediaType(`text/html`) { complete(OK, html) }
         case _              => terminate(BadRequest, Messages.invalidMedia(`text/html`))(transid)
+    }
+
+    private def resultAsSvg(result: JsValue, transid: TransactionId, rp: WebApiDirectives): RequestContext => Unit = result match {
+        case JsString(svg) => respondWithMediaType(`image/svg+xml`) { complete(OK, svg) }
+        case _             => terminate(BadRequest, Messages.invalidMedia(`image/svg+xml`))(transid)
     }
 
     private def resultAsText(result: JsValue, transid: TransactionId, rp: WebApiDirectives): RequestContext => Unit = {
