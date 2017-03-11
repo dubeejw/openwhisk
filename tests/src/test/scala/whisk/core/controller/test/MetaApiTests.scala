@@ -955,14 +955,16 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
 
         it should s"invoke a web action using the x-ow-raw-http header (auth? ${creds.isDefined})" in {
             implicit val tid = transid()
+            val body = "This is the body"
 
-            Seq(s"$systemId/proxy/export_c.text").
-                    foreach { path =>
-                        actionResult = Some(JsObject("text" -> "Something".toJson))
-                        Post(s"$testRoutePath/$path", "This is the body") ~>  addHeader("x-ow-raw-http", "TruE") ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
-                            status should be(OK)
-                        }
+            Seq(s"$systemId/proxy/export_c.json").
+                foreach { path =>
+                    Post(s"$testRoutePath/$path", body) ~>  addHeader("x-ow-raw-http", "TruE") ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
+                        status should be(OK)
+                        val response = responseAs[JsObject]
+                        response.fields("content").asJsObject.fields("__ow_meta_body") shouldBe JsString(body)
                     }
+                }
         }
 
         it should s"fail to invoke web action with an unsupported content type when an non-boolean value is passed to the x-ow-raw-http header (auth? ${creds.isDefined})" in {

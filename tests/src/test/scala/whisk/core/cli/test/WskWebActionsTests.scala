@@ -145,7 +145,7 @@ abstract class WskWebActionsTests
                 }
 
                 val host = getServiceURL()
-                val url = host + s"/api/v1/experimental/web/$namespace/default/webaction.http"
+                val url = host + s"/api/v2/web/$namespace/default/webaction.http"
 
                 val response = RestAssured.given().config(sslconfig).options(url)
                 response.statusCode shouldBe 200
