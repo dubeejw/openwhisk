@@ -163,6 +163,8 @@ func getJSONFromStrings(content []string, keyValueFormat bool) (interface{}, err
     var data map[string]interface{}
     var res interface{}
 
+    whisk.Debug(whisk.DbgInfo, "Parsing parameters: %#v\n", content)
+
     for i := 0; i < len(content); i++ {
         if err := json.Unmarshal([]byte(content[i]), &data); err != nil {
             whisk.Debug(whisk.DbgError, "Invalid JSON detected for '%s'\n", content[i])
