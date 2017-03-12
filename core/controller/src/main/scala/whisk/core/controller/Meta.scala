@@ -110,6 +110,7 @@ private case class Context(
     val requestParams = query.toJson.asJsObject.fields ++ { body.map(_.fields) getOrElse Map() }
     val overrides = propertyMap.reservedProperties.intersect(requestParams.keySet)
     def withBody(b: Option[JsObject]) = Context(propertyMap, method, headers, path, query, b)
+    def withQuery(q: Map[String, String]) = Context(propertyMap, method, headers, path, q, body)
     def metadata(user: Option[Identity]): Map[String, JsValue] = {
         Map(propertyMap.method -> method.value.toLowerCase.toJson,
             propertyMap.headers -> headers.map(h => h.lowercaseName -> h.value).toMap.toJson,
@@ -373,14 +374,52 @@ trait WhiskMetaApi
         Identity.get(authStore, namespace)
     }
 
-    private def handleMatch(namespace: EntityName, pkg: Option[EntityName], action: EntityName, extension: MediaExtension, onBehalfOf: Option[Identity])(
-        implicit transid: TransactionId) = {
-        def process(data: Either[JsString, Option[JsObject]]) = {
-            requestMethodParamsAndPath { r =>
-                // the left context computes overrides before it sets the body because the body will appear as a conflict otherwise
-                def leftContext(s: JsString) = {
-                    (r.overrides.isEmpty, r.withBody(Some(JsObject(webApiDirectives.body -> s))))
+    /**
+     * Checks that subject has right to post an activation and fetch the action
+     * followed by the package and merge parameters. The action is fetched first since
+     * it will not succeed for references relative to a binding, and the export bit is
+     * confirmed before fetching the package and merging parameters.
+     */
+    private def precheck(actionName: FullyQualifiedEntityName, onBehalfOf: Option[Identity])(
+        implicit transid: TransactionId): Future[(Identity, WhiskAction, Boolean)] = for {
+        // lookup the identity for the action namespace
+        id <- identityLookup(actionName.path.root) flatMap {
+            i => entitlementProvider.checkThrottles(i) map (_ => i)
+        }
+
+        // lookup the action - since actions are stored relative to package name
+        // the lookup will fail if the package name for the action refers to a binding instead
+        action <- confirmExportedAction(actionLookup(actionName, failureCode = NotFound), onBehalfOf) flatMap { a =>
+            if (a.namespace.defaultPackage) {
+                Future.successful(a)
+            } else {
+                pkgLookup(a.namespace.toFullyQualifiedEntityName) map {
+                    pkg => (a.inherit(pkg.parameters))
                 }
+            }
+        }
+
+        rawHTTP = action.annotations.asBool("raw-http").exists(identity)
+    } yield (id, action, rawHTTP)
+
+    private def getBytes(data: HttpData) = Future(JsString(Base64.getEncoder.encodeToString(data.toByteArray)))
+
+    private def handleMatch(namespace: EntityName, pkg: Option[EntityName], entityName: EntityName, extension: MediaExtension, onBehalfOf: Option[Identity])(
+        implicit transid: TransactionId) = {
+
+        def process(identity: Identity, action: WhiskAction, rawHTTP: Boolean, data: Either[JsString, Option[JsObject]]) = {
+            requestMethodParamsAndPath { r =>
+
+                // the left context computes overrides before it sets the body because the body will appear as a conflict otherwise
+                def leftContext(s: JsString) = if (rawHTTP) {
+                    val x = r.withBody(Some(JsObject(
+                        webApiDirectives.body -> s,
+                        webApiDirectives.env -> action.parameters.toJsObject,
+                        webApiDirectives.query -> r.query.toJson.asJsObject)))
+                        (r.overrides.isEmpty, x.withQuery(Map()))
+                    } else {
+                        (r.overrides.isEmpty, r.withBody(Some(JsObject(webApiDirectives.body -> s))))
+                    }
 
                 // the right context computes overrides after it sets the body
                 def rightContext(b: Option[JsObject]) = {
@@ -390,8 +429,8 @@ trait WhiskMetaApi
 
                 val (noOverrides, context) = data.fold(leftContext, rightContext)
                 if (noOverrides) {
-                    val fullname = namespace.addPath(pkg).addPath(action).toFullyQualifiedEntityName
-                    processRequest(fullname, context, extension, onBehalfOf)
+                    val fullname = namespace.addPath(pkg).addPath(entityName).toFullyQualifiedEntityName
+                    processRequest(identity, action, context, extension, onBehalfOf)
                 } else {
                     terminate(BadRequest, Messages.parametersNotAllowed)
                 }
@@ -400,47 +439,39 @@ trait WhiskMetaApi
 
         extract(_.request.entity.data.length) { length =>
             validateSize(isWhithinRange(length))(transid) {
-                entity(as[Option[JsObject]]) {
-                    body => process(Right(body)) ~ terminate(InternalServerError)
-                } ~ entity(as[FormData]) {
-                    form => process(Right(Some(form.fields.toMap.toJson.asJsObject))) ~ terminate(InternalServerError)
-                } ~ extract(_.request.entity.data) { data =>
-                    def getBytes = Future(JsString(Base64.getEncoder.encodeToString(data.toByteArray)))
-
-                    onComplete(getBytes) {
-                        case Success(bytes) => process(Left(bytes)) ~ terminate(InternalServerError)
-                        case Failure(t)     => terminate(BadRequest, t.getMessage)
-                    }
+                onComplete(precheck(namespace.addPath(pkg).addPath(entityName).toFullyQualifiedEntityName, onBehalfOf))  {
+                    case Success((id, action, rawHTTP)) =>
+                        if (rawHTTP) {
+                            extract(_.request.entity.data) { data =>
+                                onComplete(getBytes(data)) {
+                                    case Success(bytes) => process(id, action, rawHTTP, Left(bytes)) ~ terminate(InternalServerError)
+                                    case Failure(t)     => terminate(BadRequest, t.getMessage)
+                                }
+                            }
+                        } else {
+                            entity(as[Option[JsObject]]) {
+                                body => process(id, action, rawHTTP, Right(body)) ~ terminate(InternalServerError)
+                            } ~ entity(as[FormData]) {
+                                form => process(id, action, rawHTTP, Right(Some(form.fields.toMap.toJson.asJsObject))) ~ terminate(InternalServerError)
+                            } ~ extract(_.request.entity.data) { data =>
+                                onComplete(getBytes(data)) {
+                                    case Success(bytes) => process(id, action, rawHTTP, Left(bytes)) ~ terminate(InternalServerError)
+                                    case Failure(t)     => terminate(BadRequest, t.getMessage)
+                                }
+                            }
+                        }
+                    case Failure(t: RejectRequest)      =>
+                        terminate(t.code, t.message)
+                    case Failure(t)                     =>
+                        logging.error(this, s"exception in meta api handler: $t")
+                        terminate(InternalServerError)
                 }
             }
         }
     }
 
-    private def processRequest(actionName: FullyQualifiedEntityName, context: Context, responseType: MediaExtension, onBehalfOf: Option[Identity])(
+    private def processRequest(identity: Identity, action: WhiskAction, context: Context, responseType: MediaExtension, onBehalfOf: Option[Identity])(
         implicit transid: TransactionId) = {
-        // checks that subject has right to post an activation and fetch the action
-        // followed by the package and merge parameters. The action is fetched first since
-        // it will not succeed for references relative to a binding, and the export bit is
-        // confirmed before fetching the package and merging parameters.
-        def precheck: Future[(Identity, WhiskAction)] = for {
-            // lookup the identity for the action namespace
-            identity <- identityLookup(actionName.path.root) flatMap {
-                i => entitlementProvider.checkThrottles(i) map (_ => i)
-            }
-
-            // lookup the action - since actions are stored relative to package name
-            // the lookup will fail if the package name for the action refers to a binding instead
-            action <- confirmExportedAction(actionLookup(actionName, failureCode = NotFound), onBehalfOf) flatMap { a =>
-                if (a.namespace.defaultPackage) {
-                    Future.successful(a)
-                } else {
-                    pkgLookup(a.namespace.toFullyQualifiedEntityName) map {
-                        pkg => (a.inherit(pkg.parameters))
-                    }
-                }
-            }
-        } yield (identity, action)
-
         val projectResultField = if (responseType.projectionAllowed) {
             Option(context.path)
                 .filter(_.nonEmpty)
@@ -449,9 +480,7 @@ trait WhiskMetaApi
         } else responseType.defaultProjection
 
         completeRequest(
-            queuedActivation = precheck flatMap {
-                case (identity, action) => activate(identity, action, context, onBehalfOf)
-            },
+            activate(identity, action, context, onBehalfOf),
             projectResultField,
             responseType = responseType)
     }

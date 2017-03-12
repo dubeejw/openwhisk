@@ -202,6 +202,14 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                                     Parameters("require-whisk-auth", JsBoolean(true))
                                 } else Parameters()
                             }
+                    } else if (actionName.name.asString.startsWith("raw_export_")) {
+                        annotations ++
+                                Parameters("web-export", JsBoolean(true)) ++
+                                Parameters("raw-http", JsBoolean(true)) ++ {
+                            if (requireAuthentication) {
+                                Parameters("require-whisk-auth", JsBoolean(true))
+                            } else Parameters()
+                        }
                     } else annotations
                 })
             }
@@ -1046,6 +1054,28 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                         confirmErrorWithTid(responseAs[JsObject], Some(Messages.invalidAcceptType(MediaTypes.`text/html`)))
                     }
                 }
+        }
+
+        it should s"invoke raw action ensuring body, query and env arguments are set properly (auth? ${creds.isDefined})" in {
+            implicit val tid = transid()
+
+            val str = "1,2,3"
+            Post(s"$testRoutePath/$systemId/proxy/raw_export_c.json?key1=value1&key2=value2", str) ~> addHeader("Content-type", MediaTypes.`application/json`.value) ~> sealRoute(routes(creds)) ~> check {
+                status should be(OK)
+                val response = responseAs[JsObject]
+                response shouldBe JsObject(
+                    "pkg" -> s"$systemId/proxy".toJson,
+                    "action" -> "raw_export_c".toJson,
+                    "content" -> metaPayload(
+                        Post.method.name.toLowerCase,
+                        JsObject(
+                            webApiDirectives.body -> Base64.getEncoder.encodeToString(str.getBytes).toJson,
+                            webApiDirectives.query -> JsObject("key1" -> JsString("value1"), "key2" -> JsString("value2")),
+                            webApiDirectives.env -> (packages(0).parameters ++ defaultActionParameters).toJsObject),
+                        creds,
+                        pkgName = "proxy",
+                        headers = List(HttpHeaders.`Content-Type`(MediaTypes.`application/json`))))
+            }
         }
     }
 
