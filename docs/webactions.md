@@ -98,8 +98,15 @@ A web action, when invoked, receives all the HTTP request information available 
 1. `__ow_method`: the HTTP method of the request.
 2. `__ow_headers`: the request headers.
 3. `__ow_path`: the unmatched path of the request (matching stops after consuming the action extension).
+4. `__ow_body`: the received body content of the request, either encoded as Base64 if the content is binary, or a JSON formatted string
+5. `__ow_query`: the query parameters from the request
 
 The request may not override any of the named `__ow_` parameters above; doing so will result in a failed request with status equal to 400 Bad Request.
+
+Query parameters can only be access from `__ow_query` when used with [raw HTTP handling](#raw-http-handling) enabled web actions .
+
+Body content can always be accessed through the `__ow_body` parameter in [raw HTTP handling](#raw-http-handling) enabled web
+actions. However, `__ow_body` is only provided for standard web actions when the content is not JSON or form data.
 
 ## Additional features
 
@@ -188,7 +195,39 @@ To disable a web action from being invoked via the new API (`https://APIHOST/api
 ```bash
 $ wsk action update /guest/demo/hello hello.js \
       --annotation web-export false
-```      
+```
+
+## Raw HTTP handling
+
+Forgoing the automatic processing of the received HTTP body into action arguments is made possible through the use of
+the `raw-http` [annotation](annotations.md). When this option is enabled, the body of the received request is made available through the
+`__ow_body` parameter. If the received content-type is binary, the content of `__ow_body` will be the Base64 encoded
+representation of the request body. Otherwise, `__ow_body` will contain the request body as a JSON formatted string.
+
+Additionally, the received query parameters can be accessed via the `__ow_query` parameter when the `raw-http`
+annotation value is enabled.
+
+### Enabling raw HTTP handling
+
+Enabling of raw HTTP is achieved by creating or updating an action that has an `raw-http` [annotation](annotations.md) with a value of
+`true`.
+
+```bash
+$ wsk action create /guest/demo/hello hello.js \
+      --annotation web-export true
+      --annotation raw-http true
+```
+
+### Disabling raw HTTP handling
+
+Disabling raw HTTP can be accomplished by setting the `raw-http` [annotation](annotations.md) value to `false`, or
+removing entry.
+
+```bash
+$ wsk update create /guest/demo/hello hello.js \
+      --annotation web-export true
+      --annotation raw-http false
+```
 
 ## Error Handling
 
