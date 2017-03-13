@@ -1120,7 +1120,41 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 }
         }
 
-        it should s"invoke raw action ensuring body, query and env arguments are set properly (auth? ${creds.isDefined})" in {
+        it should s"not fail a raw http action when query or body parameters overlap with final action parameters (auth? ${creds.isDefined})" in {
+            implicit val tid = transid()
+            invocationsAllowed = 2
+
+            Post(s"$testRoutePath/$systemId/proxy/raw_export_c.json?x=overriden&key2=value2") ~> sealRoute(routes(creds)) ~> check {
+                status should be(OK)
+                val response = responseAs[JsObject]
+                response shouldBe JsObject(
+                    "pkg" -> s"$systemId/proxy".toJson,
+                    "action" -> "raw_export_c".toJson,
+                    "content" -> metaPayload(
+                        Post.method.name.toLowerCase,
+                        Map(webApiDirectives.body -> JsObject(),
+                            webApiDirectives.query -> JsObject("x" -> JsString("overriden"), "key2" -> JsString("value2"))).toJson.asJsObject,
+                        creds,
+                        pkgName = "proxy"))
+            }
+
+            Post(s"$testRoutePath/$systemId/proxy/raw_export_c.json", JsObject("x" -> "overriden".toJson, "key2" -> "value2".toJson)) ~> sealRoute(routes(creds)) ~> check {
+                status should be(OK)
+                val response = responseAs[JsObject]
+                response shouldBe JsObject(
+                    "pkg" -> s"$systemId/proxy".toJson,
+                    "action" -> "raw_export_c".toJson,
+                    "content" -> metaPayload(
+                        Post.method.name.toLowerCase,
+                        Map(webApiDirectives.query -> JsObject(),
+                            webApiDirectives.body -> JsObject("x" -> JsString("overriden"), "key2" -> JsString("value2"))).toJson.asJsObject,
+                        creds,
+                        pkgName = "proxy"))
+            }
+
+        }
+
+        it should s"invoke raw action ensuring body and query arguments are set properly (auth? ${creds.isDefined})" in {
             implicit val tid = transid()
             val str = "1,2,3"
             invocationsAllowed = 1
@@ -1142,7 +1176,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
             }
         }
 
-        it should s"invoke an action three times (auth? ${creds.isDefined})" in {
+        it should s"not invoke an action more than once when determining entity type (auth? ${creds.isDefined})" in {
             implicit val tid = transid()
 
             Seq(s"$systemId/proxy/export_c.html").

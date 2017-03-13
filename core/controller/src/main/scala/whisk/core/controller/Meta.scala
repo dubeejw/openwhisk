@@ -138,10 +138,12 @@ private case class Context(
         // if the body is a json object, merge with query parameters
         // otherwise, this is an opaque body that will be nested under
         // __ow_body in the parameters sent to the action as an argument
-        val bodyParams = body.map {
-            case JsObject(fields) if !boxQueryAndBody => fields
-            case v                                    => Map(propertyMap.body -> v)
-        } getOrElse Map.empty
+        val bodyParams = body match {
+            case Some(JsObject(fields)) if !boxQueryAndBody => fields
+            case Some(v) => Map(propertyMap.body -> v)
+            case None if !boxQueryAndBody => Map.empty
+            case _ => Map(propertyMap.body -> JsObject())
+        }
 
         // precedence order is: query params -> body (last wins)
         metadata(user) ++ queryParams ++ bodyParams
@@ -422,6 +424,7 @@ trait WhiskMetaApi
             case (actionName, Some(extension)) =>
                 extract(_.request.entity.data.length) { length =>
                     validateSize(isWhithinRange(length))(transid) {
+
                         entity(as[Option[JsObject]]) {
                             body => process(body, actionName, extension)
                         } ~ entity(as[FormData]) {
@@ -452,10 +455,10 @@ trait WhiskMetaApi
      *         or request overrides final parameters
      */
     private def verifyWebAction(actionName: FullyQualifiedEntityName, context: Context, onBehalfOf: Option[Identity])(
-        implicit transid: TransactionId): Future[(Identity, WhiskAction)] = {
+        implicit transid: TransactionId) = {
         for {
             // lookup the identity for the action namespace
-            identity <- identityLookup(actionName.path.root) flatMap {
+            actionOwnerIdentity <- identityLookup(actionName.path.root) flatMap {
                 i => entitlementProvider.checkThrottles(i) map (_ => i)
             }
 
@@ -478,14 +481,14 @@ trait WhiskMetaApi
                 // NOTE: it is assume the action parameters do not intersect with the reserved properties
                 // since these are system properties, the action should not define them, and if it does,
                 // they will be overwritten
-                val noOverrides = context.overrides(webApiDirectives.reservedProperties ++ a.immutableParameters).isEmpty
-                if (noOverrides) {
-                    Future.successful(a)
+                val isRawHttpAction = a.annotations.asBool("raw-http").exists(identity)
+                if (isRawHttpAction || context.overrides(webApiDirectives.reservedProperties ++ a.immutableParameters).isEmpty) {
+                    Future.successful(a, isRawHttpAction)
                 } else {
                     Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
                 }
             }
-        } yield (identity, action)
+        } yield (actionOwnerIdentity, action)
     }
 
     private def processRequest(actionName: FullyQualifiedEntityName, context: Context, responseType: MediaExtension, onBehalfOf: Option[Identity])(
@@ -500,8 +503,7 @@ trait WhiskMetaApi
 
         completeRequest(
             queuedActivation = verifyWebAction(actionName, context, onBehalfOf) flatMap {
-                case (actionOwnerIdentity, action) =>
-                    val isRawHttpAction = action.annotations.asBool("raw-http").exists(identity)
+                case (actionOwnerIdentity, (action, isRawHttpAction)) =>
                     val content = context.toActionArgument(onBehalfOf, isRawHttpAction)
                     val waitOverride = Some(WhiskActionsApi.maxWaitForBlockingActivation)
                     invokeAction(actionOwnerIdentity, action, Some(JsObject(content)), blocking = true, waitOverride)
