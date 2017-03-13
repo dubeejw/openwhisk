@@ -40,6 +40,7 @@ import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 import spray.json._
 import spray.json.DefaultJsonProtocol._
+import spray.http.HttpResponse
 
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
@@ -1168,8 +1169,8 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     invocationsAllowed += 1
 
                     Get(s"$testRoutePath/$path") ~> addHeader("Accept", "application/json") ~> sealRoute(routes(creds)) ~> check {
-                        status should be(BadRequest)
-                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.invalidAcceptType(MediaTypes.`text/html`)))
+                        status should be(NotAcceptable)
+                        response shouldBe HttpResponse(NotAcceptable, "Resource representation is only available with these Content-Types:\ntext/html")
                     }
                 }
         }

@@ -292,7 +292,7 @@ protected[core] object WhiskMetaApi extends Directives {
                 respondWithHeaders(headers) {
                     respondWithMediaType(mediaType) {
                         complete(code, data)
-                    } ~ terminate(BadRequest, Messages.invalidAcceptType(mediaType))(transid)
+                    }
                 }
 
             case Failure(RejectRequest(code, message)) =>
