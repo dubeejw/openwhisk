@@ -23,7 +23,10 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+import WhiskMetaApi.MediaExtension
 import spray.http._
+import spray.http.HttpEntity.Empty
+import spray.http.HttpEntity.NonEmpty
 import spray.http.HttpHeaders._
 import spray.http.MediaTypes._
 import spray.http.StatusCodes._
@@ -43,7 +46,6 @@ import whisk.core.entity.types._
 import whisk.http.ErrorResponse.terminate
 import whisk.http.Messages
 import whisk.utils.JsHelpers._
-import WhiskMetaApi.MediaExtension
 
 protected[controller] class WebApiDirectives private (
     fields: Map[String, String],
@@ -425,30 +427,33 @@ trait WhiskMetaApi
                 extract(_.request.entity) { e =>
                     validateSize(isWhithinRange(e.data.length))(transid) {
                         e match {
-                            case HttpEntity.Empty                                   =>
+                            case Empty =>
                                 process(None, actionName, extension)
-                            case HttpEntity.NonEmpty(`application/json`, data)      =>
-                                entity(as[Option[JsObject]]) {
-                                    body => process(body, actionName, extension)
+
+                            case NonEmpty(ContentType(`application/json`, _), json) /* if !isRawHttpAction */ =>
+                                // TODO: this is still parsing the content even for a raw-http action
+                                entity(as[JsObject]) {
+                                    body => process(Some(body), actionName, extension)
                                 }
-                            case HttpEntity.NonEmpty(`multipart/form-data`, data)   =>
+
+                            case NonEmpty(ContentType(`application/x-www-form-urlencoded`, _), form) /* if !isRawHttpAction */ =>
+                                // TODO: this is still parsing the content even for a raw-http action
                                 entity(as[FormData]) {
                                     form => process(Some(form.fields.toMap.toJson.asJsObject), actionName, extension)
                                 }
-                            case HttpEntity.NonEmpty(contentType, data)             =>
+
+                            case NonEmpty(contentType, data) =>
                                 if (contentType.mediaType.binary) {
-                                    extract(_.request.entity.data) { data           =>
-                                        Try(JsString(Base64.getEncoder.encodeToString(data.toByteArray))) match {
-                                            case Success(bytes) => process(Some(bytes), actionName, extension)
-                                            case Failure(t) => terminate(BadRequest, Messages.errorExtractingRequestBody)
-                                        }
+                                    Try(JsString(Base64.getEncoder.encodeToString(data.toByteArray))) match {
+                                        case Success(bytes) => process(Some(bytes), actionName, extension)
+                                        case Failure(t)     => terminate(BadRequest, Messages.unsupportedContentType(contentType.mediaType))
                                     }
                                 } else {
-                                    extract(_.request.entity.data) { data =>
-                                        process(Some(data.asString.parseJson), actionName, extension)
-                                    }
+                                    val str = JsString(data.asString(HttpCharsets.`UTF-8`))
+                                    process(Some(str), actionName, extension)
                                 }
-                            case _ => terminate(NotAcceptable, Messages.errorExtractingRequestBody)
+
+                            case _ => terminate(BadRequest, Messages.unsupportedContentType)
                         }
                     }
                 }

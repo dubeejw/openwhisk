@@ -72,39 +72,43 @@ import whisk.http.Messages
  */
 
 @RunWith(classOf[JUnitRunner])
-class MetaApiTestsV1 extends MetaApiTests {
+class MetaApiTestsV21extends extends FlatSpec with Matchers with MetaApiTests {
     override lazy val webInvokePathSegments = Seq("experimental", "web")
     override lazy val webApiDirectives = WebApiDirectives.exp
 
-    webApiDirectives.method shouldBe "__ow_meta_verb"
-    webApiDirectives.headers shouldBe "__ow_meta_headers"
-    webApiDirectives.path shouldBe "__ow_meta_path"
-    webApiDirectives.namespace shouldBe "__ow_meta_namespace"
+    "properties" should "match verion" in {
+        webApiDirectives.method shouldBe "__ow_meta_verb"
+        webApiDirectives.headers shouldBe "__ow_meta_headers"
+        webApiDirectives.path shouldBe "__ow_meta_path"
+        webApiDirectives.namespace shouldBe "__ow_meta_namespace"
 
-    webApiDirectives.query shouldBe "__ow_meta_query"
-    webApiDirectives.body shouldBe "__ow_meta_body"
+        webApiDirectives.query shouldBe "__ow_meta_query"
+        webApiDirectives.body shouldBe "__ow_meta_body"
 
-    webApiDirectives.statusCode shouldBe "code"
+        webApiDirectives.statusCode shouldBe "code"
 
-    webApiDirectives.enforceExtension shouldBe true
+        webApiDirectives.enforceExtension shouldBe true
+    }
 }
 
 @RunWith(classOf[JUnitRunner])
-class MetaApiTestsV2 extends MetaApiTests {
+class MetaApiTestsV2 extends FlatSpec with Matchers with MetaApiTests {
     override lazy val webInvokePathSegments = Seq("web")
     override lazy val webApiDirectives = WebApiDirectives.web
 
-    webApiDirectives.method shouldBe "__ow_method"
-    webApiDirectives.headers shouldBe "__ow_headers"
-    webApiDirectives.path shouldBe "__ow_path"
-    webApiDirectives.namespace shouldBe "__ow_namespace"
+    "properties" should "match verion" in {
+        webApiDirectives.method shouldBe "__ow_method"
+        webApiDirectives.headers shouldBe "__ow_headers"
+        webApiDirectives.path shouldBe "__ow_path"
+        webApiDirectives.namespace shouldBe "__ow_namespace"
 
-    webApiDirectives.query shouldBe "__ow_query"
-    webApiDirectives.body shouldBe "__ow_body"
+        webApiDirectives.query shouldBe "__ow_query"
+        webApiDirectives.body shouldBe "__ow_body"
 
-    webApiDirectives.statusCode shouldBe "statusCode"
+        webApiDirectives.statusCode shouldBe "statusCode"
 
-    webApiDirectives.enforceExtension shouldBe false
+        webApiDirectives.enforceExtension shouldBe false
+    }
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -164,7 +168,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
         failThrottleForSubject = None
         actionResult = None
         requireAuthentication = false
-        invocationsAllowed shouldBe invocationCount
+        assert(invocationsAllowed == invocationCount, "allowed invoke count did not match actual")
     }
 
     val allowedMethods = {
@@ -469,7 +473,6 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                         val content = JsObject("extra" -> "read all about it".toJson, "yummy" -> true.toJson)
                         val p = if (path.endsWith("/")) "/" else ""
                         invocationsAllowed += 1
-
                         m(s"$testRoutePath/$path", content) ~> sealRoute(routes(creds)) ~> check {
                             status should be(OK)
                             val response = responseAs[JsObject]
@@ -990,7 +993,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     "action" -> "export_c".toJson,
                     "content" -> metaPayload(
                         Post.method.name.toLowerCase,
-                        JsObject(webApiDirectives.body -> Base64.getEncoder.encodeToString(str.getBytes).toJson),
+                        JsObject(webApiDirectives.body -> str.toJson),
                         creds,
                         pkgName = "proxy",
                         headers = List(HttpHeaders.`Content-Type`(MediaTypes.`text/html`))))
@@ -1105,21 +1108,6 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 }
         }
 
-        it should s"reject invocation of web action with invalid accept header (auth? ${creds.isDefined})" in {
-            implicit val tid = transid()
-
-            Seq(s"$systemId/proxy/export_c.http").
-                foreach { path =>
-                    actionResult = Some(JsObject("body" -> "Plain text".toJson))
-                    invocationsAllowed += 1
-
-                    Get(s"$testRoutePath/$path") ~> addHeader("Accept", "application/json") ~> sealRoute(routes(creds)) ~> check {
-                        status should be(BadRequest)
-                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.invalidAcceptType(MediaTypes.`text/html`)))
-                    }
-                }
-        }
-
         it should s"not fail a raw http action when query or body parameters overlap with final action parameters (auth? ${creds.isDefined})" in {
             implicit val tid = transid()
             invocationsAllowed = 2
@@ -1168,12 +1156,27 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     "content" -> metaPayload(
                         Post.method.name.toLowerCase,
                         Map(
-                            webApiDirectives.body -> Base64.getEncoder.encodeToString(str.getBytes).toJson,
+                            webApiDirectives.body -> str.toJson,
                             webApiDirectives.query -> JsObject("key1" -> JsString("value1"), "key2" -> JsString("value2"))).toJson.asJsObject,
                         creds,
                         pkgName = "proxy",
                         headers = List(HttpHeaders.`Content-Type`(MediaTypes.`application/json`))))
             }
+        }
+
+        it should s"reject invocation of web action with invalid accept header (auth? ${creds.isDefined})" in {
+            implicit val tid = transid()
+
+            Seq(s"$systemId/proxy/export_c.http").
+                foreach { path =>
+                    actionResult = Some(JsObject("body" -> "Plain text".toJson))
+                    invocationsAllowed += 1
+
+                    Get(s"$testRoutePath/$path") ~> addHeader("Accept", "application/json") ~> sealRoute(routes(creds)) ~> check {
+                        status should be(BadRequest)
+                        confirmErrorWithTid(responseAs[JsObject], Some(Messages.invalidAcceptType(MediaTypes.`text/html`)))
+                    }
+                }
         }
 
         it should s"not invoke an action more than once when determining entity type (auth? ${creds.isDefined})" in {
@@ -1183,13 +1186,17 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                 foreach { path =>
                     val html = """<html><body>test</body></html>"""
                     val xml = """<?xml version="1.0" encoding="UTF-8"?><note><from>test</from></note>"""
-                    invocationsAllowed += 3
+                    invocationsAllowed += 1
                     actionResult = Some(JsObject("html" -> xml.toJson))
 
                     Get(s"$testRoutePath/$path") ~> addHeader("Accept", MediaTypes.`text/xml`.value) ~> sealRoute(routes(creds)) ~> check {
                         status should be(NotAcceptable)
                     }
                 }
+
+            withClue(s"allowed invoke count did not match actual") {
+                invocationsAllowed shouldBe invocationCount
+            }
         }
     }
 

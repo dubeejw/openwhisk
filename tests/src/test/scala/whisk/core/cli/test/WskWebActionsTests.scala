@@ -33,7 +33,7 @@ import spray.http.MediaTypes
 import system.rest.RestUtil
 import whisk.http.Messages
 
-import java.util.Base64
+import java.nio.charset.StandardCharsets
 
 /**
  * Tests web actions.
@@ -175,11 +175,11 @@ abstract class WskWebActionsTests
 
             val paramRes = RestAssured.given().contentType("text/html").param("key", "value").config(sslconfig).post(url)
             paramRes.statusCode shouldBe 200
-            new String(Base64.getDecoder().decode(paramRes.body.asString), "ASCII") shouldBe "key=value"
+            new String(paramRes.body.asByteArray, StandardCharsets.UTF_8) shouldBe "key=value"
 
             val bodyRes = RestAssured.given().contentType("text/html").body(bodyContent).config(sslconfig).post(url)
             bodyRes.statusCode shouldBe 200
-            new String(Base64.getDecoder().decode(bodyRes.body.asString), "ASCII") shouldBe bodyContent
+            new String(bodyRes.body.asByteArray, StandardCharsets.UTF_8) shouldBe bodyContent
     }
 
     it should "reject invocation of web action with invalid accept header" in withAssetCleaner(wskprops) {
