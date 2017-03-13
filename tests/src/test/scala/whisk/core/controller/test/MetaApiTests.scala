@@ -83,7 +83,6 @@ class MetaApiTestsV1 extends MetaApiTests {
 
     webApiDirectives.query shouldBe "__ow_meta_query"
     webApiDirectives.body shouldBe "__ow_meta_body"
-    webApiDirectives.env shouldBe "__ow_meta_env"
 
     webApiDirectives.statusCode shouldBe "code"
 
@@ -102,7 +101,6 @@ class MetaApiTestsV2 extends MetaApiTests {
 
     webApiDirectives.query shouldBe "__ow_query"
     webApiDirectives.body shouldBe "__ow_body"
-    webApiDirectives.env shouldBe "__ow_env"
 
     webApiDirectives.statusCode shouldBe "statusCode"
 
@@ -1135,10 +1133,9 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     "action" -> "raw_export_c".toJson,
                     "content" -> metaPayload(
                         Post.method.name.toLowerCase,
-                        JsObject(
+                        Map(
                             webApiDirectives.body -> Base64.getEncoder.encodeToString(str.getBytes).toJson,
-                            webApiDirectives.query -> JsObject("key1" -> JsString("value1"), "key2" -> JsString("value2")),
-                            webApiDirectives.env -> (packages(0).parameters ++ defaultActionParameters).toJsObject),
+                            webApiDirectives.query -> JsObject("key1" -> JsString("value1"), "key2" -> JsString("value2"))).toJson.asJsObject,
                         creds,
                         pkgName = "proxy",
                         headers = List(HttpHeaders.`Content-Type`(MediaTypes.`application/json`))))

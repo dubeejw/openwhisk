@@ -57,7 +57,6 @@ protected[controller] class WebApiDirectives private (
 
     val query: String = fields("query")
     val body: String = fields("body")
-    val env: String = fields("env")
 
     val statusCode = fields("statusCode")
 
@@ -72,7 +71,6 @@ protected[controller] object WebApiDirectives {
         "namespace" -> "namespace",
         "query" -> "query",
         "body" -> "body",
-        "env" -> "env",
         "statusCode" -> "statusCode")
 
     // field names for /web with raw-http action
