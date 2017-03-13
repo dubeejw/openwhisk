@@ -118,7 +118,8 @@ object Messages {
     /** Error for meta api. */
     val propertyNotFound = "Response does not include requested property."
     def invalidMedia(m: MediaType) = s"Response is not valid '${m.value}'."
-    val contentTypeExtentionNotSupported = """Extension must be specified and one of [".json", ".html", ".http", ".text"]."""
+    val contentTypeExtensionNotSupported = """Extension must be specified and one of [".json", ".html", ".http", ".text"]."""
+    val errorExtractingRequestBody = "Failed extracting request body."
     def invalidAcceptType(m: MediaType) = s"Response type of ${m.value} does not correspond with accept header."
 
     val responseNotReady = "Response not yet ready."
