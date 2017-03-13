@@ -422,18 +422,33 @@ trait WhiskMetaApi
 
         WhiskMetaApi.mediaTranscoderForName(actionNameWithExtension, webApiDirectives.enforceExtension) match {
             case (actionName, Some(extension)) =>
-                extract(_.request.entity.data.length) { length =>
-                    validateSize(isWhithinRange(length))(transid) {
-
-                        entity(as[Option[JsObject]]) {
-                            body => process(body, actionName, extension)
-                        } ~ entity(as[FormData]) {
-                            form => process(Some(form.fields.toMap.toJson.asJsObject), actionName, extension)
-                        } ~ extract(_.request.entity.data) { data =>
-                            Try(JsString(Base64.getEncoder.encodeToString(data.toByteArray))) match {
-                                case Success(bytes) => process(Some(bytes), actionName, extension)
-                                case Failure(t)     => terminate(BadRequest, Messages.errorExtractingRequestBody)
-                            }
+                extract(_.request.entity) { e =>
+                    validateSize(isWhithinRange(e.data.length))(transid) {
+                        e match {
+                            case HttpEntity.Empty                                   =>
+                                process(None, actionName, extension)
+                            case HttpEntity.NonEmpty(`application/json`, data)      =>
+                                entity(as[Option[JsObject]]) {
+                                    body => process(body, actionName, extension)
+                                }
+                            case HttpEntity.NonEmpty(`multipart/form-data`, data)   =>
+                                entity(as[FormData]) {
+                                    form => process(Some(form.fields.toMap.toJson.asJsObject), actionName, extension)
+                                }
+                            case HttpEntity.NonEmpty(contentType, data)             =>
+                                if (contentType.mediaType.binary) {
+                                    extract(_.request.entity.data) { data           =>
+                                        Try(JsString(Base64.getEncoder.encodeToString(data.toByteArray))) match {
+                                            case Success(bytes) => process(Some(bytes), actionName, extension)
+                                            case Failure(t) => terminate(BadRequest, Messages.errorExtractingRequestBody)
+                                        }
+                                    }
+                                } else {
+                                    extract(_.request.entity.data) { data =>
+                                        process(Some(data.asString.parseJson), actionName, extension)
+                                    }
+                                }
+                            case _ => terminate(NotAcceptable, Messages.errorExtractingRequestBody)
                         }
                     }
                 }
