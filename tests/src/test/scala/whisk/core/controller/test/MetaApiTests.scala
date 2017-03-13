@@ -1135,7 +1135,9 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
                     "content" -> metaPayload(
                         Post.method.name.toLowerCase,
                         Map(webApiDirectives.query -> JsObject(),
-                            webApiDirectives.body -> JsObject("x" -> JsString("overriden"), "key2" -> JsString("value2"))).toJson.asJsObject,
+                            webApiDirectives.body ->  Base64.getEncoder.encodeToString {
+                                JsObject("x" -> JsString("overriden"), "key2" -> JsString("value2")).prettyPrint.getBytes
+                            }.toJson).toJson.asJsObject,
                         creds,
                         pkgName = "proxy"))
             }
