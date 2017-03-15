@@ -17,6 +17,7 @@
 package whisk.core.controller
 
 import java.util.Base64
+import java.nio.charset.StandardCharsets
 
 import scala.concurrent.Future
 import scala.util.Failure
@@ -115,7 +116,7 @@ private case class Context(
 
     def toActionArgument(user: Option[Identity], boxQueryAndBody: Boolean): Map[String, JsValue] = {
         val queryParams = if (boxQueryAndBody) {
-            Map(propertyMap.query -> JsString(query.toString))
+            Map(propertyMap.query -> JsString(query.render(new StringRendering, StandardCharsets.UTF_8).get))
         } else {
             queryAsMap.map(kv => kv._1 -> JsString(kv._2))
         }
