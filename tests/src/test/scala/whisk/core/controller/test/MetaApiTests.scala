@@ -990,7 +990,7 @@ trait MetaApiTests extends ControllerTestCommon with BeforeAndAfterEach with Whi
              */
 
             Post(s"$testRoutePath/$systemId/proxy/export_c.json", str) ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> sealRoute(routes(creds)) ~> check {
-                //status should be(OK)
+                status should be(OK)
                 val response = responseAs[JsObject]
                 response shouldBe JsObject(
                     "pkg" -> s"$systemId/proxy".toJson,

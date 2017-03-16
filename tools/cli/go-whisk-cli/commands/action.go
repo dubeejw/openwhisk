@@ -55,6 +55,10 @@ var actionCreateCmd = &cobra.Command{
         var action *whisk.Action
         var err error
 
+        printMessage(0, "name", "some name", "err", "someerror")
+        printMessage2("Unable to invoke action '{{.name}}': {{.err}}", "name", "we wef", "err", args)
+        fmt.Println(getMessage("Unable to invoke action '{{.name}}': {{.err}}", "name", "we wef", "err", args))
+
         if whiskErr := checkArgs(
             args,
             2,
@@ -574,6 +578,47 @@ func nonNestedError(errorMessage string) (error) {
         whisk.EXITCODE_ERR_GENERAL,
         whisk.DISPLAY_MSG,
         whisk.DISPLAY_USAGE)
+}
+
+var ErrorMessage = [...]string {
+    "Unable to invoke action '{{.name}}': {{.err}}",
+    "Unable to create action: {{.err}}",
+}
+
+func printMessage2(msg string, values ...interface{}) {
+    var a map[interface{}]interface{}
+    a = make(map[interface{}]interface{})
+
+    for i := 0; i < len(values); i += 2 {
+        a[values[i]] = values[i + 1]
+
+    }
+
+    fmt.Println(wski18n.T(msg, a))
+}
+
+func getMessage(msg string, values ...interface{}) (string) {
+    var a map[interface{}]interface{}
+    a = make(map[interface{}]interface{})
+
+    for i := 0; i < len(values); i += 2 {
+        a[values[i]] = values[i + 1]
+
+    }
+
+    return wski18n.T(msg, a)
+}
+
+func printMessage(index int, values ...interface{}) {
+    var a map[interface{}]interface{}
+    a = make(map[interface{}]interface{})
+
+    for i := 0; i < len(values); i += 2 {
+        a[values[i]] = values[i + 1]
+
+    }
+
+    fmt.Println(wski18n.T(ErrorMessage[index], a))
 }
 
 func actionParseError(cmd *cobra.Command, args []string, err error) (error) {

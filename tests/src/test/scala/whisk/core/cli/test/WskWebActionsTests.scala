@@ -209,9 +209,9 @@ abstract class WskWebActionsTests
                     action.create(name, file, web = Some("defAult"))
             }
 
-            Seq("defAult", "None", "default").foreach { webAction =>
-                val optionEnabled = webAction.toLowerCase != "none"
-
+            Seq("defAult", "None", "default", "rAw", "noNE", "raw").foreach { webAction =>
+                val webEnabled = webAction.toLowerCase != "none"
+                val rawEnabled = webAction.toLowerCase == "raw"
                 if (updateAction)
                     wsk.action.create(name, file, web = Some(webAction), update = true)
                 else
@@ -222,13 +222,13 @@ abstract class WskWebActionsTests
                 removeCLIHeader(stdout).parseJson shouldBe JsArray(
                     JsObject(
                         "key" -> JsString("web-export"),
-                        "value" -> JsBoolean(optionEnabled)),
+                        "value" -> JsBoolean(webEnabled)),
                     JsObject(
                         "key" -> JsString("raw-http"),
-                        "value" -> JsBoolean(false)),
+                        "value" -> JsBoolean(rawEnabled )),
                     JsObject(
                         "key" -> JsString("final"),
-                        "value" -> JsBoolean(optionEnabled)),
+                        "value" -> JsBoolean(webEnabled)),
                     JsObject(
                         "key" -> JsString("exec"),
                         "value" -> JsString("nodejs:6")))
