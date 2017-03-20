@@ -418,10 +418,6 @@ type WhiskResult struct {
 //  Error   *WhiskError         `json:"error"`  // whisk.error(<string>) and whisk.reject({msg:<string>}) result in two different kinds of 'error' JSON objects
 }
 
-type WhiskError struct {
-    Msg     *string             `json:"msg"`
-}
-
 func (r ErrorResponse) Error() string {
     return wski18n.T("{{.msg}} (code {{.code}})",
         map[string]interface{}{"msg": fmt.Sprintf("%v", r.ErrMsg), "code": r.Code})

@@ -75,11 +75,22 @@ func main() {
             displayPrefix = werr.DisplayPrefix
             exitCode = werr.ExitCode
         } else {
-            whisk.Debug(whisk.DbgError, "Got some other error: %s\n", err)
-            fmt.Fprintf(os.Stderr, "%s\n", err)
 
-            displayUsage = false   // Cobra already displayed the usage message
-            exitCode = 1;
+            whiskErr, isWhiskError := err.(*whisk.Error)  // Is the err a WskError?
+            if isWhiskError {
+                whisk.Debug(whisk.DbgError, "Got a *whisk.WhiskError error: %#v\n", whiskErr)
+                displayUsage = whiskErr.DisplayUsage
+                displayMsg = whiskErr.DisplayMsg
+                msgDisplayed = whiskErr.MsgDisplayed
+                displayPrefix = whiskErr.DisplayPrefix
+                exitCode = whiskErr.ExitCode
+            } else {
+                whisk.Debug(whisk.DbgError, "Got some other error: %s\n", err)
+                fmt.Fprintf(os.Stderr, "%s\n", err)
+
+                displayUsage = false   // Cobra already displayed the usage message
+                exitCode = 1;
+            }
         }
 
         outputStream := colorable.NewColorableStderr()

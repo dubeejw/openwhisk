@@ -814,7 +814,7 @@ func checkArgs(args []string, minimumArgNumber int, maximumArgNumber int, comman
     if len(args) < minimumArgNumber {
         whisk.Debug(whisk.DbgError, fmt.Sprintf("%s command must have %s %d argument(s)\n", commandName,
             exactlyOrAtLeast, minimumArgNumber))
-        errMsg := wski18n.T("Invalid argument(s). {{.required}}", map[string]interface{}{"required": requiredArgMsg})
+        errMsg := wski18n.T("Invalid argument(s). {{.required}}", map[string]interface{}{"required": wski18n.T(requiredArgMsg)})
         whiskErr := whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL,
             whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
         return whiskErr
@@ -822,7 +822,7 @@ func checkArgs(args []string, minimumArgNumber int, maximumArgNumber int, comman
         whisk.Debug(whisk.DbgError, fmt.Sprintf("%s command must have %s %d argument(s)\n", commandName,
             exactlyOrNoMoreThan, maximumArgNumber))
         errMsg := wski18n.T("Invalid argument(s): {{.args}}. {{.required}}",
-            map[string]interface{}{"args": strings.Join(args[maximumArgNumber:], ", "), "required": requiredArgMsg})
+            map[string]interface{}{"args": strings.Join(args[maximumArgNumber:], ", "), "required": wski18n.T(requiredArgMsg)})
         whiskErr := whisk.MakeWskError(errors.New(errMsg), whisk.EXITCODE_ERR_GENERAL,
             whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
         return whiskErr
@@ -1050,4 +1050,31 @@ func isApplicationError(err error) (bool) {
     }
 
     return applicationError
+}
+
+func getMessageParameters(message string) ([]string) {
+    var messageParams []string
+
+    messageParams = strings.Split(message, "{{.")[1:]
+
+    for i := 0; i < len(messageParams); i++ {
+        pos := strings.Index(messageParams[i], "}}")
+        messageParams[i] = messageParams[i][0:pos]
+    }
+
+    return messageParams
+}
+
+func print(message string, args ...interface{}) {
+    var messageReplacements map[interface{}]interface{}
+    var messageParams []string
+
+    messageReplacements = make(map[interface{}]interface{})
+    messageParams = getMessageParameters(message)
+
+    for i := 0; i < len(args); i++ {
+        messageReplacements[messageParams[i]] = args[i]
+    }
+
+    fmt.Fprintf(color.Output, wski18n.T(message, messageReplacements))
 }

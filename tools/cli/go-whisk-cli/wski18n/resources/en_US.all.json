@@ -768,12 +768,12 @@
     "translation": "create a new action"
   },
   {
-    "id": "Unable to parse action command arguments: {{.err}}",
-    "translation": "Unable to parse action command arguments: {{.err}}"
+    "id": "Unable to parse action command arguments",
+    "translation": "Unable to parse action command arguments"
   },
   {
-    "id": "Unable to create action: {{.err}}",
-    "translation": "Unable to create action: {{.err}}"
+    "id": "Unable to create action",
+    "translation": "Unable to create action"
   },
   {
     "id": "{{.ok}} created action {{.name}}\n",
@@ -784,8 +784,8 @@
     "translation": "update an existing action, or create an action if it does not exist"
   },
   {
-    "id": "Unable to update action: {{.err}}",
-    "translation": "Unable to update action: {{.err}}"
+    "id": "Unable to update action",
+    "translation": "Unable to update action"
   },
   {
     "id": "{{.ok}} updated action {{.name}}\n",

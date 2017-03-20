@@ -32,13 +32,13 @@ import (
     "github.com/mattn/go-colorable"
 )
 
-const MEMORY_LIMIT = 256
-const TIMEOUT_LIMIT = 60000
-const LOGSIZE_LIMIT = 10
-const ACTIVATION_ID = "activationId"
-const WEB_EXPORT_ANNOT = "web-export"
-const RAW_HTTP_ANNOT = "raw-http"
-const FINAL_ANNOT = "final"
+const MEMORY_LIMIT      = 256
+const TIMEOUT_LIMIT     = 60000
+const LOGSIZE_LIMIT     = 10
+const ACTIVATION_ID     = "activationId"
+const WEB_EXPORT_ANNOT  = "web-export"
+const RAW_HTTP_ANNOT    = "raw-http"
+const FINAL_ANNOT       = "final"
 
 var actionCmd = &cobra.Command{
     Use:   "action",
@@ -55,24 +55,21 @@ var actionCreateCmd = &cobra.Command{
         var action *whisk.Action
         var err error
 
-        if whiskErr := checkArgs(
-            args,
-            2,
-            2,
-            "Action create",
-            wski18n.T("An action name and action are required.")); whiskErr != nil {
-                return whiskErr
+        if whiskErr := checkArgs(args, 2, 2, "Action create", "An action name and action are required."); whiskErr != nil {
+            return whiskErr
         }
 
         if action, err = parseAction(cmd, args, false); err != nil {
-            return actionParseError(cmd, args, err)
+            whisk.Debug(whisk.DbgError, "parseAction(%s, %s) error: %s\n", cmd, args, err)
+            return whisk.NestedWhiskError("Unable to parse action command arguments", err)
         }
 
         if _, _, err = client.Actions.Insert(action, false); err != nil {
-            return actionInsertError(action, err)
+            whisk.Debug(whisk.DbgError, "client.Actions.Insert(%#v, false) error: %s\n", action, err)
+            return whisk.NestedWhiskError("Unable to create action", err)
         }
 
-        printActionCreated(action.Name)
+        print("{{.ok}} created action {{.name}}\n", color.GreenString("ok:"), boldString(action.Name))
 
         return nil
     },
@@ -88,24 +85,21 @@ var actionUpdateCmd = &cobra.Command{
         var action *whisk.Action
         var err error
 
-        if whiskErr := checkArgs(
-            args,
-            1,
-            2,
-            "Action update",
-            wski18n.T("An action name is required. An action is optional.")); whiskErr != nil {
+        if whiskErr := checkArgs(args, 1, 2, "Action update", "An action name is required. An action is optional."); whiskErr != nil {
                 return whiskErr
         }
 
         if action, err = parseAction(cmd, args, false); err != nil {
-            return actionParseError(cmd, args, err)
+            whisk.Debug(whisk.DbgError, "parseAction(%s, %s) error: %s\n", cmd, args, err)
+            return whisk.NestedWhiskError("Unable to parse action command arguments", err)
         }
 
         if _, _, err = client.Actions.Insert(action, true); err != nil {
-            return actionInsertError(action, err)
+            whisk.Debug(whisk.DbgError, "client.Actions.Insert(%#v, true) error: %s\n", action, err)
+            return whisk.NestedWhiskError("Unable to update action", err)
         }
 
-        printActionUpdated(action.Name)
+        print("{{.ok}} updated action {{.name}}\n", color.GreenString("ok:"), boldString(action.Name))
 
         return nil
     },
@@ -123,12 +117,7 @@ var actionInvokeCmd = &cobra.Command{
         var qualifiedName QualifiedName
         var paramArgs []string
 
-        if whiskErr := checkArgs(
-            args,
-            1,
-            1,
-            "Action invoke",
-            wski18n.T("An action name is required.")); whiskErr != nil {
+        if whiskErr := checkArgs(args, 1, 1, "Action invoke", "An action name is required."); whiskErr != nil {
                 return whiskErr
         }
 
@@ -161,12 +150,18 @@ func handleInvocationResponse(
     result map[string]interface{},
     err error) (error) {
         if err == nil {
-            printInvocationMsg(
-                qualifiedName.namespace,
-                qualifiedName.entityName,
-                getValueFromJSONResponse(ACTIVATION_ID, result),
-                result,
-                color.Output)
+            if !flags.action.result {
+                print(
+                    "{{.ok}} invoked /{{.namespace}}/{{.name}} with id {{.id}}\n",
+                    color.GreenString("ok:"),
+                    boldString(qualifiedName.namespace),
+                    boldString(qualifiedName.entityName),
+                    boldString(getValueFromJSONResponse(ACTIVATION_ID, result)))
+            }
+
+            if flags.common.blocking {
+                printJSON(result, color.Output)
+            }
         } else {
             if !flags.common.blocking {
                 return handleInvocationError(err, qualifiedName.entityName, parameters)
@@ -204,7 +199,7 @@ var actionGetCmd = &cobra.Command{
         var action *whisk.Action
         var qualifiedName QualifiedName
 
-        if whiskErr := checkArgs(args, 1, 2, "Action get", wski18n.T("An action name is required.")); whiskErr != nil {
+        if whiskErr := checkArgs(args, 1, 2, "Action get", "An action name is required."); whiskErr != nil {
             return whiskErr
         }
 
@@ -226,14 +221,20 @@ var actionGetCmd = &cobra.Command{
             return actionGetError(qualifiedName.entityName, err)
         }
 
-        if flags.common.summary {
-            printSummary(action)
-        } else {
+        if !flags.common.summary {
             if len(field) > 0 {
-                printActionGetWithField(qualifiedName.entityName, field, action)
+                print(
+                    "{{.ok}} got action {{.name}}, displaying field {{.field}}\n",
+                    color.GreenString("ok:"),
+                    boldString(qualifiedName.entityName),
+                    boldString(field))
+                printField(action, field)
             } else {
-                printActionGet(qualifiedName.entityName, action)
+                print("{{.ok}} got action {{.name}}\n", color.GreenString("ok:"), qualifiedName.entityName)
+                printJSON(action)
             }
+        } else {
+            printSummary(action)
         }
 
         return nil
@@ -250,13 +251,8 @@ var actionDeleteCmd = &cobra.Command{
         var qualifiedName QualifiedName
         var err error
 
-        if whiskErr := checkArgs(
-            args,
-            1,
-            1,
-            "Action delete",
-            wski18n.T("An action name is required.")); whiskErr != nil {
-                return whiskErr
+        if whiskErr := checkArgs(args, 1, 1, "Action delete", "An action name is required."); whiskErr != nil {
+            return whiskErr
         }
 
         if qualifiedName, err = parseQualifiedName(args[0]); err != nil {
@@ -269,7 +265,7 @@ var actionDeleteCmd = &cobra.Command{
             return actionDeleteError(qualifiedName.entityName, err)
         }
 
-        printActionDeleted(qualifiedName.entityName)
+        print("{{.ok}} deleted action {{.name}}\n", color.GreenString("ok:"), boldString(qualifiedName.entityName))
 
         return nil
     },
@@ -286,19 +282,16 @@ var actionListCmd = &cobra.Command{
         var actions []whisk.Action
         var err error
 
+        if whiskErr := checkArgs(args, 0, 1, "Action list", "An optional namespace is the only valid argument."); whiskErr != nil {
+            return whiskErr
+        }
+
         if len(args) == 1 {
             if qualifiedName, err = parseQualifiedName(args[0]); err != nil {
                 return parseQualifiedNameError(args[0], err)
             }
 
             client.Namespace = qualifiedName.namespace
-        } else if whiskErr := checkArgs(
-            args,
-            0,
-            1,
-            "Action list",
-            wski18n.T("An optional namespace is the only valid argument.")); whiskErr != nil {
-            return whiskErr
         }
 
         options := &whisk.ActionListOptions{
@@ -593,30 +586,6 @@ func nonNestedError(errorMessage string) (error) {
         whisk.DISPLAY_USAGE)
 }
 
-func actionParseError(cmd *cobra.Command, args []string, err error) (error) {
-    whisk.Debug(whisk.DbgError, "parseAction(%s, %s) error: %s\n", cmd, args, err)
-
-    errMsg := wski18n.T(
-        "Unable to parse action command arguments: {{.err}}",
-        map[string]interface{}{
-            "err": err,
-        })
-
-    return nestedError(errMsg, err)
-}
-
-func actionInsertError(action *whisk.Action, err error) (error) {
-    whisk.Debug(whisk.DbgError, "client.Actions.Insert(%#v, false) error: %s\n", action, err)
-
-    errMsg := wski18n.T(
-        "Unable to create action: {{.err}}",
-        map[string]interface{}{
-            "err": err,
-        })
-
-    return nestedError(errMsg, err)
-}
-
 func parseQualifiedNameError(entityName string, err error) (error) {
     whisk.Debug(whisk.DbgError, "parseQualifiedName(%s) failed: %s\n", entityName, err)
 
@@ -754,27 +723,6 @@ func javaEntryError() (error) {
     return nonNestedError(errMsg)
 }
 
-func printActionCreated(entityName string) {
-    fmt.Fprintf(
-        color.Output,
-        wski18n.T(
-            "{{.ok}} created action {{.name}}\n",
-            map[string]interface{}{
-                "ok": color.GreenString("ok:"),
-                "name": boldString(entityName),
-            }))
-}
-
-func printActionUpdated(entityName string) {
-    fmt.Fprintf(
-        color.Output,
-        wski18n.T(
-            "{{.ok}} updated action {{.name}}\n",
-            map[string]interface{}{
-                "ok": color.GreenString("ok:"),
-                "name": boldString(entityName),
-            }))
-}
 
 func printBlockingTimeoutMsg(namespace string, entityName string, activationID interface{}) {
     fmt.Fprintf(
@@ -813,42 +761,9 @@ func printInvocationMsg(
         }
 }
 
-func printActionGetWithField(entityName string, field string, action *whisk.Action) {
-    fmt.Fprintf(
-        color.Output,
-        wski18n.T(
-            "{{.ok}} got action {{.name}}, displaying field {{.field}}\n",
-            map[string]interface{}{
-                "ok": color.GreenString("ok:"),
-                "name": boldString(entityName),
-                "field": boldString(field),
-            }))
 
-    printField(action, field)
-}
 
-func printActionGet(entityName string, action *whisk.Action) {
-    fmt.Fprintf(
-        color.Output,
-        wski18n.T("{{.ok}} got action {{.name}}\n",
-            map[string]interface{}{
-                "ok": color.GreenString("ok:"),
-                "name": boldString(entityName),
-            }))
 
-    printJSON(action)
-}
-
-func printActionDeleted(entityName string) {
-    fmt.Fprintf(
-        color.Output,
-        wski18n.T(
-            "{{.ok}} deleted action {{.name}}\n",
-            map[string]interface{}{
-                "ok": color.GreenString("ok:"),
-                "name": boldString(entityName),
-            }))
-}
 
 func init() {
     actionCreateCmd.Flags().BoolVar(&flags.action.docker, "docker", false, wski18n.T("treat ACTION as docker image path on dockerhub"))
