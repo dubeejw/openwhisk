@@ -16,3 +16,4 @@ RUN tar xf controller.tar
 CMD controller/bin/controller >> /logs/${COMPONENT_NAME}_logs.log 2>&1
 
 EXPOSE 8080
+EXPOSE 8081
