@@ -194,6 +194,7 @@ object Controller {
             case Success(_) =>
                 val port = config.servicePort.toInt
                 BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
+                new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1, logger)
 
             case Failure(t) =>
                 logger.error(this, s"Invalid runtimes manifest: $t")
