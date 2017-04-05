@@ -17,10 +17,7 @@
 
 package whisk.http
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.duration.FiniteDuration
-import scala.util.Try
-
+/*
 import spray.http.MediaType
 import spray.http.StatusCode
 import spray.http.StatusCodes.Forbidden
@@ -32,6 +29,27 @@ import spray.json.DefaultJsonProtocol._
 import spray.routing.Directives
 import spray.routing.Rejection
 import spray.routing.StandardRoute
+
+*/
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration.FiniteDuration
+import scala.util.Try
+
+import akka.http.scaladsl.model.StatusCode
+import akka.http.scaladsl.model.StatusCodes.Forbidden
+import akka.http.scaladsl.model.StatusCodes.NotFound
+import akka.http.scaladsl.model.MediaType
+import akka.http.scaladsl.server.Rejection
+import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport.sprayJsonMarshaller
+import akka.http.scaladsl.server.StandardRoute
+//import akka.http.marshalling.ToResponseMarshallable.isMarshallable
+
+import spray.json._
+import spray.json.DefaultJsonProtocol._
+
+
 import whisk.common.TransactionId
 import whisk.core.entity.SizeError
 import whisk.core.entity.ByteSize
@@ -113,6 +131,8 @@ object Messages {
         s"${error.field} larger than allowed: ${error.is.toBytes} > ${error.allowed.toBytes} bytes."
     }
     def maxActivationLimitExceeded(value: Int, max: Int) = s"Activation limit of $value exceeds maximum limit of $max."
+
+    val payloadMustBeJSON = "Payload must be JSON formatted."
 
     def truncateLogs(limit: ByteSize) = {
         s"Logs were truncated because the total bytes size exceeds the limit of ${limit.toBytes} bytes."
