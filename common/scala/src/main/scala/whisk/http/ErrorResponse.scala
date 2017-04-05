@@ -21,17 +21,18 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
-import spray.http.MediaType
-import spray.http.StatusCode
-import spray.http.StatusCodes.Forbidden
-import spray.http.StatusCodes.NotFound
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
+import akka.http.scaladsl.model.StatusCode
+import akka.http.scaladsl.model.StatusCodes.Forbidden
+import akka.http.scaladsl.model.StatusCodes.NotFound
+import akka.http.scaladsl.model.MediaType
+import akka.http.scaladsl.server.Rejection
+import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport.sprayJsonMarshaller
+import akka.http.scaladsl.server.StandardRoute
+
 import spray.json._
 import spray.json.DefaultJsonProtocol._
-import spray.routing.Directives
-import spray.routing.Rejection
-import spray.routing.StandardRoute
+
 import whisk.common.TransactionId
 import whisk.core.entity.SizeError
 import whisk.core.entity.ByteSize
@@ -114,6 +115,8 @@ object Messages {
     }
     def maxActivationLimitExceeded(value: Int, max: Int) = s"Activation limit of $value exceeds maximum limit of $max."
 
+    val payloadMustBeJSON = "Payload must be JSON formatted."
+
     def truncateLogs(limit: ByteSize) = {
         s"Logs were truncated because the total bytes size exceeds the limit of ${limit.toBytes} bytes."
     }
@@ -190,6 +193,8 @@ object ErrorResponse extends Directives {
         case Forbidden => ErrorResponse(Messages.notAuthorizedtoOperateOnResource, transid)
         case _         => ErrorResponse(status.defaultMessage, transid)
     }
+
+    implicit val HydraQueueMessageFormat = jsonFormat2(ErrorResponse.apply)
 
     implicit val serializer = new RootJsonFormat[ErrorResponse] {
         def write(er: ErrorResponse) = JsObject(

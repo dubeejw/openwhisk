@@ -19,56 +19,68 @@ package whisk.http
 
 import scala.concurrent.duration.DurationInt
 import scala.language.postfixOps
+import scala.concurrent.Await
+import scala.collection.immutable.Seq
 
 import akka.actor.Actor
-import akka.actor.ActorContext
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.event.Logging
-import akka.io.IO
 import akka.japi.Creator
-import akka.pattern.ask
 import akka.util.Timeout
-import spray.can.Http
-import spray.http.ContentType
-import spray.http.HttpEntity
-import spray.http.HttpRequest
-import spray.http.HttpResponse
-import spray.http.MediaTypes.`text/plain`
-import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
-import spray.httpx.marshalling
-import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
-import spray.routing.AuthenticationFailedRejection
-import spray.routing.Directive.pimpApply
-import spray.routing.Directives
-import spray.routing.HttpService
-import spray.routing.RejectionHandler
-import spray.routing.Route
-import spray.routing.directives.DebuggingDirectives
-import spray.routing.directives.LogEntry
-import spray.routing.directives.LoggingMagnet.forMessageFromFullShow
+import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.server.directives.DebuggingDirectives
+import akka.http.scaladsl.server.directives.LogEntry
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.RejectionHandler
+//import akka.http.scaladsl.server.AuthorizationFailedRejection
+import akka.http.scaladsl.server.UnacceptedResponseContentTypeRejection
+
+import akka.http.scaladsl.marshalling.Marshal
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import scala.concurrent.ExecutionContext.Implicits.global
+import akka.http.scaladsl.server.RouteResult.Rejected
+//import spray.json._
+//import spray.json.DefaultJsonProtocol._
+
 import whisk.common.LogMarker
 import whisk.common.LogMarkerToken
 import whisk.common.Logging
 import whisk.common.LoggingMarkers
 import whisk.common.TransactionCounter
 import whisk.common.TransactionId
+import akka.stream.ActorMaterializer
 
 /**
  * This trait extends the spray HttpService trait with logging and transaction counting
  * facilities common to all OpenWhisk REST services.
  */
-trait BasicHttpService extends HttpService with TransactionCounter {
+trait BasicHttpService extends Directives with Actor with TransactionCounter {
 
     /**
      * Gets the actor context.
      */
-    implicit def actorRefFactory: ActorContext
+    //implicit def actorRefFactory: ActorContext
 
     /**
      * Gets the logging
      */
     implicit def logging: Logging
+    implicit val mat = ActorMaterializer()
+
+    /** Rejection handler to terminate connection on a bad request. Delegates to Spray handler. */
+    implicit def customRejectionHandler(implicit transid: TransactionId) =
+        RejectionHandler.default.mapRejectionResponse {
+                case resp @ HttpResponse(_, _, ent: HttpEntity.Strict, _) =>
+                    val timeout = 1.second
+                    val marshalledError = Marshal(ErrorResponse(ent.data.utf8String, transid)).to[ResponseEntity]
+                    val marshalledRes = Await.result(marshalledError.flatMap(_.toStrict(timeout)), timeout)
+                    resp.withEntity(marshalledRes)
+                case x => x
+            }
 
     /**
      * Gets the routes implemented by the HTTP service.
@@ -86,39 +98,46 @@ trait BasicHttpService extends HttpService with TransactionCounter {
      */
     def loglevelForRoute(route: String): Logging.LogLevel = Logging.InfoLevel
 
+    /** Rejection handler to terminate connection on a bad request. Delegates to Spray handler. */
+    val prioritizeRejections = recoverRejections { rejections =>
+        val priorityRejection = rejections.find(_.isInstanceOf[UnacceptedResponseContentTypeRejection]).getOrElse(null)
+
+        if (priorityRejection != null) {
+            Rejected(Seq(priorityRejection))
+        } else {
+            Rejected(rejections)
+        }
+    }
+
     /**
      * Receives a message and runs the router.
      */
-    def receive = runRoute(
+    def route: Route = {
         assignId { implicit transid =>
-            DebuggingDirectives.logRequest(logRequestInfo _) {
-                DebuggingDirectives.logRequestResponse(logResponseInfo _) {
-                    routes
+            handleRejections(customRejectionHandler) {
+                prioritizeRejections {
+                    DebuggingDirectives.logRequest(logRequestInfo _) {
+                        DebuggingDirectives.logRequestResult(logResponseInfo _) {
+                            routes
+                        }
+                    }
                 }
-            }
-        })
-
-    /** Assigns transaction id to every request. */
-    protected val assignId = extract(_ => transid())
-
-    /** Rejection handler to terminate connection on a bad request. Delegates to Spray handler. */
-
-    protected def customRejectionHandler(implicit transid: TransactionId) = RejectionHandler {
-        case rejections => {
-            logging.info(this, s"[REJECT] $rejections")
-            rejections match {
-                case AuthenticationFailedRejection(cause, challengeHeaders) :: _ =>
-                    BasicHttpService.customRejectionHandler.apply(rejections.takeRight(1))
-                case _ => BasicHttpService.customRejectionHandler.apply(rejections)
             }
         }
     }
+
+    def receive = {
+        case _ =>
+    }
+
+    /** Assigns transaction id to every request. */
+    protected val assignId = extract(_ => transid())
 
     /** Generates log entry for every request. */
     protected def logRequestInfo(req: HttpRequest)(implicit tid: TransactionId): LogEntry = {
         val m = req.method.toString
         val p = req.uri.path.toString
-        val q = req.uri.query.toString
+        val q = req.uri.query().toString
         val l = loglevelForRoute(p)
         LogEntry(s"[$tid] $m $p $q", l)
     }
@@ -144,22 +163,8 @@ object BasicHttpService extends Directives {
         val actor = system.actorOf(Props.create(service), s"$name-service")
 
         implicit val timeout = Timeout(5 seconds)
-        IO(Http)(system) ? Http.Bind(actor, interface, port)
+        //IO(Http)(system) ? Http.Bind(actor, interface, port)
     }
 
-    /** Rejection handler to terminate connection on a bad request. Delegates to Spray handler. */
-    def customRejectionHandler(implicit transid: TransactionId) = RejectionHandler {
-        // get default rejection message, package it as an ErrorResponse instance
-        // which gets serialized into a Json object
-        case r if RejectionHandler.Default.isDefinedAt(r) => {
-            ctx =>
-                RejectionHandler.Default(r) {
-                    ctx.withHttpResponseMapped {
-                        case resp @ HttpResponse(_, HttpEntity.NonEmpty(ContentType(`text/plain`, _), msg), _, _) =>
-                            resp.withEntity(marshalling.marshalUnsafe(ErrorResponse(msg.asString, transid)))
-                    }
-                }
-        }
-        case CustomRejection(status, cause) :: _ => complete(status, ErrorResponse(cause, transid))
-    }
+
 }
