@@ -19,32 +19,40 @@ package whisk.core.controller
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import akka.actor.Actor
-import akka.actor.ActorContext
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+
+import akka.actor._
 import akka.actor.ActorSystem
 import akka.japi.Creator
-import spray.http.StatusCodes._
-import spray.http.Uri
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
+import akka.http.scaladsl.server.RouteResult._
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
+import akka.http.scaladsl.server.RouteResult._
+import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+
 import spray.json._
 import spray.json.DefaultJsonProtocol._
-import spray.routing.Directive.pimpApply
-import spray.routing.Route
+
 import whisk.common.AkkaLogging
 import whisk.common.Logging
 import whisk.common.LoggingMarkers
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.entitlement._
-import whisk.core.entitlement.EntitlementProvider
 import whisk.core.entity._
 import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.entity.ExecManifest.Runtimes
 import whisk.core.loadBalancer.LoadBalancerService
 import whisk.http.BasicHttpService
 import whisk.http.BasicRasService
+import whisk.common.Logging
 
-import scala.util.{ Failure, Success }
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.
@@ -75,39 +83,28 @@ class Controller(
     runtimes: Runtimes,
     implicit val whiskConfig: WhiskConfig,
     implicit val logging: Logging)
-    extends BasicRasService
-    with Actor {
-
-    // each akka Actor has an implicit context
-    override def actorRefFactory: ActorContext = context
+    extends BasicRasService {
 
     override val numberOfInstances = whiskConfig.controllerInstances.toInt
 
+    TransactionId.controller.mark(this, LoggingMarkers.CONTROLLER_STARTUP(instance.toInt), s"starting controller instance ${instance.toInt}")
+
     /**
-     * A Route in spray is technically a function taking a RequestContext as a parameter.
-     *
-     * @Idioglossia The ~ spray DSL operator composes two independent Routes, building a routing
-     * tree structure.
-     * @see http://spray.io/documentation/1.2.3/spray-routing/key-concepts/routes/#composing-routes
-     */
+      * A Route in spray is technically a function taking a RequestContext as a parameter.
+      *
+      * @Idioglossia The ~ spray DSL operator composes two independent Routes, building a routing
+      * tree structure.
+      * @see http://spray.io/documentation/1.2.3/spray-routing/key-concepts/routes/#composing-routes
+      */
     override def routes(implicit transid: TransactionId): Route = {
-        // handleRejections wraps the inner Route with a logical error-handler for unmatched paths
-        handleRejections(customRejectionHandler) {
-            super.routes ~ {
-                (pathEndOrSingleSlash & get) {
-                    complete(OK, info)
-                }
-            } ~ {
-                apiv1.routes
-            } ~ {
-                swagger.swaggerRoutes
-            } ~ {
-                internalInvokerHealth
+        super.routes ~ {
+            (pathEndOrSingleSlash & get) {
+                complete(info)
             }
-        }
+        } ~ apiV1.routes ~ swagger.swaggerRoutes ~ internalInvokerHealth
     }
 
-    TransactionId.controller.mark(this, LoggingMarkers.CONTROLLER_STARTUP(instance.toInt), s"starting controller instance ${instance.toInt}")
+    implicit val materializer = ActorMaterializer()
 
     // initialize datastores
     private implicit val actorSystem = context.system
@@ -124,10 +121,11 @@ class Controller(
 
     // register collections
     Collection.initialize(entityStore)
+    whisk.core.entitlement.Collection.initialize(entityStore)
 
     /** The REST APIs. */
     implicit val controllerInstance = instance
-    private val apiv1 = new RestAPIVersion("api", "v1")
+    private val apiV1 = new API(whiskConfig, "api", "v1")
     private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
 
     /**
@@ -144,7 +142,15 @@ class Controller(
     }
 
     // controller top level info
-    private val info = Controller.info(whiskConfig, runtimes, List(apiv1.basepath()))
+    private val info = Controller.info(whiskConfig, runtimes, List(apiV1.basepath()))
+
+    val bindingFuture = {
+        Http().bindAndHandle(route, "0.0.0.0", whiskConfig.servicePort.toInt)
+    }
+
+    def shutdown(): Future[Unit] = {
+        bindingFuture.flatMap(_.unbind()).map(_ => ())
+    }
 }
 
 /**
@@ -155,8 +161,7 @@ object Controller {
     // requiredProperties is a Map whose keys define properties that must be bound to
     // a value, and whose values are default values.   A null value in the Map means there is
     // no default value specified, so it must appear in the properties file
-    def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
-        Map(WhiskConfig.controllerInstances -> 1.toString) ++
+    def requiredProperties = Map(WhiskConfig.controllerInstances -> 1.toString) ++
         ExecManifest.requiredProperties ++
         RestApiCommons.requiredProperties ++
         LoadBalancerService.requiredProperties ++

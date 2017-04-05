@@ -17,10 +17,19 @@
 
 package whisk.core.invoker
 
-import akka.actor.Actor
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
+
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.server.Route
+import akka.stream.ActorMaterializer
+import akka.actor.ActorSystem
+
+import whisk.http.BasicRasService
+import whisk.core.WhiskConfig
 import whisk.common.Logging
 import whisk.core.entity.InstanceId
-import whisk.http.BasicRasService
+import whisk.common.TransactionId
 
 /**
  * Implements web server to handle certain REST API calls.
@@ -29,9 +38,26 @@ import whisk.http.BasicRasService
 class InvokerServer(
     override val instance: InstanceId,
     override val numberOfInstances: Int)(
-        override implicit val logging: Logging)
-    extends BasicRasService
-    with Actor {
+        override implicit val logging: Logging,
+        implicit val whiskConfig: WhiskConfig,
+        implicit val executionContext: ExecutionContext,
+        implicit val actorSystem: ActorSystem)
+    extends BasicRasService {
 
-    override def actorRefFactory = context
+    //override def actorRefFactory = context
+
+    implicit val materializer = ActorMaterializer()
+
+    override def routes(implicit transid: TransactionId): Route = {
+        super.routes
+    }
+
+    val bindingFuture = {
+        Http().bindAndHandle(route, "0.0.0.0", whiskConfig.servicePort.toInt)
+    }
+
+    def shutdown(): Future[Unit] = {
+        bindingFuture.flatMap(_.unbind()).map(_ => ())
+    }
+
 }
