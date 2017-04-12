@@ -20,24 +20,29 @@ import whisk.common.AkkaLogging
 //import whisk.core.entity.WhiskAuthStore
 
 class API(config: WhiskConfig, host: String, port: Int, logger: AkkaLogging)
-     (implicit val actorSystem: ActorSystem) extends AnyRef {
+        (implicit val actorSystem: ActorSystem) extends AnyRef {
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = actorSystem.dispatcher
+
+    val apiPath = "api"
+    val apiVersion = "v2"
+
+    def prefix = pathPrefix(apiPath / apiVersion)
 
     val restAPIVersion = new RestAPIVersion("v2", config(whiskVersionDate), config(whiskVersionBuildno)) {
         override def routes(implicit transid: TransactionId) = ???
     }
 
-    val infoRoute = path("api" / "v2") {
-        get {
-            complete(OK, restAPIVersion.info.toString)
-        }
+    val infoRoute = (pathEndOrSingleSlash & get) {
+        complete(OK, restAPIVersion.info.toString)
     }
 
     val allRoutes = {
         extractRequest { request =>
             logger.info(this, request.uri.toString)
-            infoRoute
+            prefix {
+                infoRoute
+            }
         }
     }
 
