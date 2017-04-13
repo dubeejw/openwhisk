@@ -184,7 +184,7 @@ object Controller {
         if (config.isValid && ExecManifest.initialize(config)) {
             val port = config.servicePort.toInt
             BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
-            new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1, logger)
+            new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1)
         } else {
             logger.error(this, "Bad configuration, cannot start.")
             actorSystem.terminate()
