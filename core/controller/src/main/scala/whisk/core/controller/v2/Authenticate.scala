@@ -15,11 +15,13 @@
  */
 package whisk.core.controller.v2
 
+
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
 import akka.http.scaladsl.server.directives._
 import akka.http.scaladsl.server.directives.AuthenticationResult
 import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.server.Route
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -50,7 +52,7 @@ trait Authenticate /*extends Logging*/ {
     /** Database service to lookup credentials */
     protected val authStore: AuthStore
 
-    def validateCredentials2(credentials: Option[BasicHttpCredentials])(implicit transid: TransactionId): Future[Option[Identity]] = {
+    def validateCredentials(credentials: Option[BasicHttpCredentials])(implicit transid: TransactionId): Future[Option[Identity]] = {
         credentials flatMap { pw =>
             Try {
                 // authkey deserialization is wrapped in a try to guard against malformed values
@@ -78,7 +80,7 @@ trait Authenticate /*extends Logging*/ {
         }
     }
 
-    def customBasicAuth[A](realm: String)(verify: Option[BasicHttpCredentials] => Future[Option[A]]) = {
+    def customBasicAuth[A](realm: String, verify: Option[BasicHttpCredentials] => Future[Option[A]]) = {
         authenticateOrRejectWithChallenge[BasicHttpCredentials, A] { creds =>
             verify(creds).map {
                 case Some(t) => AuthenticationResult.success(t)
@@ -87,3 +89,38 @@ trait Authenticate /*extends Logging*/ {
         }
     }
 }
+
+/** A trait for authenticated routes. */
+trait AuthenticatedRouteProvider {
+    def routes(user: Identity)(implicit transid: TransactionId): Route
+}
+
+/*
+/** A common trait for secured routes */
+trait AuthenticatedRoute {
+
+    /** An execution context for futures */
+    protected implicit val executionContext: ExecutionContext
+
+    /** Creates HTTP BasicAuth handler */
+    protected def basicauth(implicit transid: TransactionId) = {
+        new BasicHttpAuthenticator[Identity](realm = "whisk rest service", validateCredentials _) {
+            override def apply(ctx: RequestContext) = {
+                super.apply(ctx) recover {
+                    case t: IllegalStateException => Left(CustomRejection(InternalServerError))
+                    case t                        => Left(CustomRejection(ServiceUnavailable))
+                }
+            }
+        }
+    }
+
+    /** Validates credentials against database of subjects */
+    protected def validateCredentials(userpass: Option[UserPass])(implicit transid: TransactionId): Future[Option[Identity]]
+}
+
+/** A trait for authenticated routes. */
+trait AuthenticatedRouteProvider {
+    def routes(user: Identity)(implicit transid: TransactionId): Route
+}
+
+ */
