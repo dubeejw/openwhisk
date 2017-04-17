@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-package whisk.core.entitlement
+package whisk.core.entitlement.v2
+
+import whisk.core.entitlement.Privilege.ACTIVATE
+import whisk.core.entitlement.Privilege.Privilege
+import whisk.core.entitlement.Privilege.REJECT
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 
-import whisk.core.entitlement.Privilege.ACTIVATE
-import whisk.core.entitlement.Privilege.Privilege
-import whisk.core.entitlement.Privilege.REJECT
-
 import akka.actor.ActorSystem
-import spray.http.StatusCodes.Forbidden
-import spray.http.StatusCodes.TooManyRequests
+import akka.http.scaladsl.model.StatusCodes.Forbidden
+import akka.http.scaladsl.model.StatusCodes.TooManyRequests
+
 import whisk.common.ConsulClient
 import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
-import whisk.core.controller.RejectRequest
+import whisk.core.controller.v2.RejectRequest
 import whisk.core.entity._
 import whisk.core.loadBalancer.LoadBalancer
 import whisk.http.Messages._
