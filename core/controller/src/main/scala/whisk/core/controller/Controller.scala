@@ -35,7 +35,8 @@ import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.entitlement._
-import whisk.core.entitlement.EntitlementProvider
+//import whisk.core.entitlement.EntitlementProvider
+//import whisk.core.entitlement.v2.EntitlementProvider
 
 import whisk.core.entity._
 import whisk.core.entity.ExecManifest.Runtimes
@@ -98,6 +99,7 @@ class Controller(
     private implicit val loadBalancer = new LoadBalancerService(whiskConfig)
     private implicit val consulServer = whiskConfig.consulServer
     private implicit val entitlementProvider = new LocalEntitlementProvider(whiskConfig, loadBalancer)
+    private implicit val entitlementProviderV2 = new whisk.core.entitlement.v2.LocalEntitlementProvider(whiskConfig, loadBalancer)
     private implicit val activationIdFactory = new ActivationIdGenerator {}
 
     // register collections and set verbosities on datastores and backend services
@@ -105,6 +107,8 @@ class Controller(
 
     /** The REST APIs. */
     private val apiv1 = new RestAPIVersion_v1()
+    private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt + 1)
+
 
     /**
      * Handles GET /invokers URI.
@@ -132,9 +136,9 @@ object Controller {
         ExecManifest.requiredProperties ++
         RestApiCommons.requiredProperties ++
         LoadBalancerService.requiredProperties ++
-        EntitlementProvider.requiredProperties
+        whisk.core.entitlement.EntitlementProvider.requiredProperties
 
-    def optionalProperties = EntitlementProvider.optionalProperties
+    def optionalProperties = whisk.core.entitlement.EntitlementProvider.optionalProperties
 
     // akka-style factory to create a Controller object
     private class ServiceBuilder(config: WhiskConfig, instance: Int, logging: Logging) extends Creator[Controller] {
@@ -157,7 +161,7 @@ object Controller {
         if (config.isValid && ExecManifest.initialize(config)) {
             val port = config.servicePort.toInt
             BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
-            new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1)
+            //new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1)
         } else {
             logger.error(this, "Bad configuration, cannot start.")
             actorSystem.terminate()
