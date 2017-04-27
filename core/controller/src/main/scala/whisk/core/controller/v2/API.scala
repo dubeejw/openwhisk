@@ -41,11 +41,12 @@ import whisk.core.entitlement.v2._
 
 class API(config: WhiskConfig, host: String, port: Int)(
         implicit val actorSystem: ActorSystem,
-        implicit val logger: Logging,
+        implicit val logging: Logging,
         implicit val entityStore: EntityStore,
         implicit val entitlementProvider: EntitlementProvider)
         extends AnyRef
-        with Authenticate {
+        with Authenticate
+        with AuthenticatedRoute {
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = actorSystem.dispatcher
     implicit val authStore = WhiskAuthStore.datastore(config)
@@ -68,7 +69,7 @@ class API(config: WhiskConfig, host: String, port: Int)(
 
     val routes = {
         prefix {
-            info ~ customBasicAuth("OpenWhisk secure realm", validateCredentials) { user =>
+            info ~ basicAuth(validateCredentials) { user =>
                 namespaces.routes(user)
             }
         }
