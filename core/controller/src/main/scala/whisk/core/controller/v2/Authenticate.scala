@@ -15,18 +15,14 @@
  */
 package whisk.core.controller.v2
 
-
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.headers.BasicHttpCredentials
-import akka.http.scaladsl.server.directives._
-import akka.http.scaladsl.server.directives.AuthenticationResult
 import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.server.Route
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.Try
 
+import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.database.NoDocumentException
 import whisk.core.entity.UUID
@@ -43,11 +39,11 @@ object Authenticate {
 }
 
 /** A common trait for secured routes */
-trait Authenticate /*extends Logging*/ {
+trait Authenticate {
 
     protected implicit val executionContext: ExecutionContext
 
-    //protected implicit val logging: Logging
+    protected implicit val logging: Logging
 
     /** Database service to lookup credentials */
     protected val authStore: AuthStore
@@ -57,70 +53,26 @@ trait Authenticate /*extends Logging*/ {
             Try {
                 // authkey deserialization is wrapped in a try to guard against malformed values
                 val authkey = AuthKey(UUID(pw.username), Secret(pw.password))
-                //logging.info(this, s"authenticate: ${authkey.uuid}")
+                logging.info(this, s"authenticate: ${authkey.uuid}")
                 val future = Identity.get(authStore, authkey) map { result =>
                     if (authkey == result.authkey) {
-                        //logging.info(this, s"authentication valid")
+                        logging.info(this, s"authentication valid")
                         Some(result)
                     } else {
-                        //logging.info(this, s"authentication not valid")
+                        logging.info(this, s"authentication not valid")
                         None
                     }
                 } recover {
                     case _: NoDocumentException | _: IllegalArgumentException =>
-                        //logging.info(this, s"authentication not valid")
+                        logging.info(this, s"authentication not valid")
                         None
                 }
-                //future onFailure { case t => logging.error(this, s"authentication error: $t") }
+                future onFailure { case t => logging.error(this, s"authentication error: $t") }
                 future
             }.toOption
         } getOrElse {
-            //credentials.foreach(_ => logging.info(this, s"credentials are malformed"))
+            credentials.foreach(_ => logging.info(this, s"credentials are malformed"))
             Future.successful(None)
         }
     }
-
-    def customBasicAuth[A](realm: String, verify: Option[BasicHttpCredentials] => Future[Option[A]]) = {
-        authenticateOrRejectWithChallenge[BasicHttpCredentials, A] { creds =>
-            verify(creds).map {
-                case Some(t) => AuthenticationResult.success(t)
-                case None => AuthenticationResult.failWithChallenge(HttpChallenges.basic(realm))
-            }
-        }
-    }
 }
-
-/** A trait for authenticated routes. */
-trait AuthenticatedRouteProvider {
-    def routes(user: Identity)(implicit transid: TransactionId): Route
-}
-
-/*
-/** A common trait for secured routes */
-trait AuthenticatedRoute {
-
-    /** An execution context for futures */
-    protected implicit val executionContext: ExecutionContext
-
-    /** Creates HTTP BasicAuth handler */
-    protected def basicauth(implicit transid: TransactionId) = {
-        new BasicHttpAuthenticator[Identity](realm = "whisk rest service", validateCredentials _) {
-            override def apply(ctx: RequestContext) = {
-                super.apply(ctx) recover {
-                    case t: IllegalStateException => Left(CustomRejection(InternalServerError))
-                    case t                        => Left(CustomRejection(ServiceUnavailable))
-                }
-            }
-        }
-    }
-
-    /** Validates credentials against database of subjects */
-    protected def validateCredentials(userpass: Option[UserPass])(implicit transid: TransactionId): Future[Option[Identity]]
-}
-
-/** A trait for authenticated routes. */
-trait AuthenticatedRouteProvider {
-    def routes(user: Identity)(implicit transid: TransactionId): Route
-}
-
- */
