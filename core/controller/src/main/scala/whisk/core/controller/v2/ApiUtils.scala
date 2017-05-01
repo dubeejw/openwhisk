@@ -21,23 +21,6 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 
-/*
-import spray.http.StatusCode
-import spray.http.StatusCodes.Conflict
-import spray.http.StatusCodes.InternalServerError
-import spray.http.StatusCodes.NotFound
-import spray.http.StatusCodes.OK
-import spray.httpx.SprayJsonSupport._
-import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
-import spray.json.DefaultJsonProtocol._
-import spray.json.JsBoolean
-import spray.json.JsObject
-import spray.json.JsValue
-import spray.json.RootJsonFormat
-import spray.routing.Directives
-import spray.routing.RequestContext
-*/
-
 import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.model.StatusCodes.Conflict
 import akka.http.scaladsl.model.StatusCodes.InternalServerError
@@ -47,8 +30,6 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.server.RequestContext
 import akka.http.scaladsl.server.RouteResult
-
-
 
 import spray.json.DefaultJsonProtocol._
 import spray.json.JsBoolean
