@@ -98,7 +98,7 @@ trait WhiskNamespacesApi
      * - 200 Map [ String (collection name), List[EntitySummary] ] as JSON
      * - 500 Internal Server Error
      */
-    private def getAllInNamespace(namespace: EntityPath)(implicit transid: TransactionId):RequestContext => Future[RouteResult] = {
+    private def getAllInNamespace(namespace: EntityPath)(implicit transid: TransactionId): RequestContext => Future[RouteResult] = {
         onComplete(listEntitiesInNamespace(entityStore, namespace, false)) {
             case Success(entities) => {
                 complete(OK, Namespaces.emptyNamespace ++ entities - WhiskActivation.collectionName)
