@@ -25,17 +25,10 @@ import scala.util.Success
 import scala.util.Try
 import scala.concurrent.Future
 
-/*import spray.http.HttpMethod
-import spray.http.StatusCodes.InternalServerError
-import spray.routing.Directive1
-import spray.routing.Directives
-import spray.routing.RequestContext*/
-
 import akka.http.scaladsl.server.Directives
 import akka.http.javadsl.model.HttpMethod
 import akka.http.scaladsl.server.RequestContext
 import akka.http.scaladsl.server.RouteResult
-
 import akka.http.scaladsl.model.StatusCodes.InternalServerError
 import akka.http.scaladsl.server.Directive1
 
@@ -48,7 +41,6 @@ import whisk.core.entity._
 import whisk.core.entity.size._
 import whisk.http.v2.ErrorResponse.terminate
 import whisk.http.v2.Messages
-//import whisk.core.controller.RejectRequest
 
 /** A trait for routes that require entitlement checks. */
 trait BasicAuthorizedRouteProvider extends Directives {
