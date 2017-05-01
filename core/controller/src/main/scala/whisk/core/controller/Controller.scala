@@ -110,7 +110,7 @@ class Controller(
     // initialize backend services
     private implicit val loadBalancer = new LoadBalancerService(whiskConfig, entityStore)
     private implicit val consulServer = whiskConfig.consulServer
-    private implicit val entitlementProvider = new LocalEntitlementProvider(whiskConfig, loadBalancer)
+    private implicit val entitlementProvider = new whisk.core.entitlement.LocalEntitlementProvider(whiskConfig, loadBalancer)
     private implicit val entitlementProviderV2 = new whisk.core.entitlement.v2.LocalEntitlementProvider(whiskConfig, loadBalancer)
     private implicit val activationIdFactory = new ActivationIdGenerator {}
 
@@ -120,7 +120,7 @@ class Controller(
 
     /** The REST APIs. */
     private val apiv1 = new RestAPIVersion("api", "v1")
-    private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt + 1)
+    private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt + 1, "api", "v2")
     private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
 
     /**
