@@ -18,9 +18,18 @@ package whisk.core.controller.v2
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.server.Route
+
+//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+
+//import spray.httpx.unmarshalling._
+
+import spray.json._
+import spray.json.DefaultJsonProtocol._
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
@@ -29,48 +38,94 @@ import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.WhiskConfig.whiskVersionBuildno
 import whisk.core.WhiskConfig.whiskVersionDate
-import whisk.core.controller.RestAPIVersion
 import whisk.core.entity.WhiskAuthStore
 import whisk.common.Logging
 import whisk.common.TransactionId
-import whisk.core.controller._
+//import whisk.core.controller._
 import whisk.core.entity._
 import whisk.core.entity.types._
 import whisk.core.entitlement.v2._
+//import whisk.core.entitlement.v2.Collection
 
+import whisk.core.entity.ActivationId.ActivationIdGenerator
+import whisk.core.loadBalancer.LoadBalancerService
 
-class API(config: WhiskConfig, host: String, port: Int)(
-        implicit val actorSystem: ActorSystem,
-        implicit val logging: Logging,
-        implicit val entityStore: EntityStore,
-        implicit val entitlementProvider: EntitlementProvider)
-        extends AnyRef
-        with Authenticate
-        with AuthenticatedRoute {
+/**
+  * Abstract class which provides basic Directives which are used to construct route structures
+  * which are common to all versions of the Rest API.
+  */
+protected[controller] class SwaggerDocs(apipath: Uri.Path, doc: String)(implicit actorSystem: ActorSystem)
+    extends Directives {
+
+    /** Swagger end points. */
+    protected val swaggeruipath = "docs"
+    protected val swaggerdocpath = "api-docs"
+
+    def basepath(url: Uri.Path = apipath): String = {
+        (if (url.startsWithSlash) url else Uri.Path./(url)).toString
+    }
+
+    /**
+      * Defines the routes to serve the swagger docs.
+      */
+    val swaggerRoutes: Route = {
+        pathPrefix(swaggeruipath) {
+            getFromDirectory("/swagger-ui/")
+        } ~ path(swaggeruipath) {
+            redirect(s"$swaggeruipath/index.html?url=$apiDocsUrl", PermanentRedirect)
+        } ~ pathPrefix(swaggerdocpath) {
+            pathEndOrSingleSlash {
+                getFromResource(doc)
+            }
+        }
+    }
+
+    /** Forces add leading slash for swagger api-doc url rewrite to work. */
+    private def apiDocsUrl = basepath(apipath / swaggerdocpath)
+}
+
+class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVersion: String)(
+    implicit val actorSystem: ActorSystem,
+    implicit val logging: Logging,
+    implicit val entityStore: EntityStore,
+    implicit val entitlementProvider: EntitlementProvider,
+    implicit val activationIdFactory: ActivationIdGenerator,
+    implicit val loadBalancer: LoadBalancerService,
+    implicit val activationStore: ActivationStore,
+    implicit val consulServer: String,
+    implicit val whiskConfig: WhiskConfig)
+    extends SwaggerDocs(Uri.Path(apiPath) / apiVersion, "apiv1swagger.json")
+    with Authenticate
+    with AuthenticatedRoute {
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = actorSystem.dispatcher
     implicit val authStore = WhiskAuthStore.datastore(config)
 
     implicit val transactionId = TransactionId.unknown
 
-    val apiPath = "api"
-    val apiVersion = "v2"
-
     def prefix = pathPrefix(apiPath / apiVersion)
 
-    // This will go away and be replaced with SwaggerDocs
-    val restAPIVersion = new RestAPIVersion("v2", config(whiskVersionDate), config(whiskVersionBuildno)) {
-        override def routes(implicit transid: TransactionId) = ???
-    }
-
+    /**
+      * Describes details of a particular API path.
+      */
     val info = (pathEndOrSingleSlash & get) {
-        complete(OK, restAPIVersion.info.toString)
+        complete(OK, JsObject(
+            "description" -> "OpenWhisk API".toJson,
+            "api_version" -> SemVer(1, 0, 0).toJson,
+            "api_version_path" -> apiVersion.toJson,
+            "build" -> whiskConfig(whiskVersionDate).toJson,
+            "buildno" -> whiskConfig(whiskVersionBuildno).toJson,
+            "swagger_paths" -> JsObject(
+                "ui" -> s"/$swaggeruipath".toJson,
+                "api-docs" -> s"/$swaggerdocpath".toJson)).toString)
     }
 
     val routes = {
         prefix {
             info ~ basicAuth(validateCredentials) { user =>
-                namespaces.routes(user)
+                namespaces.routes(user) ~ pathPrefix(Collection.NAMESPACES) {
+                    actions.routes(user)
+                }
             }
         }
     }
@@ -84,6 +139,7 @@ class API(config: WhiskConfig, host: String, port: Int)(
     }
 
     private val namespaces = new NamespacesApi(apiPath, apiVersion)
+    private val actions = new ActionsApi(apiPath, apiVersion)
 
     class NamespacesApi(
        val apiPath: String,
@@ -93,4 +149,22 @@ class API(config: WhiskConfig, host: String, port: Int)(
        override val executionContext: ExecutionContext,
        override val logging: Logging)
     extends WhiskNamespacesApi
+
+    class ActionsApi(
+        val apipath: String,
+        val apiversion: String)(
+        implicit override val actorSystem: ActorSystem,
+        override val entityStore: EntityStore,
+        override val activationStore: ActivationStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val activationIdFactory: ActivationIdGenerator,
+        override val loadBalancer: LoadBalancerService,
+        override val consulServer: String,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging,
+        override val whiskConfig: WhiskConfig)
+    extends WhiskActionsApi with WhiskServices {
+        logging.info(this, s"actionSequenceLimit '${whiskConfig.actionSequenceLimit}'")
+        assert(whiskConfig.actionSequenceLimit.toInt > 0)
+    }
 }
