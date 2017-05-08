@@ -124,7 +124,7 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         prefix {
             info ~ basicAuth(validateCredentials) { user =>
                 namespaces.routes(user) ~ pathPrefix(Collection.NAMESPACES) {
-                    actions.routes(user)
+                    actions.routes(user) ~ packages.routes(user)
                 }
             }
         }
@@ -140,6 +140,7 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
 
     private val namespaces = new NamespacesApi(apiPath, apiVersion)
     private val actions = new ActionsApi(apiPath, apiVersion)
+    private val packages = new PackagesApi(apiPath, apiVersion)
 
     class NamespacesApi(
        val apiPath: String,
@@ -151,8 +152,8 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
     extends WhiskNamespacesApi
 
     class ActionsApi(
-        val apipath: String,
-        val apiversion: String)(
+        val apiPath: String,
+        val apiVersion: String)(
         implicit override val actorSystem: ActorSystem,
         override val entityStore: EntityStore,
         override val activationStore: ActivationStore,
@@ -167,4 +168,17 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         logging.info(this, s"actionSequenceLimit '${whiskConfig.actionSequenceLimit}'")
         assert(whiskConfig.actionSequenceLimit.toInt > 0)
     }
+
+    class PackagesApi(
+        val apiPath: String,
+        val apiVersion: String)(
+        implicit override val entityStore: EntityStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val activationIdFactory: ActivationIdGenerator,
+        override val loadBalancer: LoadBalancerService,
+        override val consulServer: String,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging,
+        override val whiskConfig: WhiskConfig)
+    extends WhiskPackagesApi with WhiskServices
 }
