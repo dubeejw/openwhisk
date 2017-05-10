@@ -124,7 +124,7 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         prefix {
             info ~ basicAuth(validateCredentials) { user =>
                 namespaces.routes(user) ~ pathPrefix(Collection.NAMESPACES) {
-                    actions.routes(user) ~ packages.routes(user) ~ triggers.routes(user) ~ activations.routes(user)
+                    actions.routes(user) ~ packages.routes(user) ~ triggers.routes(user) ~ activations.routes(user) ~ rules.routes(user)
                 }
             }
         }
@@ -143,6 +143,7 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
     private val packages = new PackagesApi(apiPath, apiVersion)
     private val triggers = new TriggersApi(apiPath, apiVersion)
     private val activations = new ActivationsApi(apiPath, apiVersion)
+    private val rules = new RulesApi(apiPath, apiVersion)
 
     class NamespacesApi(
        val apiPath: String,
@@ -192,6 +193,20 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         override val logging: Logging,
         override val whiskConfig: WhiskConfig)
     extends WhiskPackagesApi with WhiskServices
+
+    class RulesApi(
+        val apiPath: String,
+        val apiVersion: String)(
+        implicit override val actorSystem: ActorSystem,
+        override val entityStore: EntityStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val activationIdFactory: ActivationIdGenerator,
+        override val loadBalancer: LoadBalancerService,
+        override val consulServer: String,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging,
+        override val whiskConfig: WhiskConfig)
+    extends WhiskRulesApi with WhiskServices
 
     class TriggersApi(
         val apiPath: String,
