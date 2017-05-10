@@ -124,7 +124,7 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         prefix {
             info ~ basicAuth(validateCredentials) { user =>
                 namespaces.routes(user) ~ pathPrefix(Collection.NAMESPACES) {
-                    actions.routes(user) ~ packages.routes(user) ~ triggers.routes(user)
+                    actions.routes(user) ~ packages.routes(user) ~ triggers.routes(user) ~ activations.routes(user)
                 }
             }
         }
@@ -142,6 +142,7 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
     private val actions = new ActionsApi(apiPath, apiVersion)
     private val packages = new PackagesApi(apiPath, apiVersion)
     private val triggers = new TriggersApi(apiPath, apiVersion)
+    private val activations = new ActivationsApi(apiPath, apiVersion)
 
     class NamespacesApi(
        val apiPath: String,
@@ -169,6 +170,15 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         logging.info(this, s"actionSequenceLimit '${whiskConfig.actionSequenceLimit}'")
         assert(whiskConfig.actionSequenceLimit.toInt > 0)
     }
+
+    class ActivationsApi(
+        val apiPath: String,
+        val apiVersion: String)(
+        implicit override val activationStore: ActivationStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging)
+    extends WhiskActivationsApi
 
     class PackagesApi(
         val apiPath: String,
