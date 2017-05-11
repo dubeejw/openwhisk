@@ -23,6 +23,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.headers._
 
 //import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
@@ -84,6 +85,16 @@ protected[controller] class SwaggerDocs(apipath: Uri.Path, doc: String)(implicit
     private def apiDocsUrl = basepath(apipath / swaggerdocpath)
 }
 
+/**
+  * A trait for wrapping routes with headers to include in response.
+  * Useful for CORS.
+  */
+protected[controller] trait RespondWithHeaders extends Directives {
+    val allowOrigin = `Access-Control-Allow-Origin`.*
+    val allowHeaders = `Access-Control-Allow-Headers`("Authorization", "Content-Type")
+    val sendCorsHeaders = respondWithHeaders(allowOrigin, allowHeaders)
+}
+
 class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVersion: String)(
     implicit val actorSystem: ActorSystem,
     implicit val logging: Logging,
@@ -96,7 +107,8 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
     implicit val whiskConfig: WhiskConfig)
     extends SwaggerDocs(Uri.Path(apiPath) / apiVersion, "apiv1swagger.json")
     with Authenticate
-    with AuthenticatedRoute {
+    with AuthenticatedRoute
+    with RespondWithHeaders {
     implicit val materializer = ActorMaterializer()
     implicit val executionContext = actorSystem.dispatcher
     implicit val authStore = WhiskAuthStore.datastore(config)
@@ -122,13 +134,59 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
 
     val routes = {
         prefix {
-            info ~ basicAuth(validateCredentials) { user =>
-                namespaces.routes(user) ~ pathPrefix(Collection.NAMESPACES) {
-                    actions.routes(user) ~ packages.routes(user) ~ triggers.routes(user) ~ activations.routes(user) ~ rules.routes(user)
+            sendCorsHeaders {
+                info ~
+                basicAuth(validateCredentials) { user =>
+                    namespaces.routes(user) ~
+                    pathPrefix(Collection.NAMESPACES) {
+                        actions.routes(user) ~
+                        packages.routes(user) ~
+                        triggers.routes(user) ~
+                        activations.routes(user) ~
+                        rules.routes(user)
+                    }
+                } ~
+                swaggerRoutes ~
+                options {
+                    complete(OK)
                 }
             }
         }
     }
+
+    /*
+    def routes(implicit transid: TransactionId): Route = {
+        pathPrefix(apipath / apiversion) {
+            sendCorsHeaders {
+                (pathEndOrSingleSlash & get) {
+                    complete(OK, info)
+                } ~ authenticate(basicauth) { user =>
+                        namespaces.routes(user) ~
+                        pathPrefix(Collection.NAMESPACES) {
+                            actions.routes(user) ~
+                            triggers.routes(user) ~
+                            rules.routes(user) ~
+                            activations.routes(user) ~
+                            packages.routes(user)
+                        } ~ webexp.routes(user)
+                } ~ {
+                    webexp.routes()
+                } ~ {
+                    swaggerRoutes
+                } ~ options {
+                    complete(OK)
+                }
+            } ~ {
+                // web actions are distinct to separate the cors header
+                // and allow the actions themselves to respond to options
+                authenticate(basicauth) {
+                    user => web.routes(user)
+                } ~ web.routes()
+            }
+        }
+    }
+
+     */
 
     val bindingFuture = {
         Http().bindAndHandle(routes, host, port)
