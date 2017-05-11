@@ -236,8 +236,4 @@ trait WhiskActivationsApi
                 case Failure(t) => throw new IllegalArgumentException(s"Parameter is not a valid value for epoch seconds: $value")
             }
         }
-
-
-
-
 }
