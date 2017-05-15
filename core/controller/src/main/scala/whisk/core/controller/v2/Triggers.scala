@@ -20,8 +20,7 @@ import java.time.Clock
 import java.time.Instant
 
 import scala.concurrent.Future
-import scala.util.Failure
-import scala.util.Success
+import scala.util.{Failure, Success, Try}
 //import spray.client.pipelining.Post
 
 import akka.actor.ActorSystem
@@ -50,7 +49,8 @@ import akka.stream.ActorMaterializer
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
-
+import akka.http.scaladsl.model.MediaTypes.`application/json`
+import akka.http.scaladsl.unmarshalling.Unmarshaller
 //import spray.client.pipelining._
 //import spray.http.BasicHttpCredentials
 //import spray.http.HttpRequest
@@ -63,8 +63,7 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 //import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 //import spray.httpx.SprayJsonSupport.sprayJsonUnmarshaller
 //import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
-import spray.json.JsObject
-import spray.json.JsString
+import spray.json._
 import spray.json.DefaultJsonProtocol.RootJsObjectFormat
 
 //import spray.routing.directives.OnCompleteFutureMagnet.apply
@@ -85,6 +84,7 @@ import whisk.core.entity.WhiskTriggerPut
 import whisk.core.entity.types.ActivationStore
 import whisk.core.entity.types.EntityStore
 import whisk.http.v2.ErrorResponse.terminate
+import whisk.http.v2.Messages
 
 //import spray.http.StatusCodes
 import whisk.core.entity.Identity
@@ -230,7 +230,8 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
                                 terminate(InternalServerError)
                         }
                 })
-        }
+        } ~
+        terminate(BadRequest, Messages.payloadMustBeJSON)
     }
 
     /**
@@ -358,5 +359,19 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
      */
     private def completeAsTriggerResponse(trigger: WhiskTrigger): RequestContext => Future[RouteResult] = {
         complete(OK, trigger.withoutRules)
+    }
+
+    implicit val entityToJsObject: Unmarshaller[HttpEntity, JsObject] = {
+        Unmarshaller.byteStringUnmarshaller.forContentTypes(`application/json`).mapWithCharset { (data, charset) =>
+            val decoded = data.decodeString(charset.nioCharset.name)
+
+            Try {
+                decoded.parseJson.asJsObject
+            } match {
+                case Success(i) => i
+                case Failure(t) if decoded.length == 0 => JsObject()
+                case Failure(t) => throw new IllegalArgumentException(s"The request content was malformed:\n $t")
+            }
+        }
     }
 }
