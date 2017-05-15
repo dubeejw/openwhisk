@@ -129,6 +129,8 @@ object Messages {
         s"${error.field} larger than allowed: ${error.is.toBytes} > ${error.allowed.toBytes} bytes."
     }
 
+    val payloadMustBeJSON = "Payload must be JSON formatted."
+
     def truncateLogs(limit: ByteSize) = {
         s"Logs were truncated because the total bytes size exceeds the limit of ${limit.toBytes} bytes."
     }
