@@ -19,9 +19,7 @@ package whisk.core.controller.v2
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 import org.apache.kafka.common.errors.RecordTooLargeException
 
@@ -32,12 +30,23 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.RequestContext
 import akka.http.scaladsl.server.RouteResult
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.model.MediaTypes.`application/json`
+//import akka.http.scaladsl.unmarshalling.Unmarshaller
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport.sprayJsonMarshaller
 
+import akka.http.scaladsl.unmarshalling._
+//import akka.http.scaladsl.server.MalformedQueryParamRejection
+//import akka.http.scaladsl.unmarshalling.Unmarshaller
+//import akka.http.scaladsl.model.HttpEntity
 //import spray.http.HttpMethod
 //import spray.http.HttpMethods._
 //import spray.http.StatusCodes._
 //import spray.httpx.SprayJsonSupport._
-import spray.httpx.unmarshalling._
+
+//import spray.httpx.unmarshalling._
+//import scala.concurrent.ExecutionContext
+//import akka.stream.Materializer
 
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -52,8 +61,8 @@ import whisk.core.entity._
 import whisk.core.entity.types.ActivationStore
 import whisk.core.entity.types.EntityStore
 import whisk.http.v2.ErrorResponse.terminate
-import whisk.http.Messages
-import whisk.http.Messages._
+import whisk.http.v2.Messages
+import whisk.http.v2.Messages._
 
 import whisk.core.entitlement.v2.Resource
 import whisk.core.entitlement.v2.Collection
@@ -225,8 +234,7 @@ trait WhiskActionsApi
      * - 500 Internal Server Error
      */
     override def activate(user: Identity, entityName: FullyQualifiedEntityName, env: Option[Parameters])(implicit transid: TransactionId) = {
-        // Akka parameter() is not allowing FiniteDuration for timeout
-        parameter('blocking ? false, 'result ? false, 'timeout ? WhiskActionsApi.maxWaitForBlockingActivation.toSeconds) { (blocking, result, waitOverride) =>
+        parameter('blocking ? false, 'result ? false, 'timeout.as[FiniteDuration] ? WhiskActionsApi.maxWaitForBlockingActivation) { (blocking, result, waitOverride) =>
             entity(as[Option[JsObject]]) { payload =>
                 getEntity(WhiskAction, entityStore, entityName.toDocId, Some {
                     act: WhiskAction =>
@@ -235,7 +243,7 @@ trait WhiskActionsApi
                         onComplete(entitleReferencedEntities(user, whisk.core.entitlement.Privilege.ACTIVATE, Some(action.exec))) {
                             case Success(_) =>
                                 val actionWithMergedParams = env.map(action.inherit(_)) getOrElse action
-                                onComplete(invokeAction(user, actionWithMergedParams, payload, blocking, Some(waitOverride.seconds))) {
+                                onComplete(invokeAction(user, actionWithMergedParams, payload, blocking, Some(waitOverride))) {
                                     case Success((activationId, None)) =>
                                         // non-blocking invoke or blocking invoke which got queued instead
                                         complete(Accepted, activationId.toJsObject)
@@ -275,7 +283,8 @@ trait WhiskActionsApi
                                 super.handleEntitlementFailure(f)
                         }
                 })
-            }
+            } ~
+            terminate(BadRequest, Messages.payloadMustBeJSON)
         }
     }
 
@@ -639,18 +648,33 @@ trait WhiskActionsApi
     /** Max atomic action count allowed for sequences */
     private lazy val actionSequenceLimit = whiskConfig.actionSequenceLimit.toInt
 
-    /** Custom deserializer for timeout query parameter. */
-    private implicit val stringToTimeoutDeserializer = new FromStringDeserializer[FiniteDuration] {
-        val max = WhiskActionsApi.maxWaitForBlockingActivation.toMillis
-        def apply(msecs: String): Either[DeserializationError, FiniteDuration] = {
-            Try { msecs.toInt } match {
-                case Success(i) if i > 0 && i <= max => Right(i.milliseconds)
-                case _ => Left {
-                    MalformedContent(Messages.invalidTimeout(WhiskActionsApi.maxWaitForBlockingActivation))
-                }
+    implicit val stringToFiniteDuration: Unmarshaller[String, FiniteDuration] = {
+        Unmarshaller.strict[String, FiniteDuration] { value =>
+            val max = WhiskActionsApi.maxWaitForBlockingActivation.toMillis
+
+            Try {
+                value.toInt
+            } match {
+                case Success(i) if i > 0 && i <= max => i.milliseconds
+                case _ => throw new IllegalArgumentException(Messages.invalidTimeout(WhiskActionsApi.maxWaitForBlockingActivation))
             }
         }
     }
+
+    implicit val entityToJsObject: Unmarshaller[HttpEntity, JsObject] = {
+        Unmarshaller.byteStringUnmarshaller.forContentTypes(`application/json`).mapWithCharset { (data, charset) =>
+            val decoded = data.decodeString(charset.nioCharset.name)
+
+            Try {
+                decoded.parseJson.asJsObject
+            } match {
+                case Success(i) => i
+                case Failure(t) if decoded.length == 0 => JsObject()
+                case Failure(t) => throw new IllegalArgumentException(s"The request content was malformed:\n $t")
+            }
+        }
+    }
+
 }
 
 private case class TooManyActionsInSequence() extends IllegalArgumentException
