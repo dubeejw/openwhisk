@@ -521,25 +521,30 @@ trait WhiskWebActionsApi
                 case Empty =>
                     process(None, isRawHttpAction)
 
-                case NonEmpty(ContentType(`application/json`, _), json) if !isRawHttpAction =>
+                    //    case HttpEntity.Strict(contentType, data) => data.utf8String
+
+                //case NonEmpty(ContentType(`application/json`, _), json)
+                case HttpEntity.Strict(`application/json`, data) if !isRawHttpAction =>
                     entity(as[JsObject]) { body =>
                         process(Some(body), isRawHttpAction)
                     }
 
-                case NonEmpty(ContentType(`application/x-www-form-urlencoded`, _), form) if !isRawHttpAction =>
+                //case NonEmpty(ContentType(`application/x-www-form-urlencoded`, _), form)
+                case HttpEntity.Strict(`application/x-www-form-urlencoded`, data) if !isRawHttpAction =>
                     entity(as[FormData]) { form =>
                         val body = form.fields.toMap.toJson.asJsObject
                         process(Some(body), isRawHttpAction)
                     }
 
-                case NonEmpty(contentType, data) =>
+                //case NonEmpty(contentType, data) =>
+                case HttpEntity.Strict(contentType, data) =>
                     if (contentType.mediaType.binary) {
-                        Try(JsString(Base64.getEncoder.encodeToString(data.toByteArray))) match {
+                        Try(JsString(Base64.getEncoder.encodeToString(data.toArray))) match {
                             case Success(bytes) => process(Some(bytes), isRawHttpAction)
                             case Failure(t)     => terminate(BadRequest, Messages.unsupportedContentType(contentType.mediaType))
                         }
                     } else {
-                        val str = JsString(data.asString(HttpCharsets.`UTF-8`))
+                        val str = JsString(data.utf8String)
                         process(Some(str), isRawHttpAction)
                     }
 
