@@ -29,6 +29,7 @@ import scala.util.Try
 import akka.http.scaladsl.model.HttpEntity.Empty
 //import akka.http.scaladsl.model.HttpEntity.NonEmpty
 import akka.http.scaladsl.server.Directives
+//import akka.http.scaladsl.server.PathMatcher._segmentStringToPathMatcher
 import akka.http.scaladsl.model.HttpMethod
 import akka.http.scaladsl.model.HttpHeader
 import akka.http.scaladsl.model.MediaType
@@ -46,10 +47,10 @@ import akka.http.scaladsl.model.HttpCharsets
 //import akka.http.scaladsl.server.StandardRoute
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 //import akka.http.javadsl.model.Uri.Query
-import akka.http.impl.util.StringRendering
+//import akka.http.impl.util.StringRendering
 import akka.http.impl.model.parser.CharacterClasses
 import akka.http.scaladsl.model.headers.`Content-Type`
-import akka.http.impl.engine.rendering.ResponseRenderingOutput.HttpData
+import akka.http.impl.engine.rendering._
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.Multipart.FormData
@@ -349,7 +350,7 @@ trait WhiskWebActionsApi
 
     /** The prefix for web invokes e.g., /web. */
     private lazy val webRoutePrefix = {
-        pathPrefix(webInvokePathSegments.map(segmentStringToPathMatcher(_)).reduceLeft(_ / _))
+        pathPrefix(webInvokePathSegments.map(_segmentStringToPathMatcher(_)).reduceLeft(_ / _))
     }
 
     /** Allowed verbs. */
