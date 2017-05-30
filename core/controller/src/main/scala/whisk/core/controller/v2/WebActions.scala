@@ -295,20 +295,6 @@ protected[core] object WhiskWebActionsApi extends Directives {
 
     private def interpretHttpResponse(code: StatusCode, headers: List[RawHeader], str: String, transid: TransactionId) = {
         val parsedHeader: Try[MediaType] = headers.find(_.lowercaseName == `Content-Type`.lowercaseName) match {
-            /*case Some(header) =>
-                HttpParser.parseHeader(header) match {
-                    case Right(header: `Content-Type`) =>
-                        val mediaType = header.contentType.mediaType
-                        // lookup the media type specified in the content header to see if it is a recognized type
-                        MediaTypes.getForKey(mediaType.mainType -> mediaType.subType).map(Success(_)).getOrElse {
-                            // this is a content-type that is not recognized, reject it
-                            Failure(RejectRequest(BadRequest, Messages.httpUnknownContentType)(transid))
-                        }
-
-                    case _ =>
-                        Failure(RejectRequest(BadRequest, Messages.httpUnknownContentType)(transid))
-                }*/
-
             case Some(header) =>
                 MediaType.parse(header.value) match {
                     case Right(mediaType: MediaType) =>
@@ -324,15 +310,15 @@ protected[core] object WhiskWebActionsApi extends Directives {
 
         parsedHeader.flatMap { mediaType =>
             if (mediaType.binary) {
-                Try(HttpData(Base64.getDecoder().decode(str))).map((mediaType, _))
+                Try(Base64.getDecoder().decode(str))
             } else {
-                Success(mediaType, HttpData(str))
+                Success(mediaType, str)
             }
         } match {
-            case Success((mediaType, data)) =>
+            case Success((mediaType, data: String)) =>
                 respondWithHeaders(headers) {
                     complete {
-                        HttpResponse(code, entity = HttpEntity(ContentType(mediaType.applicationWithFixedCharset(mediaType, HttpCharsets.`UTF-8`)), data))
+                        HttpResponse(code, entity = HttpEntity(ContentType(MediaType.applicationWithFixedCharset(mediaType.toString, HttpCharsets.`UTF-8`)), data))
                     }
                 }
 
