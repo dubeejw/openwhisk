@@ -18,13 +18,11 @@ package whisk.core.controller.v2
 
 import java.util.Base64
 
-import java.nio.charset.StandardCharsets
-
 import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-
+import scala.collection.JavaConverters._
 //import akka.http._
 import akka.http.scaladsl.model.HttpEntity.Empty
 //import akka.http.scaladsl.model.HttpEntity.NonEmpty
@@ -39,8 +37,9 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.model.headers.RawHeader
 
-import akka.http.scaladsl.model.Uri.Query
-import akka.http.scaladsl.model.UriRendering
+//import akka.http.scaladsl.model.Uri.Query
+import akka.http.javadsl.model.Query
+
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.HttpCharsets
@@ -48,9 +47,9 @@ import akka.http.scaladsl.model.HttpCharsets
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 //import akka.http.javadsl.model.Uri.Query
 //import akka.http.impl.util.StringRendering
-import akka.http.impl.model.parser.CharacterClasses
 import akka.http.scaladsl.model.headers.`Content-Type`
-import akka.http.impl.engine.rendering._
+
+//import akka.http.impl.engine.rendering._
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.Multipart.FormData
@@ -122,16 +121,16 @@ protected[controller] object WebApiDirectives {
 private case class Context2(
     propertyMap: WebApiDirectives,
     method: HttpMethod,
-    headers: List[HttpHeader],
+    headers: Seq[HttpHeader],
     path: String,
     query: Query,
     body: Option[JsValue] = None) {
 
-    val queryAsMap = query.toMap
+    val queryAsMap = query.toMap.asScala
 
     // returns true iff the attached query and body parameters contain a property
     // that conflicts with the given reserved parameters
-    def overrides(reservedParams: Set[String]): Set[String] = {
+    def overrides(reservedParams: scala.collection.Set[String]): scala.collection.Set[String] = {
         val queryParams = queryAsMap.keySet
         val bodyParams = body.map {
             case JsObject(fields) => fields.keySet
@@ -153,9 +152,11 @@ private case class Context2(
 
     def toActionArgument(user: Option[Identity], boxQueryAndBody: Boolean): Map[String, JsValue] = {
         val queryParams = if (boxQueryAndBody) {
-            val render = UriRendering.renderQuery(new StringRendering, query,  StandardCharsets.UTF_8, CharacterClasses.unreserved)
+            Map(propertyMap.query -> JsString(query.render(HttpCharsets.`UTF-8`)))
 
-            Map(propertyMap.query -> JsString(render.get))
+            //val render = UriRendering.renderQuery(new StringRendering, query,  StandardCharsets.UTF_8, CharacterClasses.unreserved)
+
+            //Map(propertyMap.query -> JsString(render.get))
         } else {
             queryAsMap.map(kv => kv._1 -> JsString(kv._2))
         }
@@ -294,7 +295,7 @@ protected[core] object WhiskWebActionsApi extends Directives {
 
     private def interpretHttpResponse(code: StatusCode, headers: List[RawHeader], str: String, transid: TransactionId) = {
         val parsedHeader: Try[MediaType] = headers.find(_.lowercaseName == `Content-Type`.lowercaseName) match {
-            case Some(header) =>
+            /*case Some(header) =>
                 HttpParser.parseHeader(header) match {
                     case Right(header: `Content-Type`) =>
                         val mediaType = header.contentType.mediaType
@@ -306,7 +307,18 @@ protected[core] object WhiskWebActionsApi extends Directives {
 
                     case _ =>
                         Failure(RejectRequest(BadRequest, Messages.httpUnknownContentType)(transid))
-                }
+                }*/
+
+            case Some(header) =>
+                MediaType.parse(header.value) match {
+                    case Right(mediaType: MediaType) =>
+                        // lookup the media type specified in the content header to see if it is a recognized type
+                        MediaTypes.getForKey(mediaType.mainType -> mediaType.subType).map(Success(_)).getOrElse {
+                            // this is a content-type that is not recognized, reject it
+                            Failure(RejectRequest(BadRequest, Messages.httpUnknownContentType)(transid))
+                        }
+                    case _ => Failure(RejectRequest(BadRequest, Messages.httpUnknownContentType)(transid))
+            }
             case None => Success(`text/html`)
         }
 
