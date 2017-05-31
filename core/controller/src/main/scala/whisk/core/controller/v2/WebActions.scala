@@ -22,7 +22,7 @@ import scala.concurrent.Future
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import scala.collection.JavaConverters._
+//import scala.collection.JavaConverters._
 //import akka.http._
 import akka.http.scaladsl.model.HttpEntity.Empty
 //import akka.http.scaladsl.model.HttpEntity.NonEmpty
@@ -37,8 +37,8 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.model.headers.RawHeader
 
-//import akka.http.scaladsl.model.Uri.Query
-import akka.http.javadsl.model.Query
+import akka.http.scaladsl.model.Uri.Query
+//import akka.http.javadsl.model.Query
 
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.server.Route
@@ -126,7 +126,7 @@ private case class Context2(
     query: Query,
     body: Option[JsValue] = None) {
 
-    val queryAsMap = query.toMap.asScala
+    val queryAsMap = query.toMap//.asScala
 
     // returns true iff the attached query and body parameters contain a property
     // that conflicts with the given reserved parameters
@@ -152,7 +152,9 @@ private case class Context2(
 
     def toActionArgument(user: Option[Identity], boxQueryAndBody: Boolean): Map[String, JsValue] = {
         val queryParams = if (boxQueryAndBody) {
-            Map(propertyMap.query -> JsString(query.render(HttpCharsets.`UTF-8`)))
+            //Map(propertyMap.query -> JsString(query.render(HttpCharsets.`UTF-8`)))
+            // TODO: render query string
+            Map(propertyMap.query -> JsString("fix"))
 
             //val render = UriRendering.renderQuery(new StringRendering, query,  StandardCharsets.UTF_8, CharacterClasses.unreserved)
 
@@ -361,7 +363,7 @@ trait WhiskWebActionsApi
     private val requestMethodParamsAndPath = {
         extract { ctx =>
             val method = ctx.request.method
-            val query = ctx.request.message.uri.query
+            val query = ctx.request.uri.query()
             val path = ctx.unmatchedPath.toString
             val headers = ctx.request.headers
             Context2(webApiDirectives, method, headers, path, query)
@@ -531,7 +533,9 @@ trait WhiskWebActionsApi
                 //case NonEmpty(ContentType(`application/x-www-form-urlencoded`, _), form)
                 case HttpEntity.Strict(`application/x-www-form-urlencoded`, data) if !isRawHttpAction =>
                     entity(as[FormData]) { form =>
-                        val body = form.fields.toMap.toJson.asJsObject
+                        //val body = form.fields.toMap.toJson.asJsObject
+                        // TODO form.parts needs to be a JsObject
+                        val body = JsObject("fix" -> JsString("this"))
                         process(Some(body), isRawHttpAction)
                     }
 
