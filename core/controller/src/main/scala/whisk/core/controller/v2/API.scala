@@ -144,13 +144,16 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
                         triggers.routes(user) ~
                         activations.routes(user) ~
                         rules.routes(user)
-                    }
+                    } ~ webexp.routes(user)
                 } ~
+                webexp.routes() ~
                 swaggerRoutes ~
                 options {
                     complete(OK)
                 }
-            }
+            } ~ basicAuth(validateCredentials) {
+                user => web.routes(user)
+            } ~ web.routes()
         }
     }
 
@@ -202,6 +205,8 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
     private val triggers = new TriggersApi(apiPath, apiVersion)
     private val activations = new ActivationsApi(apiPath, apiVersion)
     private val rules = new RulesApi(apiPath, apiVersion)
+    private val webexp = new WebActionsApi(Seq("experimental", "web"), WebApiDirectives.exp)
+    private val web = new WebActionsApi(Seq("web"), WebApiDirectives.web)
 
     class NamespacesApi(
        val apiPath: String,
@@ -280,5 +285,21 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
         override val logging: Logging,
         override val whiskConfig: WhiskConfig)
     extends WhiskTriggersApi with WhiskServices
+
+    protected[controller] class WebActionsApi(
+        override val webInvokePathSegments: Seq[String],
+        override val webApiDirectives: WebApiDirectives)(
+        implicit override val authStore: AuthStore,
+        implicit val entityStore: EntityStore,
+        override val activationStore: ActivationStore,
+        override val entitlementProvider: EntitlementProvider,
+        override val activationIdFactory: ActivationIdGenerator,
+        override val loadBalancer: LoadBalancerService,
+        override val consulServer: String,
+        override val actorSystem: ActorSystem,
+        override val executionContext: ExecutionContext,
+        override val logging: Logging,
+        override val whiskConfig: WhiskConfig)
+    extends WhiskWebActionsApi with WhiskServices
 
 }
