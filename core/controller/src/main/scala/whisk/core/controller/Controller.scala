@@ -20,17 +20,14 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 
 import akka.actor.Actor
-import akka.actor.ActorContext
+//import akka.actor.ActorContext
 import akka.actor.ActorSystem
 import akka.japi.Creator
 
-import spray.http.StatusCodes._
-import spray.http.Uri
-import spray.httpx.SprayJsonSupport._
+//import spray.httpx.SprayJsonSupport._
 import spray.json._
 import spray.json.DefaultJsonProtocol._
-import spray.routing.Directive.pimpApply
-import spray.routing.Route
+//import spray.routing.Directive.pimpApply
 
 import whisk.common.AkkaLogging
 import whisk.common.Logging
@@ -45,9 +42,16 @@ import whisk.core.entity._
 import whisk.core.entity.ExecManifest.Runtimes
 import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.loadBalancer.LoadBalancerService
-import whisk.http.BasicHttpService
-import whisk.http.BasicRasService
+//import whisk.http.BasicHttpService
+//import whisk.http.BasicRasService
 import whisk.common.LoggingMarkers
+
+
+import akka.routing._
+import akka.actor._
+import spray.json.DefaultJsonProtocol._
+import akka.japi.Creator
+//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.
@@ -69,11 +73,8 @@ class Controller(
     runtimes: Runtimes,
     implicit val whiskConfig: WhiskConfig,
     implicit val logging: Logging)
-    extends BasicRasService
-    with Actor {
+    extends Actor {
 
-    // each akka Actor has an implicit context
-    override def actorRefFactory: ActorContext = context
 
     /**
      * A Route in spray is technically a function taking a RequestContext as a parameter.
@@ -82,7 +83,7 @@ class Controller(
      * tree structure.
      * @see http://spray.io/documentation/1.2.3/spray-routing/key-concepts/routes/#composing-routes
      */
-    override def routes(implicit transid: TransactionId): Route = {
+    /*override def routes(implicit transid: TransactionId): Route = {
         // handleRejections wraps the inner Route with a logical error-handler for unmatched paths
         handleRejections(customRejectionHandler) {
             super.routes ~ {
@@ -97,7 +98,7 @@ class Controller(
                 internalInvokerHealth
             }
         }
-    }
+    }*/
 
     TransactionId.controller.mark(this, LoggingMarkers.CONTROLLER_STARTUP(instance), s"starting controller instance ${instance}")
 
@@ -120,25 +121,29 @@ class Controller(
     whisk.core.entitlement.v2.Collection.initialize(entityStore)
 
     /** The REST APIs. */
-    private val apiv1 = new RestAPIVersion("api", "v1")
+    //private val apiv1 = new RestAPIVersion("api", "v1")
     private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt + 1, "api", "v2")
-    private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
+    //private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
 
     /**
      * Handles GET /invokers URI.
      *
      * @return JSON of invoker health
      */
-    private val internalInvokerHealth = {
+    /*private val internalInvokerHealth = {
         (path("invokers") & get) {
             complete {
                 loadBalancer.invokerHealth.map(_.mapValues(_.asString).toJson.asJsObject)
             }
         }
-    }
+    }*/
 
     // controller top level info
-    private val info = Controller.info(whiskConfig, runtimes, List(apiv1.basepath()))
+    private val info = Controller.info(whiskConfig, runtimes, List(apiV2.basepath()))
+
+    def receive = {
+        case _ =>
+    }
 }
 
 /**
@@ -189,7 +194,8 @@ object Controller {
         // initialize the runtimes manifest
         if (config.isValid && ExecManifest.initialize(config)) {
             val port = config.servicePort.toInt
-            BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
+            val router1: ActorRef = actorSystem.actorOf(RoundRobinPool(5).props(Props.create(new ServiceBuilder(config, instance, logger))), "router1")
+            //BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
             //new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1)
         } else {
             logger.error(this, "Bad configuration, cannot start.")
