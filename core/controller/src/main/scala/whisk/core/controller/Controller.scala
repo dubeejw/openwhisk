@@ -18,19 +18,16 @@ package whisk.core.controller
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.Future
 
-import akka.actor.Actor
-import akka.actor.ActorContext
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorSystem, Props}
+
 import akka.japi.Creator
 
-import spray.http.StatusCodes._
-import spray.http.Uri
-import spray.httpx.SprayJsonSupport._
+//import spray.httpx.SprayJsonSupport._
 import spray.json._
 import spray.json.DefaultJsonProtocol._
-import spray.routing.Directive.pimpApply
-import spray.routing.Route
+//import spray.routing.Directive.pimpApply
 
 import whisk.common.AkkaLogging
 import whisk.common.Logging
@@ -45,9 +42,31 @@ import whisk.core.entity._
 import whisk.core.entity.ExecManifest.Runtimes
 import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.loadBalancer.LoadBalancerService
-import whisk.http.BasicHttpService
-import whisk.http.BasicRasService
+//import whisk.http.BasicHttpService
+//import whisk.http.BasicRasService
 import whisk.common.LoggingMarkers
+
+
+//import akka.routing._
+import akka.actor._
+import spray.json.DefaultJsonProtocol._
+import akka.japi.Creator
+import akka.http.scaladsl.server.Directives
+//import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.Http
+//import akka.http.scaladsl.server.RouteResult
+import akka.stream.ActorMaterializer
+//import akka.stream.ActorFlowMaterializer
+//import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.server.RouteResult._
+import akka.http.scaladsl.server.Route
+
+
+//import akka.http.scaladsl.server.Route
+
+
+
+//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.
@@ -69,11 +88,8 @@ class Controller(
     runtimes: Runtimes,
     implicit val whiskConfig: WhiskConfig,
     implicit val logging: Logging)
-    extends BasicRasService
-    with Actor {
+    extends Directives with Actor {
 
-    // each akka Actor has an implicit context
-    override def actorRefFactory: ActorContext = context
 
     /**
      * A Route in spray is technically a function taking a RequestContext as a parameter.
@@ -82,7 +98,7 @@ class Controller(
      * tree structure.
      * @see http://spray.io/documentation/1.2.3/spray-routing/key-concepts/routes/#composing-routes
      */
-    override def routes(implicit transid: TransactionId): Route = {
+    /*override def routes(implicit transid: TransactionId): Route = {
         // handleRejections wraps the inner Route with a logical error-handler for unmatched paths
         handleRejections(customRejectionHandler) {
             super.routes ~ {
@@ -97,9 +113,14 @@ class Controller(
                 internalInvokerHealth
             }
         }
-    }
+    }*/
+
+
 
     TransactionId.controller.mark(this, LoggingMarkers.CONTROLLER_STARTUP(instance), s"starting controller instance ${instance}")
+
+    implicit val materializer = ActorMaterializer()
+
 
     // initialize datastores
     private implicit val actorSystem = context.system
@@ -120,25 +141,43 @@ class Controller(
     whisk.core.entitlement.v2.Collection.initialize(entityStore)
 
     /** The REST APIs. */
-    private val apiv1 = new RestAPIVersion("api", "v1")
-    private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt + 1, "api", "v2")
-    private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
+    //private val apiv1 = new RestAPIVersion("api", "v1")
+    private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt, "api", "v1")
+    //private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
 
     /**
      * Handles GET /invokers URI.
      *
      * @return JSON of invoker health
      */
-    private val internalInvokerHealth = {
+    /*private val internalInvokerHealth = {
         (path("invokers") & get) {
             complete {
                 loadBalancer.invokerHealth.map(_.mapValues(_.asString).toJson.asJsObject)
             }
         }
+    }*/
+
+    private val routes: Route = {
+        (path("ping") & get) {
+            complete("pong")
+        } ~ apiV2.routes
     }
 
     // controller top level info
-    private val info = Controller.info(whiskConfig, runtimes, List(apiv1.basepath()))
+    private val info = Controller.info(whiskConfig, runtimes, List(apiV2.basepath()))
+
+    def receive = {
+        case _ =>
+    }
+
+    val bindingFuture = {
+        Http().bindAndHandle(routes, "0.0.0.0", whiskConfig.servicePort.toInt)
+    }
+
+    def shutdown(): Future[Unit] = {
+        bindingFuture.flatMap(_.unbind()).map(_ => ())
+    }
 }
 
 /**
@@ -150,10 +189,10 @@ object Controller {
     // a value, and whose values are default values.   A null value in the Map means there is
     // no default value specified, so it must appear in the properties file
     def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
-        ExecManifest.requiredProperties ++
-        RestApiCommons.requiredProperties ++
-        LoadBalancerService.requiredProperties ++
-        whisk.core.entitlement.EntitlementProvider.requiredProperties
+            ExecManifest.requiredProperties ++
+            RestApiCommons.requiredProperties ++
+            LoadBalancerService.requiredProperties ++
+            whisk.core.entitlement.EntitlementProvider.requiredProperties
 
     def optionalProperties = whisk.core.entitlement.EntitlementProvider.optionalProperties
 
@@ -189,12 +228,12 @@ object Controller {
         // initialize the runtimes manifest
         if (config.isValid && ExecManifest.initialize(config)) {
             val port = config.servicePort.toInt
-            BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
-            //new whisk.core.controller.v2.API(config, "0.0.0.0", port + 1)
+            val actor = actorSystem.actorOf(Props.create(new ServiceBuilder(config, instance, logger)), "controller-service")
         } else {
             logger.error(this, "Bad configuration, cannot start.")
             actorSystem.terminate()
             Await.result(actorSystem.whenTerminated, 30.seconds)
         }
     }
+
 }

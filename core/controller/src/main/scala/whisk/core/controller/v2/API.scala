@@ -17,7 +17,7 @@
 package whisk.core.controller.v2
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
+//import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.Uri
@@ -32,7 +32,7 @@ import akka.http.scaladsl.model.headers._
 import spray.json._
 import spray.json.DefaultJsonProtocol._
 
-import scala.concurrent.Future
+//import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 
 import whisk.common.TransactionId
@@ -155,48 +155,6 @@ class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVers
                 user => web.routes(user)
             } ~ web.routes()
         }
-    }
-
-    /*
-    def routes(implicit transid: TransactionId): Route = {
-        pathPrefix(apipath / apiversion) {
-            sendCorsHeaders {
-                (pathEndOrSingleSlash & get) {
-                    complete(OK, info)
-                } ~ authenticate(basicauth) { user =>
-                        namespaces.routes(user) ~
-                        pathPrefix(Collection.NAMESPACES) {
-                            actions.routes(user) ~
-                            triggers.routes(user) ~
-                            rules.routes(user) ~
-                            activations.routes(user) ~
-                            packages.routes(user)
-                        } ~ webexp.routes(user)
-                } ~ {
-                    webexp.routes()
-                } ~ {
-                    swaggerRoutes
-                } ~ options {
-                    complete(OK)
-                }
-            } ~ {
-                // web actions are distinct to separate the cors header
-                // and allow the actions themselves to respond to options
-                authenticate(basicauth) {
-                    user => web.routes(user)
-                } ~ web.routes()
-            }
-        }
-    }
-
-     */
-
-    val bindingFuture = {
-        Http().bindAndHandle(routes, host, port)
-    }
-
-    def shutdown(): Future[Unit] = {
-        bindingFuture.flatMap(_.unbind()).map(_ => ())
     }
 
     private val namespaces = new NamespacesApi(apiPath, apiVersion)
