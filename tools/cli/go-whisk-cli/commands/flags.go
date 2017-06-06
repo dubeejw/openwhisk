@@ -97,6 +97,7 @@ var flags struct {
         sinceHours      int
         sinceDays       int
         exit            int
+        last            bool
     }
 
     // rule
