@@ -197,20 +197,26 @@ var activationLogsCmd = &cobra.Command{
         return nil
     },
 }
-
+//lastFlag(args) retrieves the last activation with flag -l or --last
+//Param: Brings in []strings from args
+//Return: Returns a args([]string) with last ID used or the original args
 func lastFlag(args []string) []string {
+  //Checks to see if there is no ID sent with the last flag
+  //If an ID is given with the last flag then the ID overides the flag
   if flags.activation.last && len(args) == 0  {
-    options := &whisk.ActivationListOptions{
+    options := &whisk.ActivationListOptions {
       Limit: 1,
       Skip: 0,
-
     }
+
     activations, _, err := client.Activations.List(options)
     if err != nil {
-      fmt.Println("ERROR")
+      whisk.Debug(whisk.DbgError, "client.Activations.List() error for flag --last: %s\n", err)
     }
+
     args = append(args, activations[0].ActivationID)
   }
+
   return args
 }
 
@@ -222,6 +228,7 @@ var activationResultCmd = &cobra.Command{
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
 
+        args = lastFlag(args)
         if whiskErr := checkArgs(args, 1, 1, "Activation result",
                 wski18n.T("An activation ID is required.")); whiskErr != nil {
             return whiskErr
@@ -366,6 +373,8 @@ func init() {
     activationGetCmd.Flags().BoolVarP(&flags.activation.last, "last", "l", false, wski18n.T("retrieves last activation"))
 
     activationLogsCmd.Flags().BoolVarP(&flags.activation.last, "last", "l", false, wski18n.T("retrieves last activation"))
+
+    activationResultCmd.Flags().BoolVarP(&flags.activation.last, "last", "l", false, wski18n.T("retrieves last activation"))
 
     activationPollCmd.Flags().IntVarP(&flags.activation.exit, "exit", "e", 0, wski18n.T("stop polling after `SECONDS` seconds"))
     activationPollCmd.Flags().IntVar(&flags.activation.sinceSeconds, "since-seconds", 0, wski18n.T("start polling for activations `SECONDS` seconds ago"))
