@@ -16,15 +16,25 @@
 
 package whisk.core.entitlement
 
+import whisk.core.entitlement.Privilege._
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-import Privilege.Privilege
+
+import akka.http.javadsl.model.HttpMethod
+import akka.http.javadsl.model.HttpMethods.DELETE
+import akka.http.javadsl.model.HttpMethods.GET
+import akka.http.javadsl.model.HttpMethods.POST
+import akka.http.javadsl.model.HttpMethods.PUT
+
+/*
 import spray.http.HttpMethod
 import spray.http.HttpMethods.DELETE
 import spray.http.HttpMethods.GET
 import spray.http.HttpMethods.POST
 import spray.http.HttpMethods.PUT
+*/
 import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.entity.Identity

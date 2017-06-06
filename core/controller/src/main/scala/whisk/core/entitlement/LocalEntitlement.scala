@@ -16,10 +16,11 @@
 
 package whisk.core.entitlement
 
+import whisk.core.entitlement.Privilege._
+
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 
-import Privilege.Privilege
 import akka.actor.ActorSystem
 import whisk.common.Logging
 import whisk.common.TransactionId

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package whisk.core.controller.v2
+package whisk.core.controller
 
 import akka.actor.ActorSystem
 //import akka.http.scaladsl.Http
@@ -45,8 +45,8 @@ import whisk.common.TransactionId
 //import whisk.core.controller._
 import whisk.core.entity._
 import whisk.core.entity.types._
-import whisk.core.entitlement.v2._
-//import whisk.core.entitlement.v2.Collection
+import whisk.core.entitlement._
+//import whisk.core.entitlement.Collection
 
 import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.loadBalancer.LoadBalancerService
@@ -85,6 +85,19 @@ protected[controller] class SwaggerDocs(apipath: Uri.Path, doc: String)(implicit
     private def apiDocsUrl = basepath(apipath / swaggerdocpath)
 }
 
+protected[controller] object RestApiCommons {
+    def requiredProperties =
+        WhiskConfig.whiskVersion ++
+                WhiskAuthStore.requiredProperties ++
+                WhiskEntityStore.requiredProperties ++
+                WhiskActivationStore.requiredProperties ++
+                WhiskConfig.consulServer ++
+                EntitlementProvider.requiredProperties ++
+                WhiskActionsApi.requiredProperties ++
+                Authenticate.requiredProperties ++
+                Collection.requiredProperties
+}
+
 /**
   * A trait for wrapping routes with headers to include in response.
   * Useful for CORS.
@@ -95,7 +108,7 @@ protected[controller] trait RespondWithHeaders extends Directives {
     val sendCorsHeaders = respondWithHeaders(allowOrigin, allowHeaders)
 }
 
-class API(config: WhiskConfig, host: String, port: Int, apiPath: String, apiVersion: String)(
+class API(config: WhiskConfig, apiPath: String, apiVersion: String)(
     implicit val actorSystem: ActorSystem,
     implicit val logging: Logging,
     implicit val entityStore: EntityStore,
