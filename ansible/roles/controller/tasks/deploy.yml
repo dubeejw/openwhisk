@@ -40,7 +40,6 @@
       - "{{ whisk_logs_dir }}/controller:/logs"
     ports:
       - "{{ controller.port }}:8080"
-      - "{{ controller.port + 1 }}:8081"
 
 - name: wait until the Controller in this host is up and running
   uri:

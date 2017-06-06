@@ -34,9 +34,8 @@ import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
 import whisk.core.entitlement._
-//import whisk.core.entitlement.v2.Collection
 //import whisk.core.entitlement.EntitlementProvider
-//import whisk.core.entitlement.v2.EntitlementProvider
+//import whisk.core.entitlement.EntitlementProvider
 
 import whisk.core.entity._
 import whisk.core.entity.ExecManifest.Runtimes
@@ -132,17 +131,15 @@ class Controller(
     // initialize backend services
     private implicit val loadBalancer = new LoadBalancerService(whiskConfig, entityStore)
     private implicit val consulServer = whiskConfig.consulServer
-    private implicit val entitlementProvider = new whisk.core.entitlement.LocalEntitlementProvider(whiskConfig, loadBalancer)
-    private implicit val entitlementProviderV2 = new whisk.core.entitlement.v2.LocalEntitlementProvider(whiskConfig, loadBalancer)
+    private implicit val entitlementProvider = new LocalEntitlementProvider(whiskConfig, loadBalancer)
     private implicit val activationIdFactory = new ActivationIdGenerator {}
 
     // register collections
     Collection.initialize(entityStore)
-    whisk.core.entitlement.v2.Collection.initialize(entityStore)
+    whisk.core.entitlement.Collection.initialize(entityStore)
 
     /** The REST APIs. */
-    //private val apiv1 = new RestAPIVersion("api", "v1")
-    private val apiV2 = new whisk.core.controller.v2.API(whiskConfig, "0.0.0.0", whiskConfig.servicePort.toInt, "api", "v1")
+    private val apiV1 = new API(whiskConfig, "api", "v1")
     //private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
 
     /**
@@ -161,11 +158,11 @@ class Controller(
     private val routes: Route = {
         (path("ping") & get) {
             complete("pong")
-        } ~ apiV2.routes
+        } ~ apiV1.routes
     }
 
     // controller top level info
-    private val info = Controller.info(whiskConfig, runtimes, List(apiV2.basepath()))
+    private val info = Controller.info(whiskConfig, runtimes, List(apiV1.basepath()))
 
     def receive = {
         case _ =>
@@ -189,10 +186,10 @@ object Controller {
     // a value, and whose values are default values.   A null value in the Map means there is
     // no default value specified, so it must appear in the properties file
     def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
-            ExecManifest.requiredProperties ++
-            RestApiCommons.requiredProperties ++
-            LoadBalancerService.requiredProperties ++
-            whisk.core.entitlement.EntitlementProvider.requiredProperties
+        ExecManifest.requiredProperties ++
+        RestApiCommons.requiredProperties ++
+        LoadBalancerService.requiredProperties ++
+        EntitlementProvider.requiredProperties
 
     def optionalProperties = whisk.core.entitlement.EntitlementProvider.optionalProperties
 

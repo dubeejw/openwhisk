@@ -36,7 +36,7 @@ import spray.http.HttpResponse
 import spray.http.MediaTypes.`text/plain`
 import spray.httpx.SprayJsonSupport.sprayJsonMarshaller
 import spray.httpx.marshalling
-import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
+//import spray.httpx.marshalling.ToResponseMarshallable.isMarshallable
 import spray.routing.AuthenticationFailedRejection
 import spray.routing.Directive.pimpApply
 import spray.routing.Directives
@@ -159,6 +159,6 @@ object BasicHttpService extends Directives {
                     }
                 }
         }
-        case CustomRejection(status, cause) :: _ => complete(status, ErrorResponse(cause, transid))
+        //case CustomRejection(status, cause) :: _ => complete(status, ErrorResponse(cause, transid))
     }
 }

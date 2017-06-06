@@ -19,8 +19,10 @@ package whisk.core.entitlement
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-import Privilege.Privilege
-import spray.http.StatusCodes._
+import whisk.core.entitlement.Privilege._
+
+import akka.http.scaladsl.model.StatusCodes._
+
 import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.controller.RejectRequest
