@@ -257,7 +257,8 @@ func lastFlag(args []string) ([]string, error) {
       whiskErr := whisk.MakeWskError(errors.New("No activations found"), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
       return args, whiskErr
     } else {
-    args = append(args, activations[0].ActivationID)
+      whisk.Debug(whisk.DbgInfo, "Appending most recent activation ID into args\n")
+      args = append(args, activations[0].ActivationID)
     }
   }
 
