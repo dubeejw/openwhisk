@@ -119,7 +119,6 @@ var activationGetCmd = &cobra.Command{
         if args, err = lastFlag(args); err != nil {
           return err
         }
-        
         if whiskErr := checkArgs(args, 1, 2, "Activation get",
                 wski18n.T("An activation ID is required.")); whiskErr != nil {
             return whiskErr
