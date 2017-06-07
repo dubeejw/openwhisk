@@ -1016,6 +1016,10 @@
     "translation": "summarize activation details"
   },
   {
+    "id": "retrieves the last activation",
+    "translation": "retrieves the last activation"
+  },
+  {
     "id": "stop polling after `SECONDS` seconds",
     "translation": "stop polling after `SECONDS` seconds"
   },
