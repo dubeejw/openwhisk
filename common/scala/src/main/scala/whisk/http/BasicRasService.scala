@@ -20,9 +20,13 @@ import akka.actor.Actor
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.japi.Creator
-import spray.httpx.SprayJsonSupport._
+
+//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+
+//import spray.httpx.SprayJsonSupport._
+
 import whisk.common.Logging
-import whisk.common.TransactionId
+//import whisk.common.TransactionId
 
 /**
  * This trait extends the BasicHttpService with a standard "ping" endpoint which
@@ -30,7 +34,7 @@ import whisk.common.TransactionId
  */
 trait BasicRasService extends BasicHttpService {
 
-    override def routes(implicit transid: TransactionId) = ping
+    override def routes = ping
 
     override def loglevelForRoute(route: String): Logging.LogLevel = {
         if (route == "/ping") {
@@ -59,7 +63,7 @@ object BasicRasService {
      * which extends the BasicRasService trait.
      */
     private class RasService(implicit val logging: Logging) extends BasicRasService with Actor {
-        override def actorRefFactory = context
+        //override def actorRefFactory = context
     }
 
     /**

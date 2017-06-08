@@ -20,7 +20,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Future
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{/*Actor,*/ ActorSystem/*, Props*/}
 
 import akka.japi.Creator
 
@@ -41,8 +41,8 @@ import whisk.core.entity._
 import whisk.core.entity.ExecManifest.Runtimes
 import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.loadBalancer.LoadBalancerService
-//import whisk.http.BasicHttpService
-//import whisk.http.BasicRasService
+import whisk.http.BasicHttpService
+import whisk.http.BasicRasService
 import whisk.common.LoggingMarkers
 
 
@@ -50,7 +50,7 @@ import whisk.common.LoggingMarkers
 import akka.actor._
 import spray.json.DefaultJsonProtocol._
 import akka.japi.Creator
-import akka.http.scaladsl.server.Directives
+//import akka.http.scaladsl.server.Directives
 //import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.Http
 //import akka.http.scaladsl.server.RouteResult
@@ -87,8 +87,10 @@ class Controller(
     runtimes: Runtimes,
     implicit val whiskConfig: WhiskConfig,
     implicit val logging: Logging)
-    extends Directives with Actor {
+    extends BasicRasService {
 
+
+    //override def actorRefFactory: ActorContext = context
 
     /**
      * A Route in spray is technically a function taking a RequestContext as a parameter.
@@ -155,18 +157,16 @@ class Controller(
         }
     }*/
 
-    private val routes: Route = {
-        (path("ping") & get) {
-            complete("pong")
-        } ~ apiV1.routes
+    override def routes: Route = {
+        super.routes ~ apiV1.routes
     }
 
     // controller top level info
     private val info = Controller.info(whiskConfig, runtimes, List(apiV1.basepath()))
 
-    def receive = {
-        case _ =>
-    }
+    //def receive = {
+    //    case _ =>
+    //}
 
     val bindingFuture = {
         Http().bindAndHandle(routes, "0.0.0.0", whiskConfig.servicePort.toInt)
@@ -225,7 +225,8 @@ object Controller {
         // initialize the runtimes manifest
         if (config.isValid && ExecManifest.initialize(config)) {
             val port = config.servicePort.toInt
-            val actor = actorSystem.actorOf(Props.create(new ServiceBuilder(config, instance, logger)), "controller-service")
+            BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
+            //val actor = actorSystem.actorOf(Props.create(new ServiceBuilder(config, instance, logger)), "controller-service")
         } else {
             logger.error(this, "Bad configuration, cannot start.")
             actorSystem.terminate()
