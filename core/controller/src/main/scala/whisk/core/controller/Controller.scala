@@ -18,7 +18,6 @@ package whisk.core.controller
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-<<<<<<< HEAD
 import akka.actor.Actor
 import akka.actor.ActorContext
 import akka.actor.ActorSystem
@@ -30,19 +29,7 @@ import spray.json._
 import spray.json.DefaultJsonProtocol._
 import spray.routing.Directive.pimpApply
 import spray.routing.Route
-=======
-import scala.concurrent.Future
 
-import akka.actor.{Actor, ActorSystem, Props}
-
-import akka.japi.Creator
-
-//import spray.httpx.SprayJsonSupport._
-import spray.json._
-import spray.json.DefaultJsonProtocol._
-//import spray.routing.Directive.pimpApply
-
->>>>>>> Only Start Akka Controller
 import whisk.common.AkkaLogging
 import whisk.common.Logging
 import whisk.common.TransactionId
@@ -55,19 +42,17 @@ import whisk.core.entity._
 import whisk.core.entity.ExecManifest.Runtimes
 import whisk.core.entity.ActivationId.ActivationIdGenerator
 import whisk.core.loadBalancer.LoadBalancerService
-//import whisk.http.BasicHttpService
-//import whisk.http.BasicRasService
+import whisk.http.BasicHttpService
+import whisk.http.BasicRasService
 import whisk.common.LoggingMarkers
 
-<<<<<<< HEAD
 import scala.util.{Failure, Success}
-=======
 
 //import akka.routing._
 import akka.actor._
 import spray.json.DefaultJsonProtocol._
 import akka.japi.Creator
-import akka.http.scaladsl.server.Directives
+//import akka.http.scaladsl.server.Directives
 //import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.Http
 //import akka.http.scaladsl.server.RouteResult
@@ -105,8 +90,10 @@ class Controller(
     runtimes: Runtimes,
     implicit val whiskConfig: WhiskConfig,
     implicit val logging: Logging)
-    extends Directives with Actor {
+    extends BasicRasService {
 
+
+    //override def actorRefFactory: ActorContext = context
 
     /**
      * A Route in spray is technically a function taking a RequestContext as a parameter.
@@ -173,18 +160,16 @@ class Controller(
         }
     }*/
 
-    private val routes: Route = {
-        (path("ping") & get) {
-            complete("pong")
-        } ~ apiV1.routes
+    override def routes: Route = {
+        super.routes ~ apiV1.routes
     }
 
     // controller top level info
     private val info = Controller.info(whiskConfig, runtimes, List(apiV1.basepath()))
 
-    def receive = {
-        case _ =>
-    }
+    //def receive = {
+    //    case _ =>
+    //}
 
     val bindingFuture = {
         Http().bindAndHandle(routes, "0.0.0.0", whiskConfig.servicePort.toInt)
@@ -254,7 +239,7 @@ object Controller {
         ExecManifest.initialize(config) match {
             case Success(_) =>
                 val port = config.servicePort.toInt
-                val actor = actorSystem.actorOf(Props.create(new ServiceBuilder(config, instance, logger)), "controller-service")
+                BasicHttpService.startService(actorSystem, "controller", "0.0.0.0", port, new ServiceBuilder(config, instance, logger))
 
             case Failure(t) =>
                 logger.error(this, s"Invalid runtimes manifest: $t")
