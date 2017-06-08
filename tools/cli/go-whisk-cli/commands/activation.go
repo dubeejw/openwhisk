@@ -237,7 +237,7 @@ var activationResultCmd = &cobra.Command{
 }
 //lastFlag(args) retrieves the last activation with flag -l or --last
 //Param: Brings in []strings from args
-//Return: Returns a args([]string) with last ID used or the original args with any errors
+//Return: Returns an args([]string) with last ID used or the original args with any errors
 func lastFlag(args []string) ([]string, error) {
   //Checks to see if there is no ID sent with the last flag
   //If an ID is given with the last flag then the ID will overide the flag
