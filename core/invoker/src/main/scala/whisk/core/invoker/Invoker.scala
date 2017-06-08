@@ -457,9 +457,14 @@ object Invoker {
             })
 
             val port = config.servicePort.toInt
+            logger.error(this, s"awewersdf. $port")
+
             BasicHttpService.startService(actorSystem, "invoker", "0.0.0.0", port, new Creator[InvokerServer] {
                 def create = new InvokerServer {
                     override implicit val logging = logger
+                    implicit val whiskConfig = config
+                    implicit val actorSystem1 = actorSystem
+                    implicit val executionContext1 = ec
                 }
             })
         } else {
