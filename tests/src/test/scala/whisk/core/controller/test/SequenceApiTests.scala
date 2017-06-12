@@ -22,10 +22,13 @@ import scala.language.postfixOps
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.server.Route
+
 import spray.json._
 import spray.json.DefaultJsonProtocol._
+
 import whisk.common.TransactionId
 import whisk.core.controller.WhiskActionsApi
 import whisk.core.entity._
@@ -61,7 +64,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sequence(components.toVector)))
 
         // create an action sequence
-        Put(s"$collectionPath/${seqName.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${seqName.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsTooLong
         }
@@ -74,7 +77,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sequence(Vector())))
 
         // create an action sequence
-        Put(s"$collectionPath/$seqName", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$seqName", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceNoComponent
         }
@@ -90,7 +93,7 @@ class SequenceApiTests
         val updateContent = WhiskActionPut(Some(sequence(Vector())))
 
         // create an action sequence
-        Put(s"$collectionPath/$seqName?overwrite=true", updateContent) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$seqName?overwrite=true", updateContent) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceNoComponent
         }
@@ -105,7 +108,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sequence(components)))
 
         // create an action sequence
-        Put(s"$collectionPath/${seqName.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${seqName.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceComponentNotFound
         }
@@ -118,7 +121,7 @@ class SequenceApiTests
 
         // create an action sequence
         val content = WhiskActionPut(Some(sSeq.exec))
-        Put(s"$collectionPath/$seqName", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$seqName", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsCyclic
         }
@@ -136,7 +139,7 @@ class SequenceApiTests
 
         // create an action sequence
         val content = WhiskActionPut(Some(sSeq.exec))
-        Put(s"$collectionPath/$seqName", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$seqName", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsCyclic
         }
@@ -153,7 +156,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sequence(components.toVector)))
 
         // create a valid action sequence first
-        Put(s"$collectionPath/${seqName.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${seqName.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(OK)
         }
 
@@ -163,7 +166,7 @@ class SequenceApiTests
         val updatedContent = WhiskActionPut(Some(sequence(updatedSeq.toVector)))
 
         // update the sequence
-        Put(s"$collectionPath/${seqName.name}?overwrite=true", updatedContent) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${seqName.name}?overwrite=true", updatedContent) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsCyclic
         }
@@ -181,7 +184,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sequence(components.toVector)))
 
         // create an action sequence
-        Put(s"$collectionPath/${seqName.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${seqName.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(OK)
         }
     }
@@ -211,7 +214,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sequence(components)))
 
         // create an action sequence
-        Put(s"$collectionPath/${seqName.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${seqName.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(OK)
             val response = responseAs[String]
         }
@@ -234,7 +237,7 @@ class SequenceApiTests
         // create an action sequence
         val namespaceWithPkg = EntityPath(s"/$namespace/$pkg")
         val content = WhiskActionPut(Some(sequence(components.toVector)))
-        Put(s"$collectionPath/$pkg/${seqName.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$pkg/${seqName.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(OK)
         }
 
@@ -249,7 +252,7 @@ class SequenceApiTests
         val updatedContent = WhiskActionPut(Some(sequence(updatedSeq.toVector)))
 
         // update the sequence
-        Put(s"$collectionPath/$pkg/${seqName.name}?overwrite=true", updatedContent) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$pkg/${seqName.name}?overwrite=true", updatedContent) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsCyclic
         }
@@ -259,7 +262,7 @@ class SequenceApiTests
         implicit val tid = transid()
         val content = JsObject("exec" -> JsObject("kind" -> Exec.SEQUENCE.toJson, "components" -> Vector("a", "b").toJson))
 
-        Put(s"$collectionPath/${aname()}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             // the content will fail to deserialize on the route directive,
             // and without a custom rejection, the response will be a string
@@ -272,7 +275,7 @@ class SequenceApiTests
         val content = JsObject("exec" -> JsObject("kind" -> Exec.SEQUENCE.toJson, "components" -> Vector("a", "b").toJson))
 
         // update an action sequence
-        Put(s"$collectionPath/${aname()}?overwrite=true", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${aname()}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             // the content will fail to deserialize on the route directive,
             // and without a custom rejection, the response will be a string
@@ -295,7 +298,7 @@ class SequenceApiTests
         val content = WhiskActionPut(Some(sSeq.exec))
 
         Console.withOut(stream) {
-            Put(s"$collectionPath/$sSeqName", content) ~> sealRoute(routes(creds)) ~> check {
+            Put(s"$collectionPath/$sSeqName", content) ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
                 logContains(s"atomic action count ${2 * actionCnt}")(stream)
             }
@@ -336,7 +339,7 @@ class SequenceApiTests
 
         stream.reset()
         Console.withOut(stream) {
-            Put(s"$collectionPath/$sAct", content) ~> sealRoute(routes(creds)) ~> check {
+            Put(s"$collectionPath/$sAct", content) ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
             }
             logContains("atomic action count 4")(stream)
@@ -345,7 +348,7 @@ class SequenceApiTests
         // update action z to point to s --- should be rejected
         val zUpdate = makeSimpleSequence(zAct, namespace, Vector(s"$sAct"), false) // s in the db already
         val zUpdateContent = WhiskActionPut(Some(zUpdate.exec))
-        Put(s"$collectionPath/$zAct?overwrite=true", zUpdateContent) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$zAct?overwrite=true", zUpdateContent) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsCyclic
         }
@@ -353,7 +356,7 @@ class SequenceApiTests
         // update action s to point to a, s, b --- should be rejected
         val sUpdate = makeSimpleSequence(sAct, namespace, Vector(s"$aAct", s"$sAct", s"$bAct"), false) // s in the db already
         val sUpdateContent = WhiskActionPut(Some(sUpdate.exec))
-        Put(s"$collectionPath/$sAct?overwrite=true", sUpdateContent) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/$sAct?overwrite=true", sUpdateContent) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
             responseAs[ErrorResponse].error shouldBe Messages.sequenceIsCyclic
         }
@@ -363,7 +366,7 @@ class SequenceApiTests
         val updateContent = WhiskActionPut(Some(zSeq.exec))
         stream.reset()
         Console.withOut(stream) {
-            Put(s"$collectionPath/$zAct?overwrite=true", updateContent) ~> sealRoute(routes(creds)) ~> check {
+            Put(s"$collectionPath/$zAct?overwrite=true", updateContent) ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
             }
             logContains("atomic action count 1")(stream)
@@ -373,7 +376,7 @@ class SequenceApiTests
         val newSContent = WhiskActionPut(Some(newS.exec))
         stream.reset()
         Console.withOut(stream) {
-            Put(s"${collectionPath}/$sAct?overwrite=true", newSContent) ~> sealRoute(routes(creds)) ~> check {
+            Put(s"${collectionPath}/$sAct?overwrite=true", newSContent) ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
             }
             logContains("atomic action count 6")(stream)

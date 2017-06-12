@@ -43,7 +43,8 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.HttpRequest
 //import akka.http.scaladsl.server.RejectionHandler
-
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.RejectionHandler
 /*import spray.can.Http
 import spray.http.ContentType
 import spray.http.HttpEntity
@@ -87,6 +88,22 @@ trait BasicHttpService extends Directives with Actor with TransactionCounter {
      */
     implicit def logging: Logging
 
+    implicit def myRejectionHandler =
+        RejectionHandler.default
+                .mapRejectionResponse {
+                    case res @ HttpResponse(_, _, ent: HttpEntity.Strict, _) =>
+                        // since all Akka default rejection responses are Strict this will handle all rejections
+                        val message = ent.data.utf8String.replaceAll("\"", """\"""")
+
+                        // we copy the response in order to keep all headers and status code, wrapping the message as hand rolled JSON
+                        // you could the entity using your favourite marshalling library (e.g. spray json or anything else)
+                        res.copy(entity = HttpEntity(ContentTypes.`application/json`, s"""{"rejection": "$message"}"""))
+
+                    //case CustomRejection(status, cause) :: _ => complete(status, ErrorResponse(cause, transid))
+
+                    case x => x // pass through all other types of responses
+                }
+
     /**
      * Gets the routes implemented by the HTTP service.
      *
@@ -109,13 +126,14 @@ trait BasicHttpService extends Directives with Actor with TransactionCounter {
     def receive = {
         case _ =>
 
-        /*assignId { implicit transid =>
-            //DebuggingDirectives.logRequest(logRequestInfo _) {
-            //    DebuggingDirectives.logRequestResponse(logResponseInfo _) {
-                    routes
-            //    }
-            //}*/
-        }
+            assignId { implicit transid =>
+                //DebuggingDirectives.logRequest(logRequestInfo _) {
+                //    DebuggingDirectives.logRequestResponse(logResponseInfo _) {
+                Route.seal(routes)
+                //    }
+                //}
+            }
+    }
 
     /** Assigns transaction id to every request. */
     protected val assignId = extract(_ => transid())

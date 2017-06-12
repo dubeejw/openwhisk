@@ -27,11 +27,16 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import common.StreamLogging
-import spray.http.BasicHttpCredentials
+
+//import spray.http.BasicHttpCredentials
 import spray.json.DefaultJsonProtocol
 import spray.json.JsString
-import spray.routing.HttpService
-import spray.testkit.ScalatestRouteTest
+//import spray.routing.HttpService
+//import spray.testkit.ScalatestRouteTest
+import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.http.scaladsl.testkit.RouteTestTimeout
+import akka.http.scaladsl.model.headers.BasicHttpCredentials
+
 import whisk.common.TransactionCounter
 import whisk.common.TransactionId
 import whisk.core.WhiskConfig
@@ -55,10 +60,9 @@ protected trait ControllerTestCommon
     with DbUtils
     with ExecHelpers
     with WhiskServices
-    with HttpService
     with StreamLogging {
 
-    override val actorRefFactory = null
+    //override val actorRefFactory = null
     implicit val routeTestTimeout = RouteTestTimeout(90 seconds)
 
     override implicit val actorSystem = system // defined in ScalatestRouteTest

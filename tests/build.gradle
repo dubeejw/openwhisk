@@ -53,6 +53,8 @@ dependencies {
     compile project(':common:scala')
     compile project(':core:controller')
     compile project(':core:invoker')
+
+    testCompile 'com.typesafe.akka:akka-http-testkit_2.11:10.0.2'
 }
 
 tasks.withType(ScalaCompile) {
