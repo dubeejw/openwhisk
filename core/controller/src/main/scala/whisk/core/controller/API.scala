@@ -254,7 +254,8 @@ class API(config: WhiskConfig, apiPath: String, apiVersion: String)(
         override val consulServer: String,
         override val executionContext: ExecutionContext,
         override val logging: Logging,
-        override val whiskConfig: WhiskConfig)
+        override val whiskConfig: WhiskConfig,
+        override val materializer: ActorMaterializer)
     extends WhiskTriggersApi with WhiskServices
 
     protected[controller] class WebActionsApi(

@@ -19,10 +19,14 @@ package whisk.core.controller.test
 import scala.concurrent.duration.DurationInt
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import spray.http.StatusCodes._
-import spray.httpx.SprayJsonSupport._
+
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.server.Route
+
 import spray.json.DefaultJsonProtocol._
 import spray.json._
+
 import whisk.core.controller.WhiskActionsApi
 import whisk.core.entity._
 import whisk.core.entitlement.Resource
@@ -65,7 +69,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         actions foreach { put(entityStore, _) }
         whisk.utils.retry {
-            Get(s"$collectionPath/${provider.name}/") ~> sealRoute(routes(creds)) ~> check {
+            Get(s"$collectionPath/${provider.name}/") ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
                 val response = responseAs[List[JsObject]]
                 actions.length should be(response.length)
@@ -85,7 +89,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, reference)
         actions foreach { put(entityStore, _) }
         whisk.utils.retry {
-            Get(s"$collectionPath/${reference.name}/") ~> sealRoute(routes(creds)) ~> check {
+            Get(s"$collectionPath/${reference.name}/") ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
                 val response = responseAs[List[JsObject]]
                 actions.length should be(response.length)
@@ -103,7 +107,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, action1)
         put(entityStore, action2)
         whisk.utils.retry {
-            Get(s"$collectionPath") ~> sealRoute(routes(creds)) ~> check {
+            Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
                 val response = responseAs[List[JsObject]]
                 response.length should be(2)
@@ -118,7 +122,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(namespace, aname, None)
         put(entityStore, provider)
         whisk.utils.retry {
-            Get(s"$collectionPath/${provider.name}") ~> sealRoute(routes(creds)) ~> check {
+            Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
                 status should be(Conflict)
             }
         }
@@ -128,7 +132,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         implicit val tid = transid()
         val provider = WhiskPackage(namespace, aname, None)
         put(entityStore, provider)
-        Delete(s"$collectionPath/${provider.name}/") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${provider.name}/") ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -140,7 +144,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         val content = WhiskActionPut(Some(action.exec))
         put(entityStore, provider)
-        Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
             deleteAction(action.docid)
             status should be(OK)
             val response = responseAs[WhiskAction]
@@ -155,7 +159,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(namespace, aname)
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         val content = WhiskActionPut(Some(action.exec))
-        Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -166,7 +170,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val binding = WhiskPackage(namespace, aname, provider.bind)
         val content = WhiskActionPut(Some(jsDefault("??")))
         put(entityStore, binding)
-        Put(s"$collectionPath/${binding.name}/$aname", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${binding.name}/$aname", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
         }
     }
@@ -178,7 +182,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val content = WhiskActionPut(Some(jsDefault("??")))
         put(entityStore, provider)
         put(entityStore, binding)
-        Put(s"$collectionPath/${binding.name}/$aname", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${binding.name}/$aname", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
         }
     }
@@ -188,7 +192,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(EntityPath(Subject().asString), aname, publish = true)
         val content = WhiskActionPut(Some(jsDefault("??")))
         put(entityStore, provider)
-        Put(s"/${provider.namespace}/${collection.path}/${provider.name}/$aname", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"/${provider.namespace}/${collection.path}/${provider.name}/$aname", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(Forbidden)
         }
     }
@@ -203,11 +207,11 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
 
         // it should "reject delete action in package owned by different subject" in {
         val auser = WhiskAuth(Subject(), AuthKey()).toIdentity
-        Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+        Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(Forbidden)
         }
 
-        Delete(s"$collectionPath/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(OK)
             val response = responseAs[WhiskAction]
             response should be(action)
@@ -219,7 +223,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(namespace, aname)
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         put(entityStore, action)
-        Delete(s"$collectionPath/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -229,7 +233,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(namespace, aname)
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         put(entityStore, provider)
-        Delete(s"$collectionPath/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -240,7 +244,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val binding = WhiskPackage(namespace, aname, provider.bind)
         val content = WhiskActionPut(Some(jsDefault("??")))
         put(entityStore, binding)
-        Delete(s"$collectionPath/${binding.name}/$aname") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${binding.name}/$aname") ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
         }
     }
@@ -252,7 +256,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val content = WhiskActionPut(Some(jsDefault("??")))
         put(entityStore, provider)
         put(entityStore, binding)
-        Delete(s"$collectionPath/${binding.name}/$aname") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${binding.name}/$aname") ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
         }
     }
@@ -263,7 +267,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         put(entityStore, provider)
         put(entityStore, action)
-        Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(Forbidden)
         }
     }
@@ -276,7 +280,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, action)
         whisk.utils.retry {
-            Get(s"$collectionPath/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+            Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
                 status should be(OK)
                 val response = responseAs[WhiskAction]
                 response should be(action inherit provider.parameters)
@@ -294,7 +298,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, binding)
         put(entityStore, action)
         whisk.utils.retry {
-            Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+            Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
                 status should be(OK)
                 val response = responseAs[WhiskAction]
                 response should be(action inherit (provider.parameters ++ binding.parameters))
@@ -312,7 +316,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, binding)
         put(entityStore, action)
         whisk.utils.retry {
-            Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+            Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
                 status should be(OK)
                 val response = responseAs[WhiskAction]
                 response should be(action inherit (provider.parameters ++ binding.parameters))
@@ -333,7 +337,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, action)
         val pkgaccess = Resource(provider.namespace, PACKAGES, Some(provider.name.asString))
         Await.result(entitlementProvider.grant(auser.subject, READ, pkgaccess), 1 second)
-        Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+        Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(OK)
             val response = responseAs[WhiskAction]
             response should be(action inherit (provider.parameters ++ binding.parameters))
@@ -345,7 +349,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(namespace, aname)
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         put(entityStore, action)
-        Get(s"$collectionPath/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+        Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -355,7 +359,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val provider = WhiskPackage(namespace, aname)
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         put(entityStore, provider)
-        Get(s"$collectionPath/${provider.name}/${action.name}") ~> sealRoute(routes(creds)) ~> check {
+        Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -369,7 +373,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"), Parameters("a", "A"))
         put(entityStore, provider)
         put(entityStore, action)
-        Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+        Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(NotFound)
         }
     }
@@ -383,7 +387,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"), Parameters("a", "A"))
         put(entityStore, binding)
         put(entityStore, action)
-        Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+        Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(Forbidden) // do not leak that package does not exist
         }
     }
@@ -397,7 +401,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"), Parameters("a", "A"))
         put(entityStore, provider)
         put(entityStore, binding)
-        Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+        Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(NotFound)
         }
     }
@@ -411,7 +415,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, binding)
         put(entityStore, action)
-        Get(s"$collectionPath/${binding.name}/${action.name}") ~> sealRoute(routes(auser)) ~> check {
+        Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(Forbidden)
         }
     }
@@ -424,7 +428,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val content = JsObject("xxx" -> "yyy".toJson)
         put(entityStore, provider)
         put(entityStore, action)
-        Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(Accepted)
             val response = responseAs[JsObject]
             response.fields("activationId") should not be None
@@ -439,7 +443,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val content = JsObject("xxx" -> "yyy".toJson)
         put(entityStore, provider)
         put(entityStore, action)
-        Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> sealRoute(routes(auser)) ~> check {
+        Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
             status should be(Accepted)
             val response = responseAs[JsObject]
             response.fields("activationId") should not be None
@@ -456,7 +460,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, reference)
         put(entityStore, action)
-        Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> sealRoute(routes(auser)) ~> check {
+        Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
             status should be(Accepted)
             val response = responseAs[JsObject]
             response.fields("activationId") should not be None
@@ -477,7 +481,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, action)
         val pkgaccess = Resource(provider.namespace, PACKAGES, Some(provider.name.asString))
         Await.result(entitlementProvider.grant(auser.subject, ACTIVATE, pkgaccess), 1 second)
-        Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> sealRoute(routes(auser)) ~> check {
+        Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
             status should be(Accepted)
             val response = responseAs[JsObject]
             response.fields("activationId") should not be None
@@ -492,7 +496,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val content = JsObject("xxx" -> "yyy".toJson)
         put(entityStore, provider)
         put(entityStore, action)
-        Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> sealRoute(routes(auser)) ~> check {
+        Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
             status should be(Forbidden)
         }
     }
@@ -503,7 +507,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         val content = JsObject("xxx" -> "yyy".toJson)
         put(entityStore, action)
-        Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -514,7 +518,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         val action = WhiskAction(provider.fullPath, aname, jsDefault("??"))
         val content = JsObject("xxx" -> "yyy".toJson)
         put(entityStore, action)
-        Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(NotFound)
         }
     }
@@ -529,7 +533,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, reference)
         put(entityStore, action)
-        Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> sealRoute(routes(auser)) ~> check {
+        Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
             status should be(Forbidden)
         }
     }
@@ -541,7 +545,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, entity)
 
-        Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
         }
     }
@@ -553,7 +557,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider, false)
         put(entityStore, entity, false)
 
-        Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> sealRoute(routes(creds)) ~> check {
+        Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(InternalServerError)
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
         }
@@ -566,13 +570,13 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, entity)
 
-        Get(s"$collectionPath/${provider.name}/${entity.name}") ~> sealRoute(routes(creds)) ~> check {
+        Get(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(InternalServerError)
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
         }
 
         val auser = WhiskAuth(Subject(), AuthKey()).toIdentity
-        Get(s"/${provider.namespace}/${collection.path}/${provider.name}/${entity.name}") ~> sealRoute(routes(auser)) ~> check {
+        Get(s"/${provider.namespace}/${collection.path}/${provider.name}/${entity.name}") ~> Route.seal(routes(auser)) ~> check {
             status should be(Forbidden)
             responseAs[ErrorResponse].error shouldBe Messages.notAuthorizedtoOperateOnResource
         }
@@ -585,7 +589,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, provider)
         put(entityStore, entity)
 
-        Get(s"$collectionPath/${provider.name}/${entity.name}") ~> sealRoute(routes(creds)) ~> check {
+        Get(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
             status should be(InternalServerError)
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
         }
@@ -599,7 +603,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, entity)
 
         val content = WhiskActionPut()
-        Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(InternalServerError)
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
         }
@@ -613,7 +617,7 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         put(entityStore, entity)
 
         val content = WhiskActionPut()
-        Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> sealRoute(routes(creds)) ~> check {
+        Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
             status should be(InternalServerError)
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
         }

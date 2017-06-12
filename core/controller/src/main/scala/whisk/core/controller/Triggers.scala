@@ -109,7 +109,7 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
     /** Path to Triggers REST API. */
     protected val triggersPath = "triggers"
 
-    implicit val materializer = ActorMaterializer()
+    protected implicit val materializer: ActorMaterializer
 
     /**
      * Creates or updates trigger if it already exists. The PUT content is deserialized into a WhiskTriggerPut
