@@ -116,7 +116,7 @@ var activationGetCmd = &cobra.Command{
         var field string
         var err error
 
-        if args, err = lastFlag(args); err != nil {
+        if args, err = lastFlag(args, "get"); err != nil {
           return err
         }
         if whiskErr := checkArgs(args, 1, 2, "Activation get",
@@ -168,6 +168,7 @@ var activationGetCmd = &cobra.Command{
                 printJSON(activation)
             }
         }
+
         return nil
     },
 }
@@ -179,10 +180,10 @@ var activationLogsCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        args, lerr := lastFlag(args)
+        var err error
 
-        if lerr != nil {
-          return lerr
+        if args, err = lastFlag(args,"logs"); err != nil {
+          return err
         }
         if whiskErr := checkArgs(args, 1, 1, "Activation logs",
                 wski18n.T("An activation ID is required.")); whiskErr != nil {
@@ -211,10 +212,10 @@ var activationResultCmd = &cobra.Command{
     SilenceErrors:  true,
     PreRunE: setupClientConfig,
     RunE: func(cmd *cobra.Command, args []string) error {
-        args,lerr := lastFlag(args)
+        var err error
 
-        if lerr != nil {
-          return lerr
+        if args, err = lastFlag(args,"result"); err != nil {
+          return err
         }
         if whiskErr := checkArgs(args, 1, 1, "Activation result",
                 wski18n.T("An activation ID is required.")); whiskErr != nil {
@@ -236,11 +237,11 @@ var activationResultCmd = &cobra.Command{
     },
 }
 //lastFlag(args) retrieves the last activation with flag -l or --last
-//Param: Brings in []strings from args
+//Param: Brings in []strings from args and the name of the function that is using it (for error feedback)
 //Return: Returns an args([]string) with last ID used or the original args with any errors
-func lastFlag(args []string) ([]string, error) {
+func lastFlag(args []string, funcName string) ([]string, error) {
   //Checks to see if there is no ID sent with the last flag
-  //If an ID is given with the last flag then the ID will overide the flag
+  //If an ID is given with the last flag then an error will be thrown
   if flags.activation.last && len(args) == 0  {
     options := &whisk.ActivationListOptions {
       Limit: 1,
@@ -254,12 +255,17 @@ func lastFlag(args []string) ([]string, error) {
     }
 
     if len(activations) == 0 {
-      whiskErr := whisk.MakeWskError(errors.New("No activations found"), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+      errStr := fmt.Sprintf("%s%s %s %s", "clinet.Activation.",funcName,"error:", "No activations found")
+      whiskErr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
       return args, whiskErr
     } else {
       whisk.Debug(whisk.DbgInfo, "Appending most recent activation ID into args\n")
       args = append(args, activations[0].ActivationID)
     }
+  } else if flags.activation.last && len(args) == 1 {
+      errStr := fmt.Sprintf("%s%s %s %s", "clinet.Activation.",funcName,"error:", "Can't use an ID wth --last")
+      whiskErr := whisk.MakeWskError(errors.New(errStr), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
+      return args, whiskErr
   }
 
   return args, nil

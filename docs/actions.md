@@ -116,6 +116,17 @@ Review the following steps and examples to create your first JavaScript action.
   44794bd6aab74415b4e42a308d880e5b         hello
   6bf1f670ee614a7eb5af3c9fde813043         hello
   ```
+7. If you just need access your last activation you can use the flag `--last` or `-l` to retrieve your last activation with get, logs and result. Run the following command to get your last activation result.
+
+```
+wsk activation result --last
+```
+```json
+{
+    "payload": "Hello world"
+}
+```
+
 
 ### Passing parameters to an action
 
@@ -648,7 +659,7 @@ docker run --rm -it -v "$(pwd):/owexec" openwhisk/swift3action bash
 
 - Copy the source code and prepare to build it
   ```
-  cp /owexec/hello.swift /swift3Action/spm-build/main.swift 
+  cp /owexec/hello.swift /swift3Action/spm-build/main.swift
   ```
 
   ```
@@ -677,16 +688,16 @@ docker run --rm -it -v "$(pwd):/owexec" openwhisk/swift3action bash
   exit
   ```
 
-This has created hello.zip in the same directory as hello.swift. 
+This has created hello.zip in the same directory as hello.swift.
 -Upload it to OpenWhisk with the action name helloSwifty:
   ```
   wsk action update helloSwiftly hello.zip --kind swift:3
   ```
 
-- To check how much faster it is, run 
+- To check how much faster it is, run
   ```
   wsk action invoke helloSwiftly --blocking
-  ``` 
+  ```
 
 
 The time it took for the action to run is in the "duration" property and compare to the time it takes to run with a compilation step in the hello action.
@@ -898,7 +909,7 @@ You can list all the actions that you have created using:
 wsk action list
 ```
 
-As you write more actions, this list gets longer and it can be helpful to group related actions into [packages](./packages.md). To filter your list of actions to just the those within a specific pacakge, you can use: 
+As you write more actions, this list gets longer and it can be helpful to group related actions into [packages](./packages.md). To filter your list of actions to just the those within a specific pacakge, you can use:
 
 ```
 wsk action list [PACKAGE NAME]
