@@ -968,6 +968,10 @@
     "translation": "Unable to get logs for activation '{{.id}}': {{.err}}"
   },
   {
+    "id": "Unable to get result for activation: {{.err}}",
+    "translation": "Unable to get result for activation: {{.err}}"
+  },
+  {
     "id": "Unable to get result for activation '{{.id}}': {{.err}}",
     "translation": "Unable to get result for activation '{{.id}}': {{.err}}"
   },

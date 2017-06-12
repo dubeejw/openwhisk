@@ -116,7 +116,7 @@ Review the following steps and examples to create your first JavaScript action.
   44794bd6aab74415b4e42a308d880e5b         hello
   6bf1f670ee614a7eb5af3c9fde813043         hello
   ```
-7. If you just need access your last activation you can use the flag `--last` or `-l` to retrieve your last activation with get, logs and result. Run the following command to get your last activation result.
+7. To quickly access the last activation use the flag `--last` or `-l` with get, logs and result to retrieve last activation. Run the following command to get your last activation result.
 
 ```
 wsk activation result --last
