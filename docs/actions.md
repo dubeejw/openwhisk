@@ -106,7 +106,18 @@ Review the following steps and examples to create your first JavaScript action.
   }
   ```
 
-6. If you forget to record the activation ID, you can get a list of activations ordered from the most recent to the oldest. Run the following command to get a list of your activations:
+  6. To access the most recent activation record, activation results or activation logs, use the `--last` or `-l` flag. Run the following command to get your last activation result.
+
+  ```
+  wsk activation result --last
+  ```
+  ```json
+  {
+      "payload": "Hello world"
+  }
+  ```
+
+7. If you forget to record the activation ID, you can get a list of activations ordered from the most recent to the oldest. Run the following command to get a list of your activations:
 
   ```
   wsk activation list
@@ -116,17 +127,6 @@ Review the following steps and examples to create your first JavaScript action.
   44794bd6aab74415b4e42a308d880e5b         hello
   6bf1f670ee614a7eb5af3c9fde813043         hello
   ```
-7. To quickly access the last activation use the flag `--last` or `-l` with get, logs and result to retrieve last activation. Run the following command to get your last activation result.
-
-```
-wsk activation result --last
-```
-```json
-{
-    "payload": "Hello world"
-}
-```
-
 
 ### Passing parameters to an action
 
