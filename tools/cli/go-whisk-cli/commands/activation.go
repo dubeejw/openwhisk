@@ -116,7 +116,7 @@ var activationGetCmd = &cobra.Command{
         var field string
         var err error
 
-        if args, err = lastFlag(args); err != nil { //Checks if any errors occured in lastFlag(args)
+        if args, err = lastFlag(args); err != nil {  //Checks if any errors occured in lastFlag(args)
           whisk.Debug(whisk.DbgError, "client.Activation.Get failed: %s\n", err)
           errStr := wski18n.T("Unable to get result for activation: {{.err}}",
             map[string]interface{}{"err": err})
@@ -186,7 +186,7 @@ var activationLogsCmd = &cobra.Command{
     RunE: func(cmd *cobra.Command, args []string) error {
         var err error
 
-        if args, err = lastFlag(args); err != nil { //Checks if any errors occured in lastFlag(args)
+        if args, err = lastFlag(args); err != nil {  //Checks if any errors occured in lastFlag(args)
           whisk.Debug(whisk.DbgError, "client.Activation.Logs failed: %s\n", err)
           errStr := wski18n.T("Unable to get result for activation: {{.err}}",
             map[string]interface{}{"err": err})
@@ -222,7 +222,7 @@ var activationResultCmd = &cobra.Command{
     RunE: func(cmd *cobra.Command, args []string) error {
         var err error
 
-        if args, err = lastFlag(args); err != nil { //Checks if any errors occured in lastFlag(args)
+        if args, err = lastFlag(args); err != nil {  //Checks if any errors occured in lastFlag(args)
           whisk.Debug(whisk.DbgError, "client.Activation.Result failed: %s\n", err)
           errStr := wski18n.T("Unable to get result for activation: {{.err}}",
             map[string]interface{}{"err": err})
@@ -260,18 +260,18 @@ func lastFlag(args []string) ([]string, error) {
       Skip: 0,
     }
     activations, _, err := client.Activations.List(options)
-    if err != nil {   //Checks Activations.List for errors when retrieving latest activaiton
+    if err != nil {  //Checks Activations.List for errors when retrieving latest activaiton
       whisk.Debug(whisk.DbgError, "client.Activations.List() error for flag --last: %s\n", err)
       return args, err
     }
-    if len(activations) == 0 {   //Checks to to see if there are activations
+    if len(activations) == 0 {  //Checks to to see if there are activations
       whiskErr := whisk.MakeWskError(errors.New("Activation list is empty"), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
       return args, whiskErr
     } else {
       whisk.Debug(whisk.DbgInfo, "Appending most recent activation ID into args\n")
       args = append(args, activations[0].ActivationID)
     }
-  } else if flags.activation.last && len(args) == 1 { //Checks conflict between ID and --last
+  } else if flags.activation.last && len(args) == 1 {  //Checks conflict between ID and --last
       whiskErr := whisk.MakeWskError(errors.New("Can't use given ID with --last"), whisk.EXITCODE_ERR_GENERAL, whisk.DISPLAY_MSG, whisk.DISPLAY_USAGE)
       return args, whiskErr
   }
