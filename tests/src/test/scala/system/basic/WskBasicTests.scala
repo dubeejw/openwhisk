@@ -46,6 +46,21 @@ class WskBasicTests
 
     behavior of "Wsk CLI"
 
+
+    it should "get the last activation" in withAssetCleaner(wskprops) {
+        (wp, assetHelper) =>
+            val name = "acitvationLast"
+            val file = Some(TestUtils.getTestActionFilename("echo.js"))
+
+            assetHelper.withCleaner(wsk.action, name) {
+                (action, _) => action.create(name, file)
+            }
+
+            val rr = wsk.action.invoke(name)
+            Thread.sleep(1000)
+            wsk.activation.extractActivationId(rr) shouldBe wsk.activation.extractActivationId(wsk.activation.get(last = Some(true)))
+    }
+
     it should "confirm wsk exists" in {
         Wsk.exists
     }
@@ -836,6 +851,7 @@ class WskBasicTests
 
     behavior of "Wsk Activation CLI"
 
+
     it should "create a trigger, and fire a trigger to get its individual fields from an activation" in withAssetCleaner(wskprops) {
         (wp, assetHelper) =>
             val name = "activationFields"
@@ -851,22 +867,22 @@ class WskBasicTests
             withActivation(wsk.activation, run) {
                 activation =>
                     val successMsg = s"ok: got activation ${activation.activationId}, displaying field"
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("namespace")).stdout should include regex (s"""(?i)$successMsg namespace\n$ns_regex_list""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("name")).stdout should include(s"""$successMsg name\n"$name"""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("version")).stdout should include(s"""$successMsg version\n"0.0.1"""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("publish")).stdout should include(s"""$successMsg publish\nfalse""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("subject")).stdout should include regex (s"""(?i)$successMsg subject\n""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("activationid")).stdout should include(s"""$successMsg activationid\n"${activation.activationId}""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("start")).stdout should include regex (s"""$successMsg start\n\\d""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("end")).stdout should include regex (s"""$successMsg end\n\\d""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("duration")).stdout should include regex (s"""$successMsg duration\n\\d""")
-                    wsk.activation.get(activation.activationId, fieldFilter = Some("annotations")).stdout should include(s"""$successMsg annotations\n[]""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("namespace")).stdout should include regex (s"""(?i)$successMsg namespace\n$ns_regex_list""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("name")).stdout should include(s"""$successMsg name\n"$name"""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("version")).stdout should include(s"""$successMsg version\n"0.0.1"""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("publish")).stdout should include(s"""$successMsg publish\nfalse""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("subject")).stdout should include regex (s"""(?i)$successMsg subject\n""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("activationid")).stdout should include(s"""$successMsg activationid\n"${activation.activationId}""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("start")).stdout should include regex (s"""$successMsg start\n\\d""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("end")).stdout should include regex (s"""$successMsg end\n\\d""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("duration")).stdout should include regex (s"""$successMsg duration\n\\d""")
+                    wsk.activation.get(Some(activation.activationId), fieldFilter = Some("annotations")).stdout should include(s"""$successMsg annotations\n[]""")
             }
     }
 
     it should "reject get of activation that does not exist" in {
         val name = "0"*32
-        val stderr = wsk.activation.get(name, expectedExitCode = NOT_FOUND).stderr
+        val stderr = wsk.activation.get(Some(name), expectedExitCode = NOT_FOUND).stderr
         stderr should include regex (s"""Unable to get activation '$name': The requested resource does not exist. \\(code \\d+\\)""")
     }
 
