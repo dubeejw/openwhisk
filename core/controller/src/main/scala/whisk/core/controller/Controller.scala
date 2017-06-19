@@ -16,19 +16,20 @@
 
 package whisk.core.controller
 
+
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
-import akka.actor.Actor
-import akka.actor.ActorContext
-import akka.actor.ActorSystem
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+
+import akka.actor.{/*Actor,*/ ActorSystem/*, Props*/}
+
 import akka.japi.Creator
-import spray.http.StatusCodes._
-import spray.http.Uri
-import spray.httpx.SprayJsonSupport._
+
+//import spray.httpx.SprayJsonSupport._
 import spray.json._
 import spray.json.DefaultJsonProtocol._
-import spray.routing.Directive.pimpApply
-import spray.routing.Route
+//import spray.routing.Directive.pimpApply
 
 import whisk.common.AkkaLogging
 import whisk.common.Logging
@@ -46,7 +47,6 @@ import whisk.http.BasicHttpService
 import whisk.http.BasicRasService
 import whisk.common.LoggingMarkers
 
-import scala.util.{Failure, Success}
 
 //import akka.routing._
 import akka.actor._
@@ -68,7 +68,6 @@ import akka.http.scaladsl.server.Route
 
 
 //import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
->>>>>>> Only Start Akka Controller
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.

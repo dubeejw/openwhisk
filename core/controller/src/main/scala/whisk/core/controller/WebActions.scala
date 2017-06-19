@@ -36,6 +36,8 @@ import akka.http.scaladsl.model.MediaTypes._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.headers._
+
 
 import akka.http.scaladsl.model.Uri.Query
 //import akka.http.javadsl.model.Query
@@ -361,7 +363,7 @@ trait WhiskWebActionsApi
     private lazy val validNameSegment = pathPrefix(EntityName.REGEX.r)
     private lazy val packagePrefix = pathPrefix("default".r | EntityName.REGEX.r)
 
-    private val allowOrigin = `Access-Control-Allow-Origin`(AllOrigins)
+    private val allowOrigin = `Access-Control-Allow-Origin`.*
     private val allowMethods = `Access-Control-Allow-Methods`(OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH)
 
     /** Extracts the HTTP method, headers, query params and unmatched (remaining) path. */
