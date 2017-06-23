@@ -419,8 +419,7 @@ trait WhiskWebActionsApi
                 // as the context body which may be the incoming request when the content type is JSON or formdata, or
                 // the raw body as __ow_body (and query parameters as __ow_query) otherwise
                 extract(_.request.entity) { e =>
-                        //_.request.entity.dataBytes.toString.length
-                    validateSize(isWhithinRange(e.dataBytes.toString.length))(transid) {
+                    validateSize(isWhithinRange(e.contentLengthOption.getOrElse(0)))(transid) {
                         requestMethodParamsAndPath { context =>
                             provide(fullyQualifiedActionName(actionName)) { fullActionName =>
                                 onComplete(verifyWebAction(fullActionName, onBehalfOf.isDefined)) {

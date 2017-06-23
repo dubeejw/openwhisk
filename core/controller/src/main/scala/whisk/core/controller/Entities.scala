@@ -43,7 +43,7 @@ import whisk.http.Messages
 protected[controller] trait ValidateRequestSize extends Directives {
     protected def validateSize(check: => Option[SizeError])(
         implicit tid: TransactionId) = new Directive0 {
-        def tapply(f: Unit => Route) = { //TODO does this work after updation????
+        def tapply(f: Unit => Route) = {
             check map {
                 case e: SizeError => terminate(RequestEntityTooLarge, Messages.entityTooBig(e))
             } getOrElse f(None)
@@ -105,9 +105,8 @@ trait WhiskCollectionAPI
                         }
                     }
                 case ACTIVATE =>
-                    // TODO how to get request length?
-                   extract(_.request.entity.dataBytes.toString.length) { length =>
-                        validateSize(isWhithinRange(length))(transid) {
+                   extract(_.request.entity.contentLengthOption) { length =>
+                        validateSize(isWhithinRange(length.getOrElse(0)))(transid) {
                             activate(user, FullyQualifiedEntityName(resource.namespace, name), resource.env)
                         }
                     }

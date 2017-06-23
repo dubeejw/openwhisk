@@ -942,7 +942,7 @@ trait WebActionsApiTests extends ControllerTestCommon with BeforeAndAfterEach wi
                         status should be(RequestEntityTooLarge)
                         val expectedErrorMsg = Messages.entityTooBig(SizeError(
                             fieldDescriptionForSizeError,
-                            (largeEntity.length + 13).B,
+                            (largeEntity.length + 8).B,
                             allowedActivationEntitySize.B))
                         confirmErrorWithTid(responseAs[JsObject], Some(expectedErrorMsg))
                     }

@@ -225,7 +225,7 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Post(s"$collectionPath/${aname}", content.parseJson.asJsObject) ~> Route.seal(routes(creds)) ~> check {
             status should be(RequestEntityTooLarge)
             responseAs[String] should include {
-                Messages.entityTooBig(SizeError(fieldDescriptionForSizeError, (content.length + 5).B, allowedActivationEntitySize.B))
+                Messages.entityTooBig(SizeError(fieldDescriptionForSizeError, (content.length).B, allowedActivationEntitySize.B))
             }
         }
     }
