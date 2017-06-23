@@ -40,7 +40,7 @@ class InvokerServer(
     override val instance: InstanceId,
     override val numberOfInstances: Int)(
         override implicit val logging: Logging,
-        implicit val config: WhiskConfig,
+        implicit val whiskConfig: WhiskConfig,
         implicit val executionContext: ExecutionContext,
         implicit val actorSystem: ActorSystem)
     extends BasicRasService
@@ -48,12 +48,7 @@ class InvokerServer(
 
     //override def actorRefFactory = context
 
-    //implicit val whiskConfig: WhiskConfig
-    //implicit val actorSystem1: ActorSystem
-    //implicit val executionContext1: ExecutionContext
     implicit val materializer = ActorMaterializer()
-    //private implicit val actorSystem2 = context.system
-
 
     override def routes: Route = {
         super.routes
@@ -61,9 +56,7 @@ class InvokerServer(
 
     val bindingFuture = {
         //Http().bindAndHandle(RouteResult.route2HandlerFlow(routes), "0.0.0.0", whiskConfig.servicePort.toInt)
-        //logging.error(this, "asdf.")
-
-        Http().bindAndHandle(routes, "0.0.0.0", 8080)//whiskConfig.servicePort.toInt)
+        Http().bindAndHandle(routes, "0.0.0.0", whiskConfig.servicePort.toInt)
     }
 
     def shutdown(): Future[Unit] = {

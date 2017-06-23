@@ -77,16 +77,16 @@ protected[controller] class SwaggerDocs(apipath: Uri.Path, doc: String)(implicit
 }
 
 protected[controller] object RestApiCommons {
-    def requiredProperties =
-        WhiskConfig.whiskVersion ++
-                WhiskAuthStore.requiredProperties ++
-                WhiskEntityStore.requiredProperties ++
-                WhiskActivationStore.requiredProperties ++
-                WhiskConfig.consulServer ++
-                EntitlementProvider.requiredProperties ++
-                WhiskActionsApi.requiredProperties ++
-                Authenticate.requiredProperties ++
-                Collection.requiredProperties
+    def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
+            WhiskConfig.whiskVersion ++
+            WhiskAuthStore.requiredProperties ++
+            WhiskEntityStore.requiredProperties ++
+            WhiskActivationStore.requiredProperties ++
+            WhiskConfig.consulServer ++
+            EntitlementProvider.requiredProperties ++
+            WhiskActionsApi.requiredProperties ++
+            Authenticate.requiredProperties ++
+            Collection.requiredProperties
 }
 
 /**

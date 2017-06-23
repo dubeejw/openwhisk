@@ -195,8 +195,7 @@ object Controller {
     // requiredProperties is a Map whose keys define properties that must be bound to
     // a value, and whose values are default values.   A null value in the Map means there is
     // no default value specified, so it must appear in the properties file
-    def requiredProperties = Map(WhiskConfig.servicePort -> 8080.toString) ++
-        Map(WhiskConfig.controllerInstances -> 1.toString) ++
+    def requiredProperties = Map(WhiskConfig.controllerInstances -> 1.toString) ++
         ExecManifest.requiredProperties ++
         RestApiCommons.requiredProperties ++
         LoadBalancerService.requiredProperties ++
