@@ -31,6 +31,7 @@ import whisk.core.WhiskConfig
 import whisk.common.Logging
 import whisk.core.entity.InstanceId
 //import akka.actor.{/*Actor,*/ ActorSystem/*, Props*/}
+import whisk.common.TransactionId
 
 /**
  * Implements web server to handle certain REST API calls.
@@ -48,9 +49,12 @@ class InvokerServer(
 
     //override def actorRefFactory = context
 
+    override implicit val transid = TransactionId.unknown
+
     implicit val materializer = ActorMaterializer()
 
-    override def routes: Route = {
+    override def routes(implicit transid: TransactionId): Route = {
+    //override def routes: Route = {
         super.routes
     }
 

@@ -29,6 +29,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.server.RouteResult._
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.Uri
 
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -63,7 +64,7 @@ import akka.http.scaladsl.server.Route
 
 //import akka.http.scaladsl.server.Route
 
-//import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
 /**
  * The Controller is the service that provides the REST API for OpenWhisk.
@@ -126,8 +127,18 @@ class Controller(
     }*/
 
 
+    override implicit val transid = TransactionId.unknown
 
     TransactionId.controller.mark(this, LoggingMarkers.CONTROLLER_STARTUP(instance.toInt), s"starting controller instance ${instance.toInt}")
+
+    override def routes(implicit transid: TransactionId): Route = {
+    //override def routes: Route = {
+        super.routes ~ {
+            (pathEndOrSingleSlash & get) {
+                complete(info)
+            }
+        } ~ apiV1.routes ~ swagger.swaggerRoutes ~ internalInvokerHealth
+    }
 
     implicit val materializer = ActorMaterializer()
 
@@ -152,23 +163,19 @@ class Controller(
     /** The REST APIs. */
     implicit val controllerInstance = instance
     private val apiV1 = new API(whiskConfig, "api", "v1")
-    //private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
+    private val swagger = new SwaggerDocs(Uri.Path.Empty, "infoswagger.json")
 
     /**
      * Handles GET /invokers URI.
      *
      * @return JSON of invoker health
      */
-    /*private val internalInvokerHealth = {
+    private val internalInvokerHealth = {
         (path("invokers") & get) {
             complete {
                 loadBalancer.invokerHealth.map(_.mapValues(_.asString).toJson.asJsObject)
             }
         }
-    }*/
-
-    override def routes: Route = {
-        super.routes ~ apiV1.routes
     }
 
     // controller top level info

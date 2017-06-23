@@ -118,7 +118,7 @@ class API(config: WhiskConfig, apiPath: String, apiVersion: String)(
     implicit val executionContext = actorSystem.dispatcher
     implicit val authStore = WhiskAuthStore.datastore(config)
 
-    implicit val transactionId = TransactionId.unknown
+    //implicit val transactionId = TransactionId.unknown
 
     def prefix = pathPrefix(apiPath / apiVersion)
 
@@ -137,7 +137,8 @@ class API(config: WhiskConfig, apiPath: String, apiVersion: String)(
                 "api-docs" -> s"/$swaggerdocpath".toJson)).toString)
     }
 
-    val routes = {
+    def routes(implicit transid: TransactionId): Route = {
+    ///val routes = {
         prefix {
             sendCorsHeaders {
                 info ~

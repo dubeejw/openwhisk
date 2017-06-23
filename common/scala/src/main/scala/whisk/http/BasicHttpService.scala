@@ -31,8 +31,7 @@ import akka.japi.Creator
 import akka.util.Timeout
 
 import akka.http.scaladsl.server.Directives
-//import akka.http.scaladsl.server.directives.DebuggingDirectives
-//import akka.http.scaladsl.server.directives.DebuggingDirectives._
+import akka.http.scaladsl.server.directives.DebuggingDirectives
 //import akka.http.scaladsl.server.directives.LoggingMagnet.forMessageFromFullShow
 import akka.http.scaladsl.server.directives.LogEntry
 
@@ -110,7 +109,8 @@ trait BasicHttpService extends Directives with Actor with TransactionCounter {
      *
      * @param transid the id for the transaction (every request is assigned an id)
      */
-    def routes: Route
+    //def routes: Route
+    def routes(implicit transid: TransactionId): Route
 
     /**
      * Gets the log level for a given route. The default is
@@ -126,13 +126,12 @@ trait BasicHttpService extends Directives with Actor with TransactionCounter {
      */
     def receive = {
         case _ =>
-
             assignId { implicit transid =>
-                //DebuggingDirectives.logRequest(logRequestInfo _) {
-                //    DebuggingDirectives.logRequestResponse(logResponseInfo _) {
-                Route.seal(routes)
-                //    }
-                //}
+                DebuggingDirectives.logRequest(logRequestInfo _) {
+                    DebuggingDirectives.logRequestResult(logResponseInfo _) {
+                        Route.seal(routes)
+                    }
+                }
             }
     }
 

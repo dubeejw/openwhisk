@@ -22,7 +22,7 @@ import akka.event.Logging
 //import spray.httpx.SprayJsonSupport._
 
 import whisk.common.Logging
-//import whisk.common.TransactionId
+import whisk.common.TransactionId
 
 /**
  * This trait extends the BasicHttpService with a standard "ping" endpoint which
@@ -30,8 +30,8 @@ import whisk.common.Logging
  */
 trait BasicRasService extends BasicHttpService {
 
-    //override def routes(implicit transid: TransactionId) = ping
-    override def routes = ping
+    override def routes(implicit transid: TransactionId) = ping
+    //override def routes = ping
 
     override def loglevelForRoute(route: String): Logging.LogLevel = {
         if (route == "/ping") {
