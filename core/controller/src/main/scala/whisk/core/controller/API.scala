@@ -138,29 +138,35 @@ class API(config: WhiskConfig, apiPath: String, apiVersion: String)(
     }
 
     def routes(implicit transid: TransactionId): Route = {
-    ///val routes = {
         prefix {
             sendCorsHeaders {
-                info ~
-                basicAuth(validateCredentials) { user =>
+                info ~ basicAuth(validateCredentials) { user =>
                     namespaces.routes(user) ~
                     pathPrefix(Collection.NAMESPACES) {
                         actions.routes(user) ~
-                        packages.routes(user) ~
                         triggers.routes(user) ~
+                        rules.routes(user) ~
                         activations.routes(user) ~
-                        rules.routes(user)
-                    } ~ webexp.routes(user)
-                } ~
-                webexp.routes() ~
-                swaggerRoutes ~
-                options {
-                    complete(OK)
+                        packages.routes(user)
+                    }
+                } ~ {
+                    swaggerRoutes
                 }
-            } ~ basicAuth(validateCredentials) {
-                user => web.routes(user)
-            } ~ web.routes()
+            } ~ {
+                // web actions are distinct to separate the cors header
+                // and allow the actions themselves to respond to options
+                basicAuth(validateCredentials) { user =>
+                    web.routes(user) ~ webexp.routes(user)
+                } ~ {
+                    web.routes() ~ webexp.routes()
+                } ~ options {
+                    sendCorsHeaders {
+                        complete(OK)
+                    }
+                }
+            }
         }
+
     }
 
     private val namespaces = new NamespacesApi(apiPath, apiVersion)

@@ -46,6 +46,8 @@ import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.HttpMethods.{ OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH }
 import akka.http.scaladsl.model.HttpCharsets
+import whisk.common.AkkaLogging
+import akka.actor.ActorSystem
 
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -149,6 +151,10 @@ private case class Context2(
 }
 
 protected[core] object WhiskWebActionsApi extends Directives {
+    implicit val actorSystem = ActorSystem("controller-actor-system2")
+
+    implicit val logger = new AkkaLogging(akka.event.Logging.getLogger(actorSystem, this))
+
 
     private val mediaTranscoders = {
         // extensions are expected to contain only [a-z]
@@ -282,15 +288,18 @@ protected[core] object WhiskWebActionsApi extends Directives {
 
         parsedHeader.flatMap { mediaType =>
             if (mediaType.binary || mediaType == `application/json`) {
-                Try(Base64.getDecoder().decode(str))
+                Try(new String(Base64.getDecoder().decode(str), "UTF-8")).map((mediaType, _))
             } else {
                 Success(mediaType, str)
             }
         } match {
             case Success((mediaType, data: String)) =>
                 respondWithHeaders(headers) {
-                    complete {
-                        HttpResponse(code, entity = HttpEntity(ContentType(MediaType.applicationWithFixedCharset(mediaType.toString, HttpCharsets.`UTF-8`)), data))
+                    mediaType.toString.split("/") match {
+                        case Array(mainType, subType) =>
+                            complete {
+                                HttpResponse(code, entity = HttpEntity(ContentType(MediaType.customWithFixedCharset(mainType, subType, HttpCharsets.`UTF-8`)), data))
+                            }
                     }
                 }
 
@@ -591,7 +600,8 @@ trait WhiskWebActionsApi
                                 case Success(done) => done // all transcoders terminate the connection
                                 case Failure(t)    => terminate(InternalServerError)
                             }
-                        case _ => terminate(NotFound, Messages.propertyNotFound)
+                        case _ =>
+                            terminate(NotFound, Messages.propertyNotFound)
                     }
                 } else {
                     terminate(BadRequest, Messages.errorProcessingRequest)

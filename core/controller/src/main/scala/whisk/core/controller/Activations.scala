@@ -27,11 +27,11 @@ import scala.util.Try
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport.sprayJsonMarshaller
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.unmarshalling._
+import akka.http.scaladsl.model.StatusCodes.BadRequest
 
 import spray.json.DeserializationException
 import spray.json.DefaultJsonProtocol.RootJsObjectFormat
 import spray.json._
-import spray.http.StatusCodes.BadRequest
 
 import whisk.common.TransactionId
 import whisk.core.entitlement.Collection

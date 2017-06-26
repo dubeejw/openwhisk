@@ -46,6 +46,7 @@ import whisk.core.entity.ExecManifest.Runtimes
 import whisk.core.loadBalancer.LoadBalancerService
 import whisk.http.BasicHttpService
 import whisk.http.BasicRasService
+import whisk.common.Logging
 
 import scala.util.{ Failure, Success }
 
