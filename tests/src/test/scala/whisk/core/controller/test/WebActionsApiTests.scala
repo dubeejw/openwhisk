@@ -31,9 +31,7 @@ import org.scalatest.FlatSpec
 
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 
-import akka.http.scaladsl.model.Multipart.FormData
-import akka.http.scaladsl.model.Multipart.FormData.BodyPart
-import akka.stream.scaladsl.Source
+import akka.http.scaladsl.model.FormData
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.model.MediaTypes
 import akka.http.scaladsl.model.StatusCodes._
@@ -45,7 +43,6 @@ import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.model.headers.`Content-Type`
 import akka.http.scaladsl.model.ContentTypes
-import akka.util.ByteString
 
 import spray.json._
 import spray.json.DefaultJsonProtocol._
@@ -919,8 +916,8 @@ trait WebActionsApiTests extends ControllerTestCommon with BeforeAndAfterEach wi
 
             Seq(s"$systemId/proxy/export_c.text/content/field1", s"$systemId/proxy/export_c.text/content/field2").
                 foreach { path =>
-                    val form = FormData(Source(BodyPart("field1", HttpEntity.Default(ContentTypes.`text/plain(UTF-8)`, ByteString("value1").length, Source.single(ByteString("value1")))) ::
-                        BodyPart("field2", HttpEntity.Default(ContentTypes.`text/plain(UTF-8)`, ByteString("value1").length, Source.single(ByteString("value1")))) :: Nil))
+
+                    val form = FormData(Map("field1" -> "value1", "field2" -> "value2"))
                     invocationsAllowed += 1
 
                     Post(s"$testRoutePath/$path", form) ~> Route.seal(routes(creds)) ~> check {
@@ -947,8 +944,7 @@ trait WebActionsApiTests extends ControllerTestCommon with BeforeAndAfterEach wi
                         confirmErrorWithTid(responseAs[JsObject], Some(expectedErrorMsg))
                     }
 
-                    val form = FormData(BodyPart("a", HttpEntity.Default(ContentTypes.`text/plain(UTF-8)`, ByteString(largeEntity).length, Source.single(ByteString("value1")))))
-
+                    val form = FormData(Map("a" -> largeEntity))
                     Post(s"$testRoutePath/$path", form) ~> Route.seal(routes(creds)) ~> check {
                         status should be(RequestEntityTooLarge)
                         val expectedErrorMsg = Messages.entityTooBig(SizeError(

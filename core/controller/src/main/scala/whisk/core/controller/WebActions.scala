@@ -42,7 +42,7 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.headers.`Content-Type`
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.ContentTypes
-import akka.http.scaladsl.model.Multipart.FormData
+import akka.http.scaladsl.model.FormData
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.HttpMethods.{ OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH }
 import akka.http.scaladsl.model.HttpCharsets
@@ -522,9 +522,7 @@ trait WhiskWebActionsApi
 
                 case HttpEntity.Strict(ContentType(MediaTypes.`application/x-www-form-urlencoded`, Some(HttpCharsets.`UTF-8`)), data) if !isRawHttpAction =>
                     entity(as[FormData]) { form =>
-                        //val body = form.fields.toMap.toJson.asJsObject
-                        // TODO form.parts needs to be a JsObject
-                        val body = JsObject("fix" -> JsString("this"))
+                        val body = form.fields.toMap.toJson.asJsObject
                         process(Some(body), isRawHttpAction)
                     }
 
