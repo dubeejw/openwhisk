@@ -33,13 +33,14 @@ import (
     "github.com/mattn/go-colorable"
 )
 
-const MEMORY_LIMIT = 256
-const TIMEOUT_LIMIT = 60000
-const LOGSIZE_LIMIT = 10
-const ACTIVATION_ID = "activationId"
-const WEB_EXPORT_ANNOT = "web-export"
-const RAW_HTTP_ANNOT = "raw-http"
-const FINAL_ANNOT = "final"
+const MEMORY_LIMIT          = 256
+const TIMEOUT_LIMIT         = 60000
+const LOGSIZE_LIMIT         = 10
+const ACTIVATION_ID         = "activationId"
+const WEB_EXPORT_ANNOT      = "web-export"
+const RAW_HTTP_ANNOT        = "raw-http"
+const FINAL_ANNOT           = "final"
+const WEB_CUSTOM_OPTIONS    = "web-custom-options"
 
 var actionCmd = &cobra.Command{
     Use:   "action",
@@ -403,6 +404,10 @@ func parseAction(cmd *cobra.Command, args []string, update bool) (*whisk.Action,
         action.Annotations, err = webAction(flags.action.web, action.Annotations, qualifiedName.entityName, update)
     }
 
+    if cmd.LocalFlags().Changed(WEB_CUSTOM_OPTIONS) {
+        action.Annotations, err = webCustomOptions(flags.action.webCustomOptions, action.Annotations, qualifiedName.entityName, update)
+    }
+
     whisk.Debug(whisk.DbgInfo, "Parsed action struct: %#v\n", action)
 
     return action, err
@@ -496,6 +501,21 @@ func webAction(webMode string, annotations whisk.KeyValueArr, entityName string,
     }
 }
 
+func webCustomOptions(webMode string, annotations whisk.KeyValueArr, entityName string, fetch bool) (whisk.KeyValueArr, error){
+    switch strings.ToLower(webMode) {
+    case "yes":
+        fallthrough
+    case "true":
+        return webActionAnnotations(fetch, annotations, entityName, addWebCustomOptions)
+    case "no":
+        fallthrough
+    case "false":
+        return webActionAnnotations(fetch, annotations, entityName, deleteWebCustomOptions)
+    default:
+        return nil, webInputError(webMode)
+    }
+}
+
 type WebActionAnnotationMethod func(annotations whisk.KeyValueArr) (whisk.KeyValueArr)
 
 func webActionAnnotations(
@@ -550,6 +570,19 @@ func deleteWebAnnotationKeys(annotations whisk.KeyValueArr) (whisk.KeyValueArr) 
     annotations = deleteKey(WEB_EXPORT_ANNOT, annotations)
     annotations = deleteKey(RAW_HTTP_ANNOT, annotations)
     annotations = deleteKey(FINAL_ANNOT, annotations)
+
+    return annotations
+}
+
+func addWebCustomOptions(annotations whisk.KeyValueArr) (whisk.KeyValueArr) {
+    annotations = addKeyValue(WEB_CUSTOM_OPTIONS, true, annotations)
+
+    return annotations
+}
+
+func deleteWebCustomOptions(annotations whisk.KeyValueArr) (whisk.KeyValueArr) {
+    annotations = deleteKey(WEB_CUSTOM_OPTIONS, annotations)
+    annotations = addKeyValue(WEB_CUSTOM_OPTIONS, false, annotations)
 
     return annotations
 }
@@ -896,6 +929,7 @@ func init() {
     actionCreateCmd.Flags().StringSliceVarP(&flags.common.param, "param", "p", nil, wski18n.T("parameter values in `KEY VALUE` format"))
     actionCreateCmd.Flags().StringVarP(&flags.common.paramFile, "param-file", "P", "", wski18n.T("`FILE` containing parameter values in JSON format"))
     actionCreateCmd.Flags().StringVar(&flags.action.web, "web", "", wski18n.T("treat ACTION as a web action, a raw HTTP web action, or as a standard action; yes | true = web action, raw = raw HTTP web action, no | false = standard action"))
+    actionCreateCmd.Flags().StringVar(&flags.action.webCustomOptions, "web-custom-options", "", wski18n.T("treat ACTION as a web action, a raw HTTP web action, or as a standard action; yes | true = web action, raw = raw HTTP web action, no | false = standard action"))
 
     actionUpdateCmd.Flags().BoolVar(&flags.action.native, "native", false, wski18n.T("treat ACTION as native action (zip file provides a compatible executable to run)"))
     actionUpdateCmd.Flags().StringVar(&flags.action.docker, "docker", "", wski18n.T("use provided docker image (a path on DockerHub) to run the action"))
@@ -911,6 +945,7 @@ func init() {
     actionUpdateCmd.Flags().StringSliceVarP(&flags.common.param, "param", "p", []string{}, wski18n.T("parameter values in `KEY VALUE` format"))
     actionUpdateCmd.Flags().StringVarP(&flags.common.paramFile, "param-file", "P", "", wski18n.T("`FILE` containing parameter values in JSON format"))
     actionUpdateCmd.Flags().StringVar(&flags.action.web, "web", "", wski18n.T("treat ACTION as a web action, a raw HTTP web action, or as a standard action; yes | true = web action, raw = raw HTTP web action, no | false = standard action"))
+    actionUpdateCmd.Flags().StringVar(&flags.action.webCustomOptions, "web-custom-options", "", wski18n.T("treat ACTION as a web action, a raw HTTP web action, or as a standard action; yes | true = web action, raw = raw HTTP web action, no | false = standard action"))
 
     actionInvokeCmd.Flags().StringSliceVarP(&flags.common.param, "param", "p", []string{}, wski18n.T("parameter values in `KEY VALUE` format"))
     actionInvokeCmd.Flags().StringVarP(&flags.common.paramFile, "param-file", "P", "", wski18n.T("`FILE` containing parameter values in JSON format"))
