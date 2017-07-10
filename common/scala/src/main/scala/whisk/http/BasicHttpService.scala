@@ -105,6 +105,16 @@ trait BasicHttpService extends Directives with Actor with TransactionCounter {
         }
     }
 
+    val toStrict = mapInnerRoute { innerRoute =>
+        extractRequest { req =>
+            onSuccess(req.toStrict(1.second)) { strictReq =>
+                mapRequest(_ => strictReq) {
+                    innerRoute
+                }
+            }
+        }
+    }
+
     /**
      * Receives a message and runs the router.
      */
@@ -114,7 +124,9 @@ trait BasicHttpService extends Directives with Actor with TransactionCounter {
                 prioritizeRejections {
                     DebuggingDirectives.logRequest(logRequestInfo _) {
                         DebuggingDirectives.logRequestResult(logResponseInfo _) {
-                            routes
+                            toStrict {
+                                routes
+                            }
                         }
                     }
                 }
