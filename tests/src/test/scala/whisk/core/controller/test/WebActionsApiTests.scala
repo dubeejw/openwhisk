@@ -1054,8 +1054,8 @@ trait WebActionsApiTests extends ControllerTestCommon with BeforeAndAfterEach wi
              *
              */
 
-            Post(s"$testRoutePath/$systemId/proxy/export_c.json", str) ~> addHeader("Content-type", MediaTypes.`text/html`.value) ~> Route.seal(routes(creds)) ~> check {
-                //status should be(OK)
+            Post(s"$testRoutePath/$systemId/proxy/export_c.json", str) ~> addHeader("Content-type", ContentTypes.`text/html(UTF-8)`.value) ~> Route.seal(routes(creds)) ~> check {
+                status should be(OK)
                 val response = responseAs[JsObject]
                 response shouldBe JsObject(
                     "pkg" -> s"$systemId/proxy".toJson,
