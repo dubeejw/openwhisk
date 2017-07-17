@@ -39,5 +39,5 @@ trait WhiskServices {
     protected val loadBalancer: LoadBalancer
 
     /** The hostname of the consul server. */
-    protected val consulServer: String
+    protected lazy val consulServer = whiskConfig.consulServer
 }

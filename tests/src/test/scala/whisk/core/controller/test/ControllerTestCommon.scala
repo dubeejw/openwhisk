@@ -66,7 +66,6 @@ protected trait ControllerTestCommon
     implicit val routeTestTimeout = RouteTestTimeout(90 seconds)
 
     override implicit val actorSystem = system // defined in ScalatestRouteTest
-    override val executionContext = actorSystem.dispatcher
 
     override val whiskConfig = new WhiskConfig(RestApiCommons.requiredProperties)
     assert(whiskConfig.isValid)
@@ -83,8 +82,6 @@ protected trait ControllerTestCommon
         private val fixedId = ActivationId()
         override def make = fixedId
     }
-
-    override val consulServer = "???"
 
     val entityStore = WhiskEntityStore.datastore(whiskConfig)
     val activationStore = WhiskActivationStore.datastore(whiskConfig)

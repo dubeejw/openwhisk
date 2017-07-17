@@ -59,6 +59,7 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
     val collectionPath = s"/${EntityPath.DEFAULT}/${collection.path}"
     def aname = MakeName.next("triggers_tests")
     val parametersLimit = Parameters.sizeLimit
+    protected implicit val executionContext = actorSystem.dispatcher
 
     //// GET /triggers
     it should "list triggers by default/explicit namespace" in {

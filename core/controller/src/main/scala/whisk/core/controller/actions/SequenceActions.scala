@@ -22,7 +22,6 @@ import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.collection._
-import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -49,7 +48,7 @@ protected[actions] trait SequenceActions {
     protected implicit val actorSystem: ActorSystem
 
     /** An execution context for futures. */
-    protected implicit val executionContext: ExecutionContext
+    protected implicit val executionContext = actorSystem.dispatcher
 
     protected implicit val logging: Logging
 

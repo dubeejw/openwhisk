@@ -49,6 +49,7 @@ class SequenceApiTests
     val defaultNamespace = EntityPath.DEFAULT
     def aname() = MakeName.next("sequence_tests")
     val allowedActionDuration = 120 seconds
+    protected implicit val executionContext = actorSystem.dispatcher
 
     it should "reject creation of sequence with more actions than allowed limit" in {
         implicit val tid = transid()

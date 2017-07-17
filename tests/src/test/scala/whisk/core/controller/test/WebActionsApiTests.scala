@@ -151,6 +151,7 @@ trait WebActionsApiTests extends ControllerTestCommon with BeforeAndAfterEach wi
     val systemIdentity = Future.successful(Identity(systemId, EntityName(systemId.asString), systemKey, Privilege.ALL))
     override lazy val entitlementProvider = new TestingEntitlementProvider(whiskConfig, loadBalancer)
     protected val testRoutePath = webInvokePathSegments.mkString("/", "/", "")
+    protected implicit val executionContext = actorSystem.dispatcher
 
     behavior of "Web actions API"
 

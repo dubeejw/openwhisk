@@ -48,6 +48,7 @@ class SequenceActionApiMigrationTests extends ControllerTestCommon
     val namespace = EntityPath(creds.subject.asString)
     val collectionPath = s"/${EntityPath.DEFAULT}/${collection.path}"
     def aname = MakeName.next("seq_migration_tests")
+    protected implicit val executionContext = actorSystem.dispatcher
 
     private def seqParameters(seq: Vector[String]) = Parameters("_actions", seq.toJson)
 

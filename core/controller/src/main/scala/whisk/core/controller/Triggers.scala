@@ -72,6 +72,9 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
     /** An actor system for timed based futures. */
     protected implicit val actorSystem: ActorSystem
 
+    /** An execution context for futures. */
+    protected implicit val executionContext = actorSystem.dispatcher
+
     /** Database service to CRUD triggers. */
     protected val entityStore: EntityStore
 

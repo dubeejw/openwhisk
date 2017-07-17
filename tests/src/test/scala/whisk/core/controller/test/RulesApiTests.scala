@@ -59,6 +59,7 @@ class RulesApiTests extends ControllerTestCommon with WhiskRulesApi {
     val activeStatus = s"""{"status":"${Status.ACTIVE}"}""".parseJson.asJsObject
     val inactiveStatus = s"""{"status":"${Status.INACTIVE}"}""".parseJson.asJsObject
     val parametersLimit = Parameters.sizeLimit
+    protected implicit val executionContext = actorSystem.dispatcher
 
     //// GET /rules
     it should "list rules by default/explicit namespace" in {

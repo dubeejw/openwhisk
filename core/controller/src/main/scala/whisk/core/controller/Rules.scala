@@ -45,6 +45,9 @@ trait WhiskRulesApi extends WhiskCollectionAPI with ReferencedEntities {
     /** An actor system for timed based futures. */
     protected implicit val actorSystem: ActorSystem
 
+    /** An execution context for futures. */
+    protected implicit val executionContext = actorSystem.dispatcher
+
     /** Database service to CRUD rules. */
     protected val entityStore: EntityStore
 

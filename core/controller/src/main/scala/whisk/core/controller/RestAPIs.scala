@@ -109,9 +109,7 @@ protected[controller] object RestApiCommons {
             override val entitlementProvider: EntitlementProvider,
             override val activationIdFactory: ActivationIdGenerator,
             override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
             override val actorSystem: ActorSystem,
-            override val executionContext: ExecutionContext,
             override val logging: Logging,
             override val whiskConfig: WhiskConfig)
         extends WhiskWebActionsApi with WhiskServices
@@ -139,15 +137,15 @@ protected[controller] class RestAPIVersion(apipath: String, apiversion: String)(
     implicit val entitlementProvider: EntitlementProvider,
     implicit val activationIdFactory: ActivationIdGenerator,
     implicit val loadBalancer: LoadBalancerService,
-    implicit val consulServer: String,
     implicit val actorSystem: ActorSystem,
-    implicit val executionContext: ExecutionContext,
     implicit val logging: Logging,
     implicit val whiskConfig: WhiskConfig)
     extends SwaggerDocs(Uri.Path(apipath) / apiversion, "apiv1swagger.json")
     with Authenticate
     with AuthenticatedRoute
     with RespondWithHeaders {
+
+    implicit val executionContext = actorSystem.dispatcher
 
     /**
      * Here is the key method: it defines the Route (route tree) which implement v1 of the REST API.
@@ -230,8 +228,6 @@ protected[controller] class RestAPIVersion(apipath: String, apiversion: String)(
             override val entitlementProvider: EntitlementProvider,
             override val activationIdFactory: ActivationIdGenerator,
             override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val executionContext: ExecutionContext,
             override val logging: Logging,
             override val whiskConfig: WhiskConfig)
         extends WhiskActionsApi with WhiskServices {
@@ -248,8 +244,6 @@ protected[controller] class RestAPIVersion(apipath: String, apiversion: String)(
             override val activationStore: ActivationStore,
             override val activationIdFactory: ActivationIdGenerator,
             override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val executionContext: ExecutionContext,
             override val logging: Logging,
             override val whiskConfig: WhiskConfig)
         extends WhiskTriggersApi with WhiskServices
@@ -262,8 +256,6 @@ protected[controller] class RestAPIVersion(apipath: String, apiversion: String)(
             override val entitlementProvider: EntitlementProvider,
             override val activationIdFactory: ActivationIdGenerator,
             override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
-            override val executionContext: ExecutionContext,
             override val logging: Logging,
             override val whiskConfig: WhiskConfig)
         extends WhiskRulesApi with WhiskServices
@@ -284,7 +276,6 @@ protected[controller] class RestAPIVersion(apipath: String, apiversion: String)(
             override val entitlementProvider: EntitlementProvider,
             override val activationIdFactory: ActivationIdGenerator,
             override val loadBalancer: LoadBalancerService,
-            override val consulServer: String,
             override val executionContext: ExecutionContext,
             override val logging: Logging,
             override val whiskConfig: WhiskConfig)
