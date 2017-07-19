@@ -121,7 +121,17 @@ public class WhiskProperties {
      * The path to the Go CLI executable.
      */
     public static String getCLIPath() {
-        return getCLIDir() + "/wsk";
+        String cliPath = System.getProperty("cli_path");
+
+        if (cliPath.length() > 0) {
+            return cliPath;
+        } else {
+            return getCLIDir() + "/wsk";
+        }
+    }
+
+    public static String getCLIPluginName() {
+        return System.getProperty("cli_plugin");
     }
 
     public static File getFileRelativeToWhiskHome(String name) {

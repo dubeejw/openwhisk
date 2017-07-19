@@ -1007,17 +1007,29 @@ object Wsk {
     private val binaryName = "wsk"
 
     /** What is the path to a downloaded CLI? **/
-    private def getDownloadedGoCLIPath = {
+    private def getDownloadedCLIPath = {
         s"${System.getProperty("user.home")}${File.separator}.local${File.separator}bin${File.separator}${binaryName}"
     }
 
     def exists() = {
-        val cliPath = if (WhiskProperties.useCLIDownload) getDownloadedGoCLIPath else WhiskProperties.getCLIPath
+        val cliPath = if (WhiskProperties.useCLIDownload) getDownloadedCLIPath else WhiskProperties.getCLIPath
         assert((new File(cliPath)).exists, s"did not find $cliPath")
     }
 
-    def baseCommand() =
-        if (WhiskProperties.useCLIDownload) Buffer(getDownloadedGoCLIPath) else Buffer(WhiskProperties.getCLIPath)
+    def baseCommand() = {
+        val cliPluginName = WhiskProperties.getCLIPluginName
+
+        if (WhiskProperties.useCLIDownload) {
+            Buffer(getDownloadedCLIPath)
+        } else {
+            if (cliPluginName.length > 0) {
+                Buffer(WhiskProperties.getCLIPath, cliPluginName)
+            } else {
+                Buffer(WhiskProperties.getCLIPath)
+            }
+        }
+    }
+
 }
 
 trait RunWskCmd extends Matchers {

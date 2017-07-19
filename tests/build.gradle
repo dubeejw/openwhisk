@@ -6,7 +6,13 @@ repositories {
     mavenCentral()
 }
 
+def commonConfiguration = {
+    systemProperty 'cli_path', System.getProperty('cli_path', '')
+    systemProperty 'cli_plugin', System.getProperty('cli_plugin', '')
+}
+
 tasks.withType(Test) {
+    configure commonConfiguration
     systemProperties(System.getProperties())
 
     testLogging {
@@ -39,6 +45,7 @@ test.dependsOn([
     ':tests:dat:blackbox:badaction:distDocker',
     ':tests:dat:blackbox:badproxy:distDocker'
 ])
+
 
 dependencies {
     compile "org.scala-lang:scala-library:${gradle.scala.version}"
