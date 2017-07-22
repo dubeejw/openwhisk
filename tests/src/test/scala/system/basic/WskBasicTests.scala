@@ -48,7 +48,7 @@ class WskBasicTests
     behavior of "Wsk CLI"
 
     it should "confirm wsk exists" in {
-        Wsk.exists
+        wsk.exists
     }
 
     it should "show api build details" in {

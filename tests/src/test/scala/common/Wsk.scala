@@ -276,7 +276,6 @@ class WskAction()
     with HasActivation {
 
     override protected val noun = "action"
-    override def baseCommand = Wsk.baseCommand
 
     /**
      * Creates action. Parameters mirror those available in the CLI.
@@ -1005,7 +1004,7 @@ trait WaitFor {
     }
 }
 
-object Wsk {
+trait WskPath {
     private val binaryName = "wsk"
 
     /** What is the path to a downloaded CLI? **/
@@ -1013,21 +1012,16 @@ object Wsk {
         s"${System.getProperty("user.home")}${File.separator}.local${File.separator}bin${File.separator}${binaryName}"
     }
 
-    def exists() = {
+    def exists = {
         val cliPath = if (WhiskProperties.useCLIDownload) getDownloadedGoCLIPath else WhiskProperties.getCLIPath
         assert((new File(cliPath)).exists, s"did not find $cliPath")
     }
 
-    def baseCommand() =
+    def baseCommand =
         if (WhiskProperties.useCLIDownload) Buffer(getDownloadedGoCLIPath) else Buffer(WhiskProperties.getCLIPath)
 }
 
-trait RunWskCmd extends Matchers {
-
-    /**
-     * The base command to run.
-     */
-    def baseCommand = Wsk.baseCommand
+trait RunWskCmd extends WskPath with Matchers {
 
     /**
      * Runs a command wsk [params] where the arguments come in as a sequence.
@@ -1045,6 +1039,7 @@ trait RunWskCmd extends Matchers {
         if (verbose) args += "--verbose"
         if (showCmd) println(args.mkString(" ") + " " + params.mkString(" "))
         val rr = TestUtils.runCmd(DONTCARE_EXIT, workingDir, TestUtils.logger, sys.env ++ env, stdinFile.getOrElse(null), args ++ params: _*)
+
 
         withClue(reportFailure(args ++ params, expectedExitCode, rr)) {
             if (expectedExitCode != TestUtils.DONTCARE_EXIT) {
