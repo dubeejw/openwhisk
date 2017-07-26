@@ -20,6 +20,11 @@ package common
 import scala.collection.mutable.Buffer
 
 class BmxWsk() extends Wsk with BmxWskPath {
+    val bmx = new Bmx
+
+    bmx.setAPIHost
+    bmx.login
+
     override implicit val action = new BmxWskAction
     override implicit val trigger = new WskTrigger
     override implicit val rule = new WskRule
@@ -52,6 +57,32 @@ class BmxWskApi() extends WskApi with BmxWskPath{
 }
 
 class BmxWskApiExperimental() extends WskApiExperimental with BmxWskPath {
+}
+
+class Bmx extends RunWskCmd with BmxPath {
+    def setAPIHost = {
+        // bx api https://api.ng.bluemix.net
+        val params = Seq("api", "https://api.ng.bluemix.net")
+
+        cli(params, showCmd = true)
+    }
+
+    def login = {
+        // bx login --sso -u jwdubee@us.ibm.com -o jwdubee@us.ibm.com -s dev
+        // bx login --apikey sBTxWOAUMem7kkCM87YCtN2s-mfcF_B8oKak3hVQ4F0_
+        val params = Seq("login", "--apikey", "sBTxWOAUMem7kkCM87YCtN2s-mfcF_B8oKak3hVQ4F0_", "-s", "dev")
+        cli(params, showCmd = true)
+    }
+
+    def pluginInstall = {
+        // bx plugin install /Users/dubee/bluewhisk/open/bin/wsk
+        val params = Seq("plugin", "install", "/Users/dubee/bluewhisk/open/bin/wsk")
+        cli(params, showCmd = true)
+    }
+}
+
+trait BmxPath extends WskPath {
+    override def baseCommand = Buffer("/usr/local/bin/bx")
 }
 
 trait BmxWskPath extends WskPath {

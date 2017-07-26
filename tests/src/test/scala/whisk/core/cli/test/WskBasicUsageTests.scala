@@ -67,7 +67,7 @@ class WskBasicUsageTests
     behavior of "Wsk CLI usage"
 
     it should "confirm wsk exists" in {
-        Wsk.exists
+        wsk.exists
     }
 
     it should "show help and usage info" in {
