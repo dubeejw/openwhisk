@@ -247,23 +247,32 @@ func limitRespField(data []byte, field []byte, limit int, buffer string) []byte 
 func respBodyLimiter(body io.ReadCloser) ([]byte, io.ReadCloser, error) {
     var action = new(Action)
     limit := 1000    // 1000 byte limit, anything over is truncated
-    buffer := "\"\n    "    // Appended to the end of newData to keep correct formating
+    //buffer := "\"\n    "    // Appended to the end of newData to keep correct formating
     data, err := ioutil.ReadAll(body)
     if err != nil {
         Verbose("ioutil.ReadAll(req.Body) error: %s\n", err)
         werr := MakeWskError(err, EXITCODE_ERR_NETWORK, DISPLAY_MSG, NO_DISPLAY_USAGE)
         return nil, body, werr
     }
-    reload := ioutil.NopCloser(bytes.NewBuffer(data))
 
     json.Unmarshal(data, &action)    // JSON parsing
     code := []byte(fmt.Sprintf("%+q", *action.Exec.Code))
+
+    fmt.Println("were1")
+    //fmt.Println(string(code))
     if len(code) > 0 {
-        newData := limitRespField(data, code, limit, buffer)
+
+        fmt.Println("were2")
+        newData := limitRespField(data, code, limit, "")
+
+        reload := ioutil.NopCloser(bytes.NewBuffer(newData))
+
+        fmt.Println("asdf")
+        fmt.Println(string(newData))
         return newData, reload, nil
     }
 
-    return data, reload, nil
+    return data, body, nil
 }
 
 // reqBodyLimiter limits the size of action Req Body for --verbose ONLY.
@@ -282,6 +291,8 @@ func reqBodyLimiter(body io.ReadCloser) ([]byte, io.ReadCloser, error) {
     if len(data) > limit {
         Verbose("Req Body excedes %d bytes and will be truncated\n", limit)
         newData := string(data[:limit]) + buffer    // Must convert to string to add buffer otherwise malformed error will be thrown
+        fmt.Println("new")
+        fmt.Println(newData)
         return []byte(newData), reload, nil
     }
 
@@ -296,25 +307,34 @@ func reqBodyLimiter(body io.ReadCloser) ([]byte, io.ReadCloser, error) {
 func (c *Client) Do(req *http.Request, v interface{}, ExitWithErrorOnTimeout bool) (*http.Response, error) {
     var err error
     var limitBody []byte
+    //var body io.ReadCloser
 
+    fmt.Println("asdfasdf")
+    fmt.Println(IsDebug())
     if IsVerbose() {
         fmt.Println("REQUEST:")
         fmt.Printf("[%s]\t%s\n", req.Method, req.URL)
+
         if len(req.Header) > 0 {
             fmt.Println("Req Headers")
             PrintJSON(req.Header)
         }
+
         if req.Body != nil {
             fmt.Println("Req Body")
+
+
             // Check if --verbose flag was given and is an action attempt to limit Req Body
-            if IsVerboseOnly() && reflect.TypeOf(v).String() == "**whisk.Action" {
+            if !IsDebug() && reflect.TypeOf(v).String() == "**whisk.Action" {
                 if limitBody, req.Body, err = reqBodyLimiter(req.Body); err != nil {
                     return nil, err
                 }
+
                 fmt.Println(string(limitBody))
             } else {
                 fmt.Println(req.Body)
             }
+
             Debug(DbgInfo, "Req Body (ASCII quoted string):\n%+q\n", req.Body)
         }
     }
@@ -326,19 +346,26 @@ func (c *Client) Do(req *http.Request, v interface{}, ExitWithErrorOnTimeout boo
         werr := MakeWskError(err, EXITCODE_ERR_NETWORK, DISPLAY_MSG, NO_DISPLAY_USAGE)
         return nil, werr
     }
+
     // Don't "defer resp.Body.Close()" here because the body is reloaded to allow caller to
     // do custom body parsing, such as handling per-route error responses.
     Verbose("RESPONSE:")
     Verbose("Got response with code %d\n", resp.StatusCode)
+
     if (IsVerbose() && len(resp.Header) > 0) {
         fmt.Println("Resp Headers")
         PrintJSON(resp.Header)
     }
+
     // Check if --verbose flag was given and is an action attempt to limit Resp Body
-    if IsVerboseOnly() && reflect.TypeOf(v).String() == "**whisk.Action" {
+    if !IsDebug() && reflect.TypeOf(v).String() == "**whisk.Action" {
         if limitBody, resp.Body, err = respBodyLimiter(resp.Body); err != nil {
             return nil, err
         }
+
+        fmt.Println("HERE")
+        fmt.Println(limitBody)
+        fmt.Println(resp.Body)
     }
 
     // Read the response body
@@ -348,13 +375,16 @@ func (c *Client) Do(req *http.Request, v interface{}, ExitWithErrorOnTimeout boo
         werr := MakeWskError(err, EXITCODE_ERR_NETWORK, DISPLAY_MSG, NO_DISPLAY_USAGE)
         return resp, werr
     }
+
     Verbose("Response body size is %d bytes\n", len(data))
+
     // Check if --verbose flag was given and is an action print Resp Body
-    if IsVerboseOnly() && reflect.TypeOf(v).String() == "**whisk.Action" {
+    if !IsDebug() && reflect.TypeOf(v).String() == "**whisk.Action" {
         Verbose("Response body received:\n%s\n", string(limitBody))
     } else {
         Verbose("Response body received:\n%s\n", string(data))
     }
+
     Debug(DbgInfo, "Response body received (ASCII quoted string):\n%+q\n", resp.Body)
 
     // Reload the response body to allow caller access to the body; otherwise,
