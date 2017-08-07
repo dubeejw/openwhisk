@@ -31,6 +31,10 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer
 
 import whisk.common.Logging
 import whisk.core.connector.MessageConsumer
+import org.apache.kafka.clients.consumer.OffsetCommitCallback
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
+import scala.concurrent.Promise
+import org.apache.kafka.common.TopicPartition
 
 class KafkaConsumerConnector(
     kafkahost: String,
@@ -58,7 +62,16 @@ class KafkaConsumerConnector(
     /**
      * Commits offsets from last poll.
      */
-    def commit() = consumer.commitSync()
+    def commit() = {
+        val committed = Promise[Unit]()
+        consumer.commitAsync(new OffsetCommitCallback {
+            override def onComplete(offsets: java.util.Map[TopicPartition, OffsetAndMetadata], exception: Exception): Unit = {
+                if (exception == null) committed.success(())
+                else committed.failure(exception)
+            }
+        })
+        committed.future
+    }
 
     override def close() = {
         logging.info(this, s"closing '$topic' consumer")

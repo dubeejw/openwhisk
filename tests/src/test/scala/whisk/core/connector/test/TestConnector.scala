@@ -52,9 +52,9 @@ class TestConnector(
 
     override def commit() = {
         if (throwCommitException) {
-            throw new Exception("commit failed")
+            Future.failed(new Exception("commit failed"))
         } else {
-            // nothing to do
+            Future.successful(())
         }
     }
 
