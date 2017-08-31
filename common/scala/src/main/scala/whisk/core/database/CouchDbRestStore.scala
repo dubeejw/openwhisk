@@ -35,6 +35,13 @@ import whisk.core.entity.DocRevision
 import whisk.core.entity.WhiskDocument
 import whisk.http.Messages
 
+import whisk.core.entity.WhiskAction
+import whisk.core.entity.WhiskActionMini
+import whisk.core.entity.WhiskActivation
+import whisk.core.entity.WhiskPackage
+import whisk.core.entity.WhiskTrigger
+import whisk.core.entity.WhiskRule
+
 /**
  * Basic client to put and delete artifacts in a data store.
  *
@@ -127,6 +134,18 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
         reportFailure(f, failure => transid.failed(this, start, s"[DEL] '$dbName' internal error, doc: '$doc', failure: '${failure.getMessage}'", ErrorLevel))
     }
 
+    def newRead[A](ma: Manifest[A], value: JsValue) = {
+        ma.runtimeClass match {
+            case x if x == classOf[WhiskAction]     => WhiskAction.serdes.read(value)
+            case x if x == classOf[WhiskActionMini] => WhiskActionMini.serdes.read(value)
+            case x if x == classOf[WhiskPackage]    => WhiskPackage.serdes.read(value)
+            case x if x == classOf[WhiskActivation] => WhiskActivation.serdes.read(value)
+            case x if x == classOf[WhiskTrigger]    => WhiskTrigger.serdes.read(value)
+            case x if x == classOf[WhiskRule]       => WhiskRule.serdes.read(value)
+            case _ => throw DocumentUnreadable(Messages.corruptedEntity)
+        }
+    }
+
     override protected[database] def get[A <: DocumentAbstraction](doc: DocInfo)(
         implicit transid: TransactionId,
         ma: Manifest[A]): Future[A] = {
@@ -144,7 +163,10 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
             e match {
                 case Right(response) =>
                     transid.finished(this, start, s"[GET] '$dbName' completed: found document '$doc'")
-                    val asFormat = jsonFormat.read(response)
+
+                    val asFormat = newRead(ma, response)
+
+                    // TODO: delete this
                     if (asFormat.getClass != ma.runtimeClass) {
                         throw DocumentTypeMismatchException(s"document type ${asFormat.getClass} did not match expected type ${ma.runtimeClass}.")
                     }

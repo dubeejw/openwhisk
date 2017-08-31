@@ -22,7 +22,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{ Failure, Success, Try }
 
-import org.apache.kafka.common.errors.RecordTooLargeException
+//import org.apache.kafka.common.errors.RecordTooLargeException
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethod
@@ -225,15 +225,22 @@ trait WhiskActionsApi
     override def activate(user: Identity, entityName: FullyQualifiedEntityName, env: Option[Parameters])(implicit transid: TransactionId) = {
         parameter('blocking ? false, 'result ? false, 'timeout.as[FiniteDuration] ? WhiskActionsApi.maxWaitForBlockingActivation) { (blocking, result, waitOverride) =>
             entity(as[Option[JsObject]]) { payload =>
-                getEntity(WhiskAction, entityStore, entityName.toDocId, Some {
-                    act: WhiskAction =>
+                getEntity(WhiskActionMini, entityStore, entityName.toDocId, Some { action: WhiskActionMini =>
+                val mergedAction = env map { action inherit _ } getOrElse action
+                complete(OK, mergedAction)
+            })
+
+                /*getEntity(WhiskActionMini, entityStore, entityName.toDocId, Some {
+                    act: WhiskActionMini =>
                         // resolve the action --- special case for sequences that may contain components with '_' as default package
                         val action = act.resolve(user.namespace)
                         onComplete(entitleReferencedEntities(user, Privilege.ACTIVATE, Some(action.exec))) {
                             case Success(_) =>
                                 val actionWithMergedParams = env.map(action.inherit(_)) getOrElse action
                                 val waitForResponse = if (blocking) Some(waitOverride) else None
-                                onComplete(invokeAction(user, actionWithMergedParams, payload, waitForResponse, cause = None)) {
+
+                                // TODO: invoke action with WhiskAction or WhiskActionMini
+                                OonComplete(invokeAction(user, actionWithMergedParams, payload, waitForResponse, cause = None)) {
                                     case Success(Left(activationId)) =>
                                         // non-blocking invoke or blocking invoke which got queued instead
                                         complete(Accepted, activationId.toJsObject)
@@ -266,10 +273,14 @@ trait WhiskActionsApi
                                         terminate(InternalServerError)
                                 }
 
+                                val mergedAction = env map { action inherit _ } getOrElse action
+                                complete(OK, mergedAction)
+
+
                             case Failure(f) =>
                                 super.handleEntitlementFailure(f)
                         }
-                })
+                })*/
             }
         }
     }
