@@ -443,8 +443,8 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
    * This method is factored out to allow mock testing.
    */
   protected def getAction(actionName: FullyQualifiedEntityName)(
-    implicit transid: TransactionId): Future[WhiskAction] = {
-    WhiskAction.get(entityStore, actionName.toDocId)
+    implicit transid: TransactionId): Future[WhiskActionMini] = {
+    WhiskActionMini.get(entityStore, actionName.toDocId)
   }
 
   /**
@@ -543,7 +543,7 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
   }
 
   private def extractEntityAndProcessRequest(actionOwnerIdentity: Identity,
-                                             action: WhiskAction,
+                                             action: WhiskActionMini,
                                              extension: MediaExtension,
                                              onBehalfOf: Option[Identity],
                                              context: Context,
@@ -591,7 +591,7 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
   }
 
   private def processRequest(actionOwnerIdentity: Identity,
-                             action: WhiskAction,
+                             action: WhiskActionMini,
                              responseType: MediaExtension,
                              onBehalfOf: Option[Identity],
                              context: Context,
@@ -609,6 +609,7 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
             .overrides(webApiDirectives.reservedProperties ++ action.immutableParameters)
             .isEmpty) {
         val content = context.toActionArgument(onBehalfOf, isRawHttpAction)
+        Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
         invokeAction(actionOwnerIdentity, action, Some(JsObject(content)), maxWaitForWebActionResult, cause = None)
       } else {
         Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
@@ -688,7 +689,7 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
    * @return future action document or NotFound rejection
    */
   private def actionLookup(actionName: FullyQualifiedEntityName)(
-    implicit transid: TransactionId): Future[WhiskAction] = {
+    implicit transid: TransactionId): Future[WhiskActionMini] = {
     getAction(actionName) recoverWith {
       case _: ArtifactStoreException | DeserializationException(_, _, _) =>
         Future.failed(RejectRequest(NotFound))
@@ -711,8 +712,8 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
   /**
    * Checks if an action is exported (i.e., carries the required annotation).
    */
-  private def confirmExportedAction(actionLookup: Future[WhiskAction], authenticated: Boolean)(
-    implicit transid: TransactionId): Future[WhiskAction] = {
+  private def confirmExportedAction(actionLookup: Future[WhiskActionMini], authenticated: Boolean)(
+    implicit transid: TransactionId): Future[WhiskActionMini] = {
     actionLookup flatMap { action =>
       val requiresAuthenticatedUser = action.annotations.asBool("require-whisk-auth").exists(identity)
       val isExported = action.annotations.asBool("web-export").exists(identity)

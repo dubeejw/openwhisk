@@ -186,12 +186,12 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
   override protected def getAction(actionName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     if (!failActionLookup) {
       def theAction = {
-        val annotations = Parameters(WhiskAction.finalParamsAnnotationName, JsBoolean(true))
+        val annotations = Parameters(WhiskActionMini.finalParamsAnnotationName, JsBoolean(true))
 
-        WhiskAction(
+        WhiskActionMini(
           actionName.path,
           actionName.name,
-          jsDefault("??"),
+          jsDefault2("??"),
           defaultActionParameters,
           annotations = {
             if (actionName.name.asString.startsWith("export_")) {
@@ -243,7 +243,7 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
 
   override protected[controller] def invokeAction(
     user: Identity,
-    action: WhiskAction,
+    action: WhiskActionMini,
     payload: Option[JsObject],
     waitForResponse: Option[FiniteDuration],
     cause: Option[ActivationId])(implicit transid: TransactionId): Future[Either[ActivationId, WhiskActivation]] = {

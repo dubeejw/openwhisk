@@ -48,7 +48,7 @@ import whisk.core.connector.MessagingProvider
 import whisk.core.database.NoDocumentException
 import whisk.core.entity.{ActivationId, WhiskActivation}
 import whisk.core.entity.EntityName
-import whisk.core.entity.ExecutableWhiskAction
+import whisk.core.entity.ExecutableWhiskAction2
 import whisk.core.entity.Identity
 import whisk.core.entity.InstanceId
 import whisk.core.entity.UUID
@@ -78,7 +78,7 @@ trait LoadBalancer {
    *         The future is guaranteed to complete within the declared action time limit
    *         plus a grace period (see activeAckTimeoutGrace).
    */
-  def publish(action: ExecutableWhiskAction, msg: ActivationMessage)(
+  def publish(action: ExecutableWhiskAction2, msg: ActivationMessage)(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]]
 
 }
@@ -101,7 +101,7 @@ class LoadBalancerService(config: WhiskConfig, instance: InstanceId, entityStore
 
   override def totalActiveActivations = loadBalancerData.totalActivationCount
 
-  override def publish(action: ExecutableWhiskAction, msg: ActivationMessage)(
+  override def publish(action: ExecutableWhiskAction2, msg: ActivationMessage)(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
     chooseInvoker(msg.user, action).flatMap { invokerName =>
       val entry = setupActivation(action, msg.activationId, msg.user.uuid, invokerName, transid)
@@ -144,7 +144,7 @@ class LoadBalancerService(config: WhiskConfig, instance: InstanceId, entityStore
   /**
    * Creates an activation entry and insert into various maps.
    */
-  private def setupActivation(action: ExecutableWhiskAction,
+  private def setupActivation(action: ExecutableWhiskAction2,
                               activationId: ActivationId,
                               namespaceId: UUID,
                               invokerName: InstanceId,
@@ -287,7 +287,7 @@ class LoadBalancerService(config: WhiskConfig, instance: InstanceId, entityStore
   }
 
   /** Determine which invoker this activation should go to. Due to dynamic conditions, it may return no invoker. */
-  private def chooseInvoker(user: Identity, action: ExecutableWhiskAction): Future[InstanceId] = {
+  private def chooseInvoker(user: Identity, action: ExecutableWhiskAction2): Future[InstanceId] = {
     val hash = generateHash(user.namespace, action)
 
     allInvokers.flatMap { invokers =>
@@ -307,7 +307,7 @@ class LoadBalancerService(config: WhiskConfig, instance: InstanceId, entityStore
   }
 
   /** Generates a hash based on the string representation of namespace and action */
-  private def generateHash(namespace: EntityName, action: ExecutableWhiskAction): Int = {
+  private def generateHash(namespace: EntityName, action: ExecutableWhiskAction2): Int = {
     (namespace.asString.hashCode() ^ action.fullyQualifiedName(false).asString.hashCode()).abs
   }
 }

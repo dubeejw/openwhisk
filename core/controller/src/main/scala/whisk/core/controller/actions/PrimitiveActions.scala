@@ -93,11 +93,12 @@ protected[actions] trait PrimitiveActions {
    */
   protected[actions] def invokeSingleAction(
     user: Identity,
-    action: ExecutableWhiskAction,
+    action: ExecutableWhiskAction2,
     payload: Option[JsObject],
     waitForResponse: Option[FiniteDuration],
     cause: Option[ActivationId])(implicit transid: TransactionId): Future[Either[ActivationId, WhiskActivation]] = {
 
+    logging.info(this, "asdf5")
     // merge package parameters with action (action parameters supersede), then merge in payload
     val args = action.parameters merge payload
     val message = ActivationMessage(
