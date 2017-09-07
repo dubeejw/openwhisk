@@ -100,6 +100,33 @@ abstract class WhiskActionLike(override val name: EntityName) extends WhiskEntit
       "annotations" -> annotations.toJson)
 }
 
+abstract class WhiskActionLike2(override val name: EntityName) extends WhiskEntity(name) {
+  def exec: Exec2
+  def parameters: Parameters
+  def limits: ActionLimits
+
+  /** @return true iff action has appropriate annotation. */
+  def hasFinalParamsAnnotation = {
+    annotations.asBool(WhiskAction.finalParamsAnnotationName) getOrElse false
+  }
+
+  /** @return a Set of immutable parameternames */
+  def immutableParameters =
+    if (hasFinalParamsAnnotation) {
+      parameters.definedParameters
+    } else Set.empty[String]
+
+  def toJson =
+    JsObject(
+      "namespace" -> namespace.toJson,
+      "name" -> name.toJson,
+      "parameters" -> parameters.toJson,
+      "limits" -> limits.toJson,
+      "version" -> version.toJson,
+      "publish" -> publish.toJson,
+      "annotations" -> annotations.toJson)
+}
+
 /**
  * A WhiskAction provides an abstraction of the meta-data
  * for a whisk action.
@@ -161,6 +188,43 @@ case class WhiskAction(namespace: EntityPath,
   }
 }
 
+@throws[IllegalArgumentException]
+case class WhiskActionMini(namespace: EntityPath,
+                           override val name: EntityName,
+                           exec: Exec2,
+                           parameters: Parameters = Parameters(),
+                           limits: ActionLimits = ActionLimits(),
+                           version: SemVer = SemVer(),
+                           publish: Boolean = false,
+                           annotations: Parameters = Parameters())
+    extends WhiskActionLike2(name) {
+
+  require(limits != null, "limits undefined")
+
+  /**
+   * Merges parameters (usually from package) with existing action parameters.
+   * Existing parameters supersede those in p.
+   */
+  def inherit(p: Parameters) = copy(parameters = p ++ parameters).revision[WhiskActionMini](rev)
+
+  /**
+   * Resolves sequence components if they contain default namespace.
+   */
+  protected[core] def resolve(userNamespace: EntityName): WhiskActionMini = {
+    this
+  }
+
+  def toExecutableWhiskAction = exec match {
+    case codeExec: CodeExec2[_] =>
+      Some(
+        ExecutableWhiskAction2(namespace, name, codeExec, parameters, limits, version, publish, annotations)
+          .revision[ExecutableWhiskAction2](rev))
+    case _ =>
+      None
+  }
+
+}
+
 /**
  * Variant of WhiskAction which only includes information necessary to be
  * executed by an Invoker.
@@ -204,6 +268,36 @@ case class ExecutableWhiskAction(namespace: EntityPath,
 
   def toWhiskAction =
     WhiskAction(namespace, name, exec, parameters, limits, version, publish, annotations).revision[WhiskAction](rev)
+}
+
+@throws[IllegalArgumentException]
+case class ExecutableWhiskAction2(namespace: EntityPath,
+                                  override val name: EntityName,
+                                  exec: CodeExec2[_],
+                                  parameters: Parameters = Parameters(),
+                                  limits: ActionLimits = ActionLimits(),
+                                  version: SemVer = SemVer(),
+                                  publish: Boolean = false,
+                                  annotations: Parameters = Parameters())
+    extends WhiskActionLike2(name) {
+
+  require(exec != null, "exec undefined")
+  require(limits != null, "limits undefined")
+
+  /**
+   * Gets initializer for action. This typically includes the code to execute,
+   * or a zip file containing the executable artifacts.
+   */
+  def containerInitializer: JsObject = {
+    val code = Option(exec.codeAsJson).filter(_ != JsNull).map("code" -> _)
+    val base =
+      Map("name" -> name.toJson, "binary" -> exec.binary.toJson, "main" -> exec.entryPoint.getOrElse("main").toJson)
+    JsObject(base ++ code)
+  }
+
+  def toWhiskAction =
+    WhiskActionMini(namespace, name, exec, parameters, limits, version, publish, annotations)
+      .revision[WhiskActionMini](rev)
 }
 
 object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[WhiskAction] with DefaultJsonProtocol {
@@ -337,6 +431,85 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
         val fqnAction = resolvedPkg.fullyQualifiedName(withVersion = false).add(actionName)
         // get the whisk action associate with it and inherit the parameters from the package/binding
         WhiskAction.get(entityStore, fqnAction.toDocId) map { _.inherit(resolvedPkg.parameters) }
+      }
+    }
+  }
+}
+
+object WhiskActionMini
+    extends DocumentFactory[WhiskActionMini]
+    with WhiskEntityQueries[WhiskActionMini]
+    with DefaultJsonProtocol {
+
+  val execFieldName = "exec"
+  val finalParamsAnnotationName = "final"
+
+  override val collectionName = "actions"
+
+  override implicit val serdes = jsonFormat(
+    WhiskActionMini.apply,
+    "namespace",
+    "name",
+    "exec",
+    "parameters",
+    "limits",
+    "version",
+    "publish",
+    "annotations")
+
+  override val cacheEnabled = true
+
+  /**
+   * Resolves an action name if it is contained in a package.
+   * Look up the package to determine if it is a binding or the actual package.
+   * If it's a binding, rewrite the fully qualified name of the action using the actual package path name.
+   * If it's the actual package, use its name directly as the package path name.
+   */
+  def resolveAction(db: EntityStore, fullyQualifiedActionName: FullyQualifiedEntityName)(
+    implicit ec: ExecutionContext,
+    transid: TransactionId): Future[FullyQualifiedEntityName] = {
+    // first check that there is a package to be resolved
+    val entityPath = fullyQualifiedActionName.path
+    if (entityPath.defaultPackage) {
+      // this is the default package, nothing to resolve
+      Future.successful(fullyQualifiedActionName)
+    } else {
+      // there is a package to be resolved
+      val pkgDocId = fullyQualifiedActionName.path.toDocId
+      val actionName = fullyQualifiedActionName.name
+      WhiskPackage.resolveBinding(db, pkgDocId) map {
+        _.fullyQualifiedName(withVersion = false).add(actionName)
+      }
+    }
+  }
+
+  /**
+   * Resolves an action name if it is contained in a package.
+   * Look up the package to determine if it is a binding or the actual package.
+   * If it's a binding, rewrite the fully qualified name of the action using the actual package path name.
+   * If it's the actual package, use its name directly as the package path name.
+   * While traversing the package bindings, merge the parameters.
+   */
+  def resolveActionAndMergeParameters(entityStore: EntityStore, fullyQualifiedName: FullyQualifiedEntityName)(
+    implicit ec: ExecutionContext,
+    transid: TransactionId): Future[WhiskActionMini] = {
+    // first check that there is a package to be resolved
+    val entityPath = fullyQualifiedName.path
+    if (entityPath.defaultPackage) {
+      // this is the default package, nothing to resolve
+      WhiskActionMini.get(entityStore, fullyQualifiedName.toDocId)
+    } else {
+      // there is a package to be resolved
+      val pkgDocid = fullyQualifiedName.path.toDocId
+      val actionName = fullyQualifiedName.name
+      val wp = WhiskPackage.resolveBinding(entityStore, pkgDocid, mergeParameters = true)
+      wp flatMap { resolvedPkg =>
+        // fully resolved name for the action
+        val fqnAction = resolvedPkg.fullyQualifiedName(withVersion = false).add(actionName)
+        // get the whisk action associate with it and inherit the parameters from the package/binding
+        WhiskActionMini.get(entityStore, fqnAction.toDocId) map {
+          _.inherit(resolvedPkg.parameters)
+        }
       }
     }
   }
