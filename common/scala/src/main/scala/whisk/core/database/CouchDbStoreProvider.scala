@@ -21,11 +21,13 @@ import akka.actor.ActorSystem
 import spray.json.RootJsonFormat
 import whisk.common.Logging
 import whisk.core.WhiskConfig
+import whisk.core.entity.DocumentReader
 
 object CouchDbStoreProvider extends ArtifactStoreProvider {
 
   def makeStore[D <: DocumentSerializer](config: WhiskConfig, name: WhiskConfig => String)(
     implicit jsonFormat: RootJsonFormat[D],
+    docReader: DocumentReader,
     actorSystem: ActorSystem,
     logging: Logging): ArtifactStore[D] = {
     require(config != null && config.isValid, "config is undefined or not valid")

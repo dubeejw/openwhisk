@@ -33,6 +33,7 @@ import whisk.core.entity.DocInfo
 import whisk.core.entity.DocRevision
 import whisk.core.entity.WhiskDocument
 import whisk.http.Messages
+import whisk.core.entity.DocumentReader
 
 import scala.util.{Failure, Success, Try}
 
@@ -47,13 +48,16 @@ import scala.util.{Failure, Success, Try}
  * @param dbName the name of the database to operate on
  * @param serializerEvidence confirms the document abstraction is serializable to a Document with an id
  */
-class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
-  dbProtocol: String,
-  dbHost: String,
-  dbPort: Int,
-  dbUsername: String,
-  dbPassword: String,
-  dbName: String)(implicit system: ActorSystem, val logging: Logging, jsonFormat: RootJsonFormat[DocumentAbstraction])
+class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: String,
+                                                                  dbHost: String,
+                                                                  dbPort: Int,
+                                                                  dbUsername: String,
+                                                                  dbPassword: String,
+                                                                  dbName: String)(
+  implicit system: ActorSystem,
+  val logging: Logging,
+  jsonFormat: RootJsonFormat[DocumentAbstraction],
+  docReader: DocumentReader)
     extends ArtifactStore[DocumentAbstraction]
     with DefaultJsonProtocol {
 
@@ -195,7 +199,13 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
       e match {
         case Right(response) =>
           transid.finished(this, start, s"[GET] '$dbName' completed: found document '$doc'")
-          val asFormat = jsonFormat.read(response)
+
+          val asFormat = try {
+            docReader.read(ma, response)
+          } catch {
+            case e: Exception => jsonFormat.read(response)
+          }
+
           if (asFormat.getClass != ma.runtimeClass) {
             throw DocumentTypeMismatchException(
               s"document type ${asFormat.getClass} did not match expected type ${ma.runtimeClass}.")
