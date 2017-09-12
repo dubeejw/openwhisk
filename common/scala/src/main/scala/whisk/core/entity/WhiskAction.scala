@@ -199,6 +199,7 @@ case class WhiskActionMini(namespace: EntityPath,
                            annotations: Parameters = Parameters())
     extends WhiskActionLike2(name) {
 
+  require(exec != null, "exec undefined")
   require(limits != null, "limits undefined")
 
   /**
@@ -211,7 +212,14 @@ case class WhiskActionMini(namespace: EntityPath,
    * Resolves sequence components if they contain default namespace.
    */
   protected[core] def resolve(userNamespace: EntityName): WhiskActionMini = {
-    this
+    exec match {
+      case SequenceExec2(components) =>
+        val newExec = SequenceExec2(components map { c =>
+          FullyQualifiedEntityName(c.path.resolveNamespace(userNamespace), c.name)
+        })
+        copy(exec = newExec).revision[WhiskActionMini](rev)
+      case _ => this
+    }
   }
 
   def toExecutableWhiskAction = exec match {
@@ -457,7 +465,36 @@ object WhiskActionMini
     "publish",
     "annotations")
 
-  override val cacheEnabled = true
+  override val cacheEnabled = false
+
+  /*override def get[A >: WhiskActionMini](
+    db: ArtifactStore[A],
+    doc: DocId,
+    rev: DocRevision = DocRevision.empty,
+    fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskActionMini]): Future[WhiskActionMini] = {
+
+    implicit val ec = db.executionContext
+
+    val fa = super.get(db, doc, rev, fromCache)
+
+    fa.flatMap { action =>
+      action.exec match {
+        case exec @ CodeExecAsAttachment2(_, _) =>
+          val boas = new ByteArrayOutputStream()
+          val b64s = Base64.getEncoder().wrap(boas)
+
+          getAttachment[A](db, action.docinfo, attachmentName, b64s).map { _ =>
+            b64s.close()
+            val newAction = action.copy(exec = exec.inline(boas.toByteArray))
+            newAction.revision(action.rev)
+            newAction
+          }
+
+        case _ =>
+          Future.successful(action)
+      }
+    }
+  }*/
 
   /**
    * Resolves an action name if it is contained in a package.

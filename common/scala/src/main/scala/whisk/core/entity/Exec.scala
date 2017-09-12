@@ -45,7 +45,7 @@ import whisk.core.entity.size.SizeString
  *   main  : name of the entry point function, when using a non-default value (for Java, the name of the main class)" }
  */
 sealed abstract class Exec extends ByteSizeable {
-  override def toString = "" //Exec.serdes.write(this).compactPrint
+  override def toString: String = Exec.serdes.write(this).compactPrint
 
   /** A type descriptor. */
   val kind: String
@@ -55,7 +55,7 @@ sealed abstract class Exec extends ByteSizeable {
 }
 
 sealed abstract class Exec2 extends ByteSizeable {
-  override def toString = "" //Exec2.serdes.write(this).compactPrint
+  override def toString: String = Exec2.serdes.write(this).compactPrint
 
   /** A type descriptor. */
   val kind: String
