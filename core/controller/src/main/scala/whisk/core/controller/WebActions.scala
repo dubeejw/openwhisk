@@ -615,7 +615,6 @@ trait WhiskWebActionsApi extends Directives with ValidateRequestSize with PostAc
             .overrides(webApiDirectives.reservedProperties ++ action.immutableParameters)
             .isEmpty) {
         val content = context.toActionArgument(onBehalfOf, isRawHttpAction)
-        Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
         invokeAction(actionOwnerIdentity, action, Some(JsObject(content)), maxWaitForWebActionResult, cause = None)
       } else {
         Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
