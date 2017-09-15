@@ -465,7 +465,7 @@ object WhiskActionMini
     "publish",
     "annotations")
 
-  override val cacheEnabled = false
+  override val cacheEnabled = true
 
   /*override def get[A >: WhiskActionMini](
     db: ArtifactStore[A],
