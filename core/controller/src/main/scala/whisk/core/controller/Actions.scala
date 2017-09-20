@@ -217,49 +217,29 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
    */
   override def activate(user: Identity, entityName: FullyQualifiedEntityName, env: Option[Parameters])(
     implicit transid: TransactionId) = {
-
-    /*parameter('blocking ? false, 'result ? false, 'timeout.as[FiniteDuration] ? WhiskActionsApi.maxWaitForBlockingActivation) { (blocking, result, waitOverride) =>
-      entity(as[Option[JsObject]]) { payload =>
-        getEntity(WhiskActionMetaData, entityStore, entityName.toDocId, Some { action: WhiskActionMetaData =>
-          val mergedAction = env map {
-            action inherit _
-          } getOrElse action
-          complete(OK, mergedAction)
-        })
-      }
-    }*/
-
     parameter(
       'blocking ? false,
       'result ? false,
       'timeout.as[FiniteDuration] ? WhiskActionsApi.maxWaitForBlockingActivation) { (blocking, result, waitOverride) =>
       entity(as[Option[JsObject]]) { payload =>
-        logging.info(this, "here1")
         getEntity(WhiskActionMetaData, entityStore, entityName.toDocId, Some {
           act: WhiskActionMetaData =>
-            logging.info(this, "here2")
             // resolve the action --- special case for sequences that may contain components with '_' as default package
             val action = act.resolve(user.namespace)
             onComplete(entitleReferencedEntities2(user, Privilege.ACTIVATE, Some(action.exec))) {
               case Success(_) =>
-                logging.info(this, "here3")
                 val actionWithMergedParams = env.map(action.inherit(_)) getOrElse action
                 val waitForResponse = if (blocking) Some(waitOverride) else None
-                logging.info(this, "here3b")
                 onComplete(invokeAction(user, actionWithMergedParams, payload, waitForResponse, cause = None)) {
                   case Success(Left(activationId)) =>
-                    logging.info(this, "here4")
                     // non-blocking invoke or blocking invoke which got queued instead
                     complete(Accepted, activationId.toJsObject)
                   case Success(Right(activation)) =>
-                    logging.info(this, "here5")
                     val response = if (result) activation.resultAsJson else activation.toExtendedJson
 
                     if (activation.response.isSuccess) {
-                      logging.info(this, "here6")
                       complete(OK, response)
                     } else if (activation.response.isApplicationError) {
-                      logging.info(this, "here7")
                       // actions that result is ApplicationError status are considered a 'success'
                       // and will have an 'error' property in the result - the HTTP status is OK
                       // and clients must check the response status if it exists
@@ -268,10 +248,8 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
                       // PRESERVING OLD BEHAVIOR and will address defect in separate change
                       complete(BadGateway, response)
                     } else if (activation.response.isContainerError) {
-                      logging.info(this, "here8")
                       complete(BadGateway, response)
                     } else {
-                      logging.info(this, "here9")
                       complete(InternalServerError, response)
                     }
                   case Failure(t: RecordTooLargeException) =>

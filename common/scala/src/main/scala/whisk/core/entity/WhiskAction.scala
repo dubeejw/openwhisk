@@ -223,7 +223,7 @@ case class WhiskActionMetaData(namespace: EntityPath,
   }
 
   def toExecutableWhiskAction = exec match {
-    case codeExec: CodeExec2[_] =>
+    case codeExec: CodeExec2 =>
       Some(
         ExecutableWhiskAction2(namespace, name, codeExec, parameters, limits, version, publish, annotations)
           .revision[ExecutableWhiskAction2](rev))
@@ -281,7 +281,7 @@ case class ExecutableWhiskAction(namespace: EntityPath,
 @throws[IllegalArgumentException]
 case class ExecutableWhiskAction2(namespace: EntityPath,
                                   override val name: EntityName,
-                                  exec: CodeExec2[_],
+                                  exec: CodeExec2,
                                   parameters: Parameters = Parameters(),
                                   limits: ActionLimits = ActionLimits(),
                                   version: SemVer = SemVer(),
