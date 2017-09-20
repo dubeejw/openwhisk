@@ -223,9 +223,9 @@ case class WhiskActionMetaData(namespace: EntityPath,
   }
 
   def toExecutableWhiskAction = exec match {
-    case codeExec: CodeExec2 =>
+    case execMetaData: ExecMetaData =>
       Some(
-        ExecutableWhiskAction2(namespace, name, codeExec, parameters, limits, version, publish, annotations)
+        ExecutableWhiskAction2(namespace, name, execMetaData, parameters, limits, version, publish, annotations)
           .revision[ExecutableWhiskAction2](rev))
     case _ =>
       None
@@ -281,7 +281,7 @@ case class ExecutableWhiskAction(namespace: EntityPath,
 @throws[IllegalArgumentException]
 case class ExecutableWhiskAction2(namespace: EntityPath,
                                   override val name: EntityName,
-                                  exec: CodeExec2,
+                                  exec: ExecMetaData,
                                   parameters: Parameters = Parameters(),
                                   limits: ActionLimits = ActionLimits(),
                                   version: SemVer = SemVer(),
@@ -297,10 +297,9 @@ case class ExecutableWhiskAction2(namespace: EntityPath,
    * or a zip file containing the executable artifacts.
    */
   def containerInitializer: JsObject = {
-    val code = Option(exec.codeAsJson).filter(_ != JsNull).map("code" -> _)
     val base =
-      Map("name" -> name.toJson, "binary" -> exec.binary.toJson, "main" -> exec.entryPoint.getOrElse("main").toJson)
-    JsObject(base ++ code)
+      Map("name" -> name.toJson, "main" -> exec.entryPoint.getOrElse("main").toJson)
+    JsObject(base)
   }
 
   def toWhiskAction =
