@@ -30,6 +30,9 @@ import whisk.core.entity.size.SizeInt
 import whisk.core.entity.size.SizeOptionString
 import whisk.core.entity.size.SizeString
 
+import whisk.common.AkkaLogging
+import akka.actor.ActorSystem
+
 /**
  * Exec encodes the executable details of an action. For black
  * box container, an image name is required. For Javascript and Python
@@ -54,14 +57,8 @@ sealed abstract class Exec extends ByteSizeable {
   val deprecated: Boolean
 }
 
-sealed abstract class Exec2 extends ByteSizeable {
+sealed abstract class Exec2 extends Exec {
   override def toString: String = Exec2.serdes.write(this).compactPrint
-
-  /** A type descriptor. */
-  val kind: String
-
-  /** When true exec may not be executed or updated. */
-  val deprecated: Boolean
 }
 
 /**
@@ -99,7 +96,7 @@ sealed abstract class CodeExec[+T <% SizeConversion] extends Exec {
   override def size = code.sizeInBytes + entryPoint.map(_.sizeInBytes).getOrElse(0.B)
 }
 
-sealed abstract class CodeExec2[+T <% SizeConversion] extends Exec2 {
+sealed abstract class CodeExec2 extends Exec2 {
 
   /** An entrypoint (typically name of 'main' function). 'None' means a default value will be used. */
   val entryPoint: Option[String]
@@ -141,7 +138,7 @@ protected[core] case class CodeExecAsString(manifest: RuntimeManifest,
 }
 
 protected[core] case class CodeExecAsString2(manifest: RuntimeManifest, override val entryPoint: Option[String])
-    extends CodeExec2[String] {
+    extends CodeExec2 {
   override val kind = manifest.kind
   override val image = manifest.image
   override val sentinelledLogs = manifest.sentinelledLogs.getOrElse(true)
@@ -176,7 +173,7 @@ protected[core] case class CodeExecAsAttachment(manifest: RuntimeManifest,
 }
 
 protected[core] case class CodeExecAsAttachment2(manifest: RuntimeManifest, override val entryPoint: Option[String])
-    extends CodeExec2[Attachment[String]] {
+    extends CodeExec2 {
   override val kind = manifest.kind
   override val image = manifest.image
   override val sentinelledLogs = manifest.sentinelledLogs.getOrElse(true)
@@ -220,7 +217,7 @@ protected[core] case class BlackBoxExec(override val image: ImageName,
 protected[core] case class BlackBoxExec2(override val image: ImageName,
                                          override val entryPoint: Option[String],
                                          val native: Boolean)
-    extends CodeExec2[Option[String]] {
+    extends CodeExec2 {
   override val kind = Exec2.BLACKBOX
   override val deprecated = false
   override def codeAsJson = "".toJson //code.toJson
@@ -279,6 +276,10 @@ protected[core] object Exec extends ArgNormalizer[Exec] with DefaultJsonProtocol
         val code = b.code.filter(_.trim.nonEmpty).map("code" -> JsString(_))
         val main = b.entryPoint.map("main" -> JsString(_))
         JsObject(base ++ code ++ main)
+      case c: CodeExecAsString2 => JsObject()
+      case a: CodeExecAsAttachment2 => JsObject()
+      case s @ SequenceExec2(comp) => JsObject()
+      case b: BlackBoxExec2 => JsObject()
     }
 
     override def read(v: JsValue) = {
@@ -387,6 +388,10 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
     private def attFmt[T: JsonFormat] = Attachments.serdes[T]
     private lazy val runtimes: Set[String] = execManifests.knownContainerRuntimes ++ Set(SEQUENCE, BLACKBOX)
 
+    implicit val actorSystem = ActorSystem("controller-actor-system")
+    implicit val logging = new AkkaLogging(akka.event.Logging.getLogger(actorSystem, this))
+
+
     override def write(e: Exec2) = e match {
       case c: CodeExecAsString2 =>
         val base = Map("kind" -> JsString(c.kind), "binary" -> JsBoolean(c.binary))
@@ -412,6 +417,8 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
 
     override def read(v: JsValue) = {
       require(v != null)
+
+      logging.info(this, s"in exec2 $v")
 
       val obj = v.asJsObject
 
