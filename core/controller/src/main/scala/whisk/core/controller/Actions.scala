@@ -220,7 +220,7 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
 
     /*parameter('blocking ? false, 'result ? false, 'timeout.as[FiniteDuration] ? WhiskActionsApi.maxWaitForBlockingActivation) { (blocking, result, waitOverride) =>
       entity(as[Option[JsObject]]) { payload =>
-        getEntity(WhiskActionMini, entityStore, entityName.toDocId, Some { action: WhiskActionMini =>
+        getEntity(WhiskActionMetaData, entityStore, entityName.toDocId, Some { action: WhiskActionMetaData =>
           val mergedAction = env map {
             action inherit _
           } getOrElse action
@@ -235,8 +235,8 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
       'timeout.as[FiniteDuration] ? WhiskActionsApi.maxWaitForBlockingActivation) { (blocking, result, waitOverride) =>
       entity(as[Option[JsObject]]) { payload =>
         logging.info(this, "here1")
-        getEntity(WhiskActionMini, entityStore, entityName.toDocId, Some {
-          act: WhiskActionMini =>
+        getEntity(WhiskActionMetaData, entityStore, entityName.toDocId, Some {
+          act: WhiskActionMetaData =>
             logging.info(this, "here2")
             // resolve the action --- special case for sequences that may contain components with '_' as default package
             val action = act.resolve(user.namespace)
