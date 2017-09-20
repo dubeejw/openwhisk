@@ -103,7 +103,7 @@ class Controller(val instance: InstanceId,
   private implicit val cacheChangeNotification = Some(new CacheChangeNotification {
     val remoteCacheInvalidaton = new RemoteCacheInvalidation(whiskConfig, "controller", instance)
     override def apply(k: CacheKey) = {
-      remoteCacheInvalidaton.invalidateWhiskActionMini(k)
+      remoteCacheInvalidaton.invalidateWhiskActionMetaData(k)
       remoteCacheInvalidaton.notifyOtherInstancesAboutInvalidation(k)
     }
   })

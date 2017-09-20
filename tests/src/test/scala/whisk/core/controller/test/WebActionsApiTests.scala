@@ -59,7 +59,7 @@ import whisk.core.loadBalancer.LoadBalancer
 import whisk.http.ErrorResponse
 import whisk.http.Messages
 
-/**
+/**w
  * Tests web actions API.
  *
  * Unit tests of the controller service as a standalone component.
@@ -185,9 +185,9 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
   override protected def getAction(actionName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     if (!failActionLookup) {
       def theAction = {
-        val annotations = Parameters(WhiskActionMini.finalParamsAnnotationName, JsBoolean(true))
+        val annotations = Parameters(WhiskActionMetaData.finalParamsAnnotationName, JsBoolean(true))
 
-        WhiskActionMini(
+        WhiskActionMetaData(
           actionName.path,
           actionName.name,
           jsDefault2("??"),
@@ -242,7 +242,7 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
 
   override protected[controller] def invokeAction(
     user: Identity,
-    action: WhiskActionMini,
+    action: WhiskActionMetaData,
     payload: Option[JsObject],
     waitForResponse: Option[FiniteDuration],
     cause: Option[ActivationId])(implicit transid: TransactionId): Future[Either[ActivationId, WhiskActivation]] = {

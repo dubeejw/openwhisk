@@ -46,7 +46,7 @@ protected[core] trait PostActionActivation extends PrimitiveActions with Sequenc
    */
   protected[controller] def invokeAction(
     user: Identity,
-    action: WhiskActionMini,
+    action: WhiskActionMetaData,
     payload: Option[JsObject],
     waitForResponse: Option[FiniteDuration],
     cause: Option[ActivationId])(implicit transid: TransactionId): Future[Either[ActivationId, WhiskActivation]] = {

@@ -36,7 +36,7 @@ import whisk.core.entity.WhiskDocument
 import whisk.http.Messages
 
 import whisk.core.entity.WhiskAction
-import whisk.core.entity.WhiskActionMini
+import whisk.core.entity.WhiskActionMetaData
 import whisk.core.entity.WhiskActivation
 import whisk.core.entity.WhiskPackage
 import whisk.core.entity.WhiskTrigger
@@ -160,7 +160,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
   def newRead[A](ma: Manifest[A], value: JsValue) = {
     ma.runtimeClass match {
       case x if x == classOf[WhiskAction]     => WhiskAction.serdes.read(value)
-      case x if x == classOf[WhiskActionMini] => WhiskActionMini.serdes.read(value)
+      case x if x == classOf[WhiskActionMetaData] => WhiskActionMetaData.serdes.read(value)
       case x if x == classOf[WhiskPackage]    => WhiskPackage.serdes.read(value)
       case x if x == classOf[WhiskActivation] => WhiskActivation.serdes.read(value)
       case x if x == classOf[WhiskTrigger]    => WhiskTrigger.serdes.read(value)

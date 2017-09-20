@@ -189,7 +189,7 @@ case class WhiskAction(namespace: EntityPath,
 }
 
 @throws[IllegalArgumentException]
-case class WhiskActionMini(namespace: EntityPath,
+case class WhiskActionMetaData(namespace: EntityPath,
                            override val name: EntityName,
                            exec: Exec2,
                            parameters: Parameters = Parameters(),
@@ -206,18 +206,18 @@ case class WhiskActionMini(namespace: EntityPath,
    * Merges parameters (usually from package) with existing action parameters.
    * Existing parameters supersede those in p.
    */
-  def inherit(p: Parameters) = copy(parameters = p ++ parameters).revision[WhiskActionMini](rev)
+  def inherit(p: Parameters) = copy(parameters = p ++ parameters).revision[WhiskActionMetaData](rev)
 
   /**
    * Resolves sequence components if they contain default namespace.
    */
-  protected[core] def resolve(userNamespace: EntityName): WhiskActionMini = {
+  protected[core] def resolve(userNamespace: EntityName): WhiskActionMetaData = {
     exec match {
       case SequenceExec2(components) =>
         val newExec = SequenceExec2(components map { c =>
           FullyQualifiedEntityName(c.path.resolveNamespace(userNamespace), c.name)
         })
-        copy(exec = newExec).revision[WhiskActionMini](rev)
+        copy(exec = newExec).revision[WhiskActionMetaData](rev)
       case _ => this
     }
   }
@@ -304,8 +304,8 @@ case class ExecutableWhiskAction2(namespace: EntityPath,
   }
 
   def toWhiskAction =
-    WhiskActionMini(namespace, name, exec, parameters, limits, version, publish, annotations)
-      .revision[WhiskActionMini](rev)
+    WhiskActionMetaData(namespace, name, exec, parameters, limits, version, publish, annotations)
+      .revision[WhiskActionMetaData](rev)
 }
 
 object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[WhiskAction] with DefaultJsonProtocol {
@@ -444,9 +444,9 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
   }
 }
 
-object WhiskActionMini
-    extends DocumentFactory[WhiskActionMini]
-    with WhiskEntityQueries[WhiskActionMini]
+object WhiskActionMetaData
+    extends DocumentFactory[WhiskActionMetaData]
+    with WhiskEntityQueries[WhiskActionMetaData]
     with DefaultJsonProtocol {
 
   val execFieldName = "exec"
@@ -455,7 +455,7 @@ object WhiskActionMini
   override val collectionName = "actions"
 
   override implicit val serdes = jsonFormat(
-    WhiskActionMini.apply,
+    WhiskActionMetaData.apply,
     "namespace",
     "name",
     "exec",
@@ -467,11 +467,11 @@ object WhiskActionMini
 
   override val cacheEnabled = true
 
-  /*override def get[A >: WhiskActionMini](
+  /*override def get[A >: WhiskActionMetaData](
     db: ArtifactStore[A],
     doc: DocId,
     rev: DocRevision = DocRevision.empty,
-    fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskActionMini]): Future[WhiskActionMini] = {
+    fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskActionMetaData]): Future[WhiskActionMetaData] = {
 
     implicit val ec = db.executionContext
 
@@ -529,12 +529,12 @@ object WhiskActionMini
    */
   def resolveActionAndMergeParameters(entityStore: EntityStore, fullyQualifiedName: FullyQualifiedEntityName)(
     implicit ec: ExecutionContext,
-    transid: TransactionId): Future[WhiskActionMini] = {
+    transid: TransactionId): Future[WhiskActionMetaData] = {
     // first check that there is a package to be resolved
     val entityPath = fullyQualifiedName.path
     if (entityPath.defaultPackage) {
       // this is the default package, nothing to resolve
-      WhiskActionMini.get(entityStore, fullyQualifiedName.toDocId)
+      WhiskActionMetaData.get(entityStore, fullyQualifiedName.toDocId)
     } else {
       // there is a package to be resolved
       val pkgDocid = fullyQualifiedName.path.toDocId
@@ -544,7 +544,7 @@ object WhiskActionMini
         // fully resolved name for the action
         val fqnAction = resolvedPkg.fullyQualifiedName(withVersion = false).add(actionName)
         // get the whisk action associate with it and inherit the parameters from the package/binding
-        WhiskActionMini.get(entityStore, fqnAction.toDocId) map {
+        WhiskActionMetaData.get(entityStore, fqnAction.toDocId) map {
           _.inherit(resolvedPkg.parameters)
         }
       }
