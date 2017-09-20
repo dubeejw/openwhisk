@@ -98,7 +98,6 @@ protected[actions] trait PrimitiveActions {
     waitForResponse: Option[FiniteDuration],
     cause: Option[ActivationId])(implicit transid: TransactionId): Future[Either[ActivationId, WhiskActivation]] = {
 
-    logging.info(this, "asdf5")
     // merge package parameters with action (action parameters supersede), then merge in payload
     val args = action.parameters merge payload
     val message = ActivationMessage(

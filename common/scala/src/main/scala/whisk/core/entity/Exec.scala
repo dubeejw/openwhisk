@@ -98,15 +98,6 @@ sealed abstract class CodeExec[+T <% SizeConversion] extends Exec {
 
 sealed abstract class ExecMetaData extends Exec2 {
 
-  /** An entrypoint (typically name of 'main' function). 'None' means a default value will be used. */
-  val entryPoint: Option[String]
-
-  /** The runtime image (either built-in or a public image). */
-  val image: ImageName
-
-  /** Indicates if the action execution generates log markers to stdout/stderr once action activation completes. */
-  val sentinelledLogs: Boolean
-
   /** Indicates if a container image is required from the registry to execute the action. */
   val pull: Boolean
 
@@ -126,11 +117,8 @@ protected[core] case class CodeExecAsString(manifest: RuntimeManifest,
   override def codeAsJson = JsString(code)
 }
 
-protected[core] case class CodeExecAsString2(manifest: RuntimeManifest, override val entryPoint: Option[String])
-    extends ExecMetaData {
+protected[core] case class CodeExecAsString2(manifest: RuntimeManifest) extends ExecMetaData {
   override val kind = manifest.kind
-  override val image = manifest.image
-  override val sentinelledLogs = manifest.sentinelledLogs.getOrElse(true)
   override val deprecated = manifest.deprecated.getOrElse(false)
   override val pull = false
 }
@@ -159,11 +147,8 @@ protected[core] case class CodeExecAsAttachment(manifest: RuntimeManifest,
   }
 }
 
-protected[core] case class CodeExecAsAttachment2(manifest: RuntimeManifest, override val entryPoint: Option[String])
-    extends ExecMetaData {
+protected[core] case class CodeExecAsAttachment2(manifest: RuntimeManifest) extends ExecMetaData {
   override val kind = manifest.kind
-  override val image = manifest.image
-  override val sentinelledLogs = manifest.sentinelledLogs.getOrElse(true)
   override val deprecated = manifest.deprecated.getOrElse(false)
   override val pull = false
 }
@@ -186,15 +171,10 @@ protected[core] case class BlackBoxExec(override val image: ImageName,
   override def size = super.size + image.publicImageName.sizeInBytes
 }
 
-protected[core] case class BlackBoxExec2(override val image: ImageName,
-                                         override val entryPoint: Option[String],
-                                         val native: Boolean)
-    extends ExecMetaData {
+protected[core] case class BlackBoxExec2(val native: Boolean) extends ExecMetaData {
   override val kind = Exec2.BLACKBOX
   override val deprecated = false
-  override val sentinelledLogs = native
   override val pull = !native
-  override def size = super.size + image.publicImageName.sizeInBytes
 }
 
 protected[core] case class SequenceExec(components: Vector[FullyQualifiedEntityName]) extends Exec {
@@ -358,27 +338,23 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
     implicit val actorSystem = ActorSystem("controller-actor-system")
     implicit val logging = new AkkaLogging(akka.event.Logging.getLogger(actorSystem, this))
 
-
     override def write(e: Exec2) = e match {
       case c: CodeExecAsString2 =>
         val base = Map("kind" -> JsString(c.kind))
-        val main = c.entryPoint.map("main" -> JsString(_))
-        JsObject(base ++ main)
+        JsObject(base)
 
       case a: CodeExecAsAttachment2 =>
         val base =
           Map("kind" -> JsString(a.kind))
-        val main = a.entryPoint.map("main" -> JsString(_))
-        JsObject(base ++ main)
+        JsObject(base)
 
       case s @ SequenceExec2(comp) =>
         JsObject("kind" -> JsString(s.kind), "components" -> comp.map(_.qualifiedNameWithLeadingSlash).toJson)
 
       case b: BlackBoxExec2 =>
         val base =
-          Map("kind" -> JsString(b.kind), "image" -> JsString(b.image.publicImageName))
-        val main = b.entryPoint.map("main" -> JsString(_))
-        JsObject(base ++ main)
+          Map("kind" -> JsString(b.kind))
+        JsObject(base)
     }
 
     override def read(v: JsValue) = {
@@ -424,7 +400,7 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
             case None => None
           }
           val native = execManifests.blackboxImages.contains(image)
-          BlackBoxExec2(image, optMainField, native)
+          BlackBoxExec2(native)
 
         case _ =>
           // map "default" virtual runtime versions to the currently blessed actual runtime version
@@ -449,7 +425,7 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
                   throw new DeserializationException(s"'main' must be a string defined in 'exec' for '$kind' actions")
                 } else None
               }
-              CodeExecAsAttachment2(manifest, main)
+              CodeExecAsAttachment2(manifest)
             }
             .getOrElse {
               val code: String = obj.fields.get("code") match {
@@ -457,7 +433,7 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
                 case _ =>
                   throw new DeserializationException(s"'code' must be a string defined in 'exec' for '$kind' actions")
               }
-              CodeExecAsString2(manifest, optMainField)
+              CodeExecAsString2(manifest)
             }
       }
     }
