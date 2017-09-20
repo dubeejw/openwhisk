@@ -190,13 +190,13 @@ case class WhiskAction(namespace: EntityPath,
 
 @throws[IllegalArgumentException]
 case class WhiskActionMetaData(namespace: EntityPath,
-                           override val name: EntityName,
-                           exec: Exec2,
-                           parameters: Parameters = Parameters(),
-                           limits: ActionLimits = ActionLimits(),
-                           version: SemVer = SemVer(),
-                           publish: Boolean = false,
-                           annotations: Parameters = Parameters())
+                               override val name: EntityName,
+                               exec: Exec2,
+                               parameters: Parameters = Parameters(),
+                               limits: ActionLimits = ActionLimits(),
+                               version: SemVer = SemVer(),
+                               publish: Boolean = false,
+                               annotations: Parameters = Parameters())
     extends WhiskActionLike2(name) {
 
   require(exec != null, "exec undefined")
@@ -298,7 +298,7 @@ case class ExecutableWhiskAction2(namespace: EntityPath,
    */
   def containerInitializer: JsObject = {
     val base =
-      Map("name" -> name.toJson, "main" -> exec.entryPoint.getOrElse("main").toJson)
+      Map("name" -> name.toJson)
     JsObject(base)
   }
 
