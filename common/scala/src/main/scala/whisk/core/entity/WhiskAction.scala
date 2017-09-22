@@ -100,31 +100,8 @@ abstract class WhiskActionLike(override val name: EntityName) extends WhiskEntit
       "annotations" -> annotations.toJson)
 }
 
-abstract class WhiskActionLike2(override val name: EntityName) extends WhiskEntity(name) {
-  def exec: Exec2
-  def parameters: Parameters
-  def limits: ActionLimits
-
-  /** @return true iff action has appropriate annotation. */
-  def hasFinalParamsAnnotation = {
-    annotations.asBool(WhiskAction.finalParamsAnnotationName) getOrElse false
-  }
-
-  /** @return a Set of immutable parameternames */
-  def immutableParameters =
-    if (hasFinalParamsAnnotation) {
-      parameters.definedParameters
-    } else Set.empty[String]
-
-  def toJson =
-    JsObject(
-      "namespace" -> namespace.toJson,
-      "name" -> name.toJson,
-      "parameters" -> parameters.toJson,
-      "limits" -> limits.toJson,
-      "version" -> version.toJson,
-      "publish" -> publish.toJson,
-      "annotations" -> annotations.toJson)
+abstract class WhiskActionLikeMeta(override val name: EntityName) extends WhiskActionLike(name) {
+  override def exec: Exec2
 }
 
 /**
@@ -197,7 +174,7 @@ case class WhiskActionMetaData(namespace: EntityPath,
                                version: SemVer = SemVer(),
                                publish: Boolean = false,
                                annotations: Parameters = Parameters())
-    extends WhiskActionLike2(name) {
+    extends WhiskActionLikeMeta(name) {
 
   require(exec != null, "exec undefined")
   require(limits != null, "limits undefined")
@@ -287,7 +264,7 @@ case class ExecutableWhiskAction2(namespace: EntityPath,
                                   version: SemVer = SemVer(),
                                   publish: Boolean = false,
                                   annotations: Parameters = Parameters())
-    extends WhiskActionLike2(name) {
+    extends WhiskActionLikeMeta(name) {
 
   require(exec != null, "exec undefined")
   require(limits != null, "limits undefined")
