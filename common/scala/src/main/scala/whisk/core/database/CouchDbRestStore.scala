@@ -186,9 +186,12 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
         case Right(response) =>
           transid.finished(this, start, s"[GET] '$dbName' completed: found document '$doc'")
 
-          val asFormat = newRead(ma, response)
+          val asFormat = try {
+            newRead(ma, response)
+          } catch {
+            case e: Exception => jsonFormat.read(response)
+          }
 
-          // TODO: Delete this check
           if (asFormat.getClass != ma.runtimeClass) {
             throw DocumentTypeMismatchException(
               s"document type ${asFormat.getClass} did not match expected type ${ma.runtimeClass}.")

@@ -59,6 +59,7 @@ sealed abstract class Exec extends ByteSizeable {
 
 sealed abstract class Exec2 extends Exec {
   override def toString: String = Exec2.serdes.write(this).compactPrint
+  override def size = 0.B
 }
 
 /**
@@ -96,12 +97,10 @@ sealed abstract class CodeExec[+T <% SizeConversion] extends Exec {
   override def size = code.sizeInBytes + entryPoint.map(_.sizeInBytes).getOrElse(0.B)
 }
 
-sealed abstract class ExecMetaData extends Exec2 {
-
-  /** Indicates if a container image is required from the registry to execute the action. */
-  val pull: Boolean
-
-  override def size = 0.B
+protected[core] case class ExecMetaData(manifest: RuntimeManifest) extends Exec2 {
+  override val kind = manifest.kind
+  val deprecated = manifest.deprecated.getOrElse(false)
+  val pull = false
 }
 
 protected[core] case class CodeExecAsString(manifest: RuntimeManifest,
@@ -115,12 +114,6 @@ protected[core] case class CodeExecAsString(manifest: RuntimeManifest,
   override val pull = false
   override lazy val binary = Exec.isBinaryCode(code)
   override def codeAsJson = JsString(code)
-}
-
-protected[core] case class CodeExecAsString2(manifest: RuntimeManifest) extends ExecMetaData {
-  override val kind = manifest.kind
-  override val deprecated = manifest.deprecated.getOrElse(false)
-  override val pull = false
 }
 
 protected[core] case class CodeExecAsAttachment(manifest: RuntimeManifest,
@@ -147,12 +140,6 @@ protected[core] case class CodeExecAsAttachment(manifest: RuntimeManifest,
   }
 }
 
-protected[core] case class CodeExecAsAttachment2(manifest: RuntimeManifest) extends ExecMetaData {
-  override val kind = manifest.kind
-  override val deprecated = manifest.deprecated.getOrElse(false)
-  override val pull = false
-}
-
 /**
  * @param image the image name
  * @param code an optional script or zip archive (as base64 encoded) string
@@ -171,10 +158,10 @@ protected[core] case class BlackBoxExec(override val image: ImageName,
   override def size = super.size + image.publicImageName.sizeInBytes
 }
 
-protected[core] case class BlackBoxExec2(val native: Boolean) extends ExecMetaData {
+protected[core] case class BlackBoxExec2(val native: Boolean) extends Exec2 {
   override val kind = Exec2.BLACKBOX
   override val deprecated = false
-  override val pull = !native
+  val pull = !native
 }
 
 protected[core] case class SequenceExec(components: Vector[FullyQualifiedEntityName]) extends Exec {
@@ -339,13 +326,8 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
     implicit val logging = new AkkaLogging(akka.event.Logging.getLogger(actorSystem, this))
 
     override def write(e: Exec2) = e match {
-      case c: CodeExecAsString2 =>
+      case c: ExecMetaData =>
         val base = Map("kind" -> JsString(c.kind))
-        JsObject(base)
-
-      case a: CodeExecAsAttachment2 =>
-        val base =
-          Map("kind" -> JsString(a.kind))
         JsObject(base)
 
       case s @ SequenceExec2(comp) =>
@@ -425,7 +407,7 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
                   throw new DeserializationException(s"'main' must be a string defined in 'exec' for '$kind' actions")
                 } else None
               }
-              CodeExecAsAttachment2(manifest)
+              ExecMetaData(manifest)
             }
             .getOrElse {
               val code: String = obj.fields.get("code") match {
@@ -433,7 +415,7 @@ protected[core] object Exec2 extends ArgNormalizer[Exec2] with DefaultJsonProtoc
                 case _ =>
                   throw new DeserializationException(s"'code' must be a string defined in 'exec' for '$kind' actions")
               }
-              CodeExecAsString2(manifest)
+              ExecMetaData(manifest)
             }
       }
     }
