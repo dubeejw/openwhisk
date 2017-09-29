@@ -269,16 +269,6 @@ case class ExecutableWhiskActionMetaData(namespace: EntityPath,
   require(exec != null, "exec undefined")
   require(limits != null, "limits undefined")
 
-  /**
-   * Gets initializer for action. This typically includes the code to execute,
-   * or a zip file containing the executable artifacts.
-   */
-  def containerInitializer: JsObject = {
-    val base =
-      Map("name" -> name.toJson)
-    JsObject(base)
-  }
-
   def toWhiskAction =
     WhiskActionMetaData(namespace, name, exec, parameters, limits, version, publish, annotations)
       .revision[WhiskActionMetaData](rev)

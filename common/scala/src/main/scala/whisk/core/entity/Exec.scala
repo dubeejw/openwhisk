@@ -30,9 +30,6 @@ import whisk.core.entity.size.SizeInt
 import whisk.core.entity.size.SizeOptionString
 import whisk.core.entity.size.SizeString
 
-import whisk.common.AkkaLogging
-import akka.actor.ActorSystem
-
 /**
  * Exec encodes the executable details of an action. For black
  * box container, an image name is required. For Javascript and Python
@@ -335,9 +332,6 @@ protected[core] object ExecMetaDataBase extends ArgNormalizer[ExecMetaDataBase] 
     private def attFmt[T: JsonFormat] = Attachments.serdes[T]
     private lazy val runtimes: Set[String] = execManifests.knownContainerRuntimes ++ Set(SEQUENCE, BLACKBOX)
 
-    implicit val actorSystem = ActorSystem("controller-actor-system")
-    implicit val logging = new AkkaLogging(akka.event.Logging.getLogger(actorSystem, this))
-
     override def write(e: ExecMetaDataBase) = e match {
       case c: CodeExecMetaDataAsString =>
         val base = Map("kind" -> JsString(c.kind))
@@ -359,8 +353,6 @@ protected[core] object ExecMetaDataBase extends ArgNormalizer[ExecMetaDataBase] 
 
     override def read(v: JsValue) = {
       require(v != null)
-
-      logging.info(this, s"in ExecMetaDataBase $v")
 
       val obj = v.asJsObject
 
@@ -437,14 +429,5 @@ protected[core] object ExecMetaDataBase extends ArgNormalizer[ExecMetaDataBase] 
             }
       }
     }
-  }
-
-  val isBase64Pattern = new Regex("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$").pattern
-
-  def isBinaryCode(code: String): Boolean = {
-    if (code != null) {
-      val t = code.trim
-      (t.length > 0) && (t.length % 4 == 0) && isBase64Pattern.matcher(t).matches()
-    } else false
   }
 }
