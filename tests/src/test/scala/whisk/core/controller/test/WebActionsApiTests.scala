@@ -59,7 +59,7 @@ import whisk.core.loadBalancer.LoadBalancer
 import whisk.http.ErrorResponse
 import whisk.http.Messages
 
-/**w
+/**
  * Tests web actions API.
  *
  * Unit tests of the controller service as a standalone component.
