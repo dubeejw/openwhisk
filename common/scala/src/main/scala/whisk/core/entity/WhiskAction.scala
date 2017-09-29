@@ -100,8 +100,8 @@ abstract class WhiskActionLike(override val name: EntityName) extends WhiskEntit
       "annotations" -> annotations.toJson)
 }
 
-abstract class WhiskActionLikeMeta(override val name: EntityName) extends WhiskActionLike(name) {
-  override def exec: Exec2
+abstract class WhiskActionLikeMetaData(override val name: EntityName) extends WhiskActionLike(name) {
+  override def exec: ExecMetaDataBase
 }
 
 /**
@@ -168,13 +168,13 @@ case class WhiskAction(namespace: EntityPath,
 @throws[IllegalArgumentException]
 case class WhiskActionMetaData(namespace: EntityPath,
                                override val name: EntityName,
-                               exec: Exec2,
+                               exec: ExecMetaDataBase,
                                parameters: Parameters = Parameters(),
                                limits: ActionLimits = ActionLimits(),
                                version: SemVer = SemVer(),
                                publish: Boolean = false,
                                annotations: Parameters = Parameters())
-    extends WhiskActionLikeMeta(name) {
+    extends WhiskActionLikeMetaData(name) {
 
   require(exec != null, "exec undefined")
   require(limits != null, "limits undefined")
@@ -190,8 +190,8 @@ case class WhiskActionMetaData(namespace: EntityPath,
    */
   protected[core] def resolve(userNamespace: EntityName): WhiskActionMetaData = {
     exec match {
-      case SequenceExec2(components) =>
-        val newExec = SequenceExec2(components map { c =>
+      case SequenceExecMetaData(components) =>
+        val newExec = SequenceExecMetaData(components map { c =>
           FullyQualifiedEntityName(c.path.resolveNamespace(userNamespace), c.name)
         })
         copy(exec = newExec).revision[WhiskActionMetaData](rev)
@@ -202,8 +202,8 @@ case class WhiskActionMetaData(namespace: EntityPath,
   def toExecutableWhiskAction = exec match {
     case execMetaData: ExecMetaData =>
       Some(
-        ExecutableWhiskAction2(namespace, name, execMetaData, parameters, limits, version, publish, annotations)
-          .revision[ExecutableWhiskAction2](rev))
+        ExecutableWhiskActionMetaData(namespace, name, execMetaData, parameters, limits, version, publish, annotations)
+          .revision[ExecutableWhiskActionMetaData](rev))
     case _ =>
       None
   }
@@ -256,15 +256,15 @@ case class ExecutableWhiskAction(namespace: EntityPath,
 }
 
 @throws[IllegalArgumentException]
-case class ExecutableWhiskAction2(namespace: EntityPath,
-                                  override val name: EntityName,
-                                  exec: ExecMetaData,
-                                  parameters: Parameters = Parameters(),
-                                  limits: ActionLimits = ActionLimits(),
-                                  version: SemVer = SemVer(),
-                                  publish: Boolean = false,
-                                  annotations: Parameters = Parameters())
-    extends WhiskActionLikeMeta(name) {
+case class ExecutableWhiskActionMetaData(namespace: EntityPath,
+                                         override val name: EntityName,
+                                         exec: ExecMetaData,
+                                         parameters: Parameters = Parameters(),
+                                         limits: ActionLimits = ActionLimits(),
+                                         version: SemVer = SemVer(),
+                                         publish: Boolean = false,
+                                         annotations: Parameters = Parameters())
+    extends WhiskActionLikeMetaData(name) {
 
   require(exec != null, "exec undefined")
   require(limits != null, "limits undefined")
@@ -442,35 +442,6 @@ object WhiskActionMetaData
     "annotations")
 
   override val cacheEnabled = true
-
-  /*override def get[A >: WhiskActionMetaData](
-    db: ArtifactStore[A],
-    doc: DocId,
-    rev: DocRevision = DocRevision.empty,
-    fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskActionMetaData]): Future[WhiskActionMetaData] = {
-
-    implicit val ec = db.executionContext
-
-    val fa = super.get(db, doc, rev, fromCache)
-
-    fa.flatMap { action =>
-      action.exec match {
-        case exec @ CodeExecAsAttachment2(_, _) =>
-          val boas = new ByteArrayOutputStream()
-          val b64s = Base64.getEncoder().wrap(boas)
-
-          getAttachment[A](db, action.docinfo, attachmentName, b64s).map { _ =>
-            b64s.close()
-            val newAction = action.copy(exec = exec.inline(boas.toByteArray))
-            newAction.revision(action.rev)
-            newAction
-          }
-
-        case _ =>
-          Future.successful(action)
-      }
-    }
-  }*/
 
   /**
    * Resolves an action name if it is contained in a package.

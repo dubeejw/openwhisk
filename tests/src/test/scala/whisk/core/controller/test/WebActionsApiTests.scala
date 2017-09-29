@@ -190,7 +190,7 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
         WhiskActionMetaData(
           actionName.path,
           actionName.name,
-          jsDefault2("??"),
+          jsDefaultMetaData("??"),
           defaultActionParameters,
           annotations = {
             if (actionName.name.asString.startsWith("export_")) {

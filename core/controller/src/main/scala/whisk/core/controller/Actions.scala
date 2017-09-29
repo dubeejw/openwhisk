@@ -226,7 +226,7 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
           act: WhiskActionMetaData =>
             // resolve the action --- special case for sequences that may contain components with '_' as default package
             val action = act.resolve(user.namespace)
-            onComplete(entitleReferencedEntities2(user, Privilege.ACTIVATE, Some(action.exec))) {
+            onComplete(entitleReferencedEntitiesMetaData(user, Privilege.ACTIVATE, Some(action.exec))) {
               case Success(_) =>
                 val actionWithMergedParams = env.map(action.inherit(_)) getOrElse action
                 val waitForResponse = if (blocking) Some(waitOverride) else None
@@ -386,10 +386,10 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
     }
   }
 
-  private def entitleReferencedEntities2(user: Identity, right: Privilege, exec: Option[Exec2])(
+  private def entitleReferencedEntitiesMetaData(user: Identity, right: Privilege, exec: Option[ExecMetaDataBase])(
     implicit transid: TransactionId) = {
     exec match {
-      case Some(seq: SequenceExec2) =>
+      case Some(seq: SequenceExecMetaData) =>
         logging.info(this, "checking if sequence components are accessible")
         entitlementProvider.check(user, right, referencedEntities(seq))
       case _ => Future.successful(true)

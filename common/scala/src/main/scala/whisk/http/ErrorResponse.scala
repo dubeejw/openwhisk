@@ -35,7 +35,7 @@ import whisk.common.TransactionId
 import whisk.core.entity.SizeError
 import whisk.core.entity.ByteSize
 import whisk.core.entity.Exec
-import whisk.core.entity.Exec2
+import whisk.core.entity.ExecMetaDataBase
 import whisk.core.entity.ActivationId
 
 object Messages {
@@ -59,7 +59,7 @@ object Messages {
   /**
    * Standard message for reporting deprecated runtimes.
    */
-  def runtimeDeprecated(e: Exec2) =
+  def runtimeDeprecated(e: ExecMetaDataBase) =
     s"The '${e.kind}' runtime is no longer supported. You may read and delete but not update or invoke this action."
 
   /** Standard message for resource not found. */
