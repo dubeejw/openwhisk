@@ -34,13 +34,7 @@ import whisk.core.entity.DocInfo
 import whisk.core.entity.DocRevision
 import whisk.core.entity.WhiskDocument
 import whisk.http.Messages
-
-import whisk.core.entity.WhiskAction
-import whisk.core.entity.WhiskActionMetaData
-import whisk.core.entity.WhiskActivation
-import whisk.core.entity.WhiskPackage
-import whisk.core.entity.WhiskTrigger
-import whisk.core.entity.WhiskRule
+import whisk.core.entity.DocumentReader
 
 /**
  * Basic client to put and delete artifacts in a data store.
@@ -53,13 +47,16 @@ import whisk.core.entity.WhiskRule
  * @param dbName the name of the database to operate on
  * @param serializerEvidence confirms the document abstraction is serializable to a Document with an id
  */
-class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
-  dbProtocol: String,
-  dbHost: String,
-  dbPort: Int,
-  dbUsername: String,
-  dbPassword: String,
-  dbName: String)(implicit system: ActorSystem, val logging: Logging, jsonFormat: RootJsonFormat[DocumentAbstraction])
+class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: String,
+                                                                  dbHost: String,
+                                                                  dbPort: Int,
+                                                                  dbUsername: String,
+                                                                  dbPassword: String,
+                                                                  dbName: String)(
+  implicit system: ActorSystem,
+  val logging: Logging,
+  jsonFormat: RootJsonFormat[DocumentAbstraction],
+  docReader: DocumentReader)
     extends ArtifactStore[DocumentAbstraction]
     with DefaultJsonProtocol {
 
@@ -157,18 +154,6 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
           ErrorLevel))
   }
 
-  def newRead[A](ma: Manifest[A], value: JsValue) = {
-    ma.runtimeClass match {
-      case x if x == classOf[WhiskAction]         => WhiskAction.serdes.read(value)
-      case x if x == classOf[WhiskActionMetaData] => WhiskActionMetaData.serdes.read(value)
-      case x if x == classOf[WhiskPackage]        => WhiskPackage.serdes.read(value)
-      case x if x == classOf[WhiskActivation]     => WhiskActivation.serdes.read(value)
-      case x if x == classOf[WhiskTrigger]        => WhiskTrigger.serdes.read(value)
-      case x if x == classOf[WhiskRule]           => WhiskRule.serdes.read(value)
-      case _                                      => throw DocumentUnreadable(Messages.corruptedEntity)
-    }
-  }
-
   override protected[database] def get[A <: DocumentAbstraction](doc: DocInfo)(implicit transid: TransactionId,
                                                                                ma: Manifest[A]): Future[A] = {
 
@@ -187,7 +172,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](
           transid.finished(this, start, s"[GET] '$dbName' completed: found document '$doc'")
 
           val asFormat = try {
-            newRead(ma, response)
+            docReader.read(ma, response)
           } catch {
             case e: Exception => jsonFormat.read(response)
           }
