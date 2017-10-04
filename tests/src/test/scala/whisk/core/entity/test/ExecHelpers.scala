@@ -27,6 +27,9 @@ import whisk.core.entity._
 import whisk.core.entity.ArgNormalizer.trim
 import whisk.core.entity.ExecManifest._
 
+import spray.json._
+import spray.json.DefaultJsonProtocol._
+
 trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   self: Suite =>
 
@@ -37,6 +40,9 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   protected val NODEJS6 = "nodejs:6"
   protected val SWIFT = "swift"
   protected val SWIFT3 = "swift:3"
+  protected val JAVA_DEFAULT = "java"
+
+  private def attFmt[T: JsonFormat] = Attachments.serdes[T]
 
   protected def imagename(name: String) =
     ExecManifest.ImageName(s"${name}action".replace(":", ""), Some("openwhisk"), Some("latest"))
@@ -54,6 +60,13 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
 
   protected def jsDefault(code: String, main: Option[String] = None) = {
     js6(code, main)
+  }
+
+  protected def javaDefault(code: String, main: Option[String] = None) = {
+    val attachment = attFmt[String].read(code.trim.toJson)
+    val manifest = ExecManifest.runtimesManifest.resolveDefaultRuntime(JAVA_DEFAULT).get
+
+    CodeExecAsAttachment(manifest, attachment, main.map(_.trim))
   }
 
   protected def swift(code: String, main: Option[String] = None) = {
