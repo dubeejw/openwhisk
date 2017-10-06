@@ -568,7 +568,8 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
   }
 
   it should "put and then get a Java action from cache" in {
-    val action = WhiskAction(namespace, aname(), javaDefault("ZHViZWU=", Some("hello")), annotations = Parameters("exec", "java"))
+    val action =
+      WhiskAction(namespace, aname(), javaDefault("ZHViZWU=", Some("hello")), annotations = Parameters("exec", "java"))
     val content = WhiskActionPut(
       Some(action.exec),
       Some(action.parameters),
@@ -591,7 +592,7 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
           action.annotations ++ Parameters(WhiskAction.execFieldName, JAVA_DEFAULT)).toJson)
     }
     stream.toString should include(s"caching ${CacheKey(action)}")
-    stream.toString should not include(s"invalidating ${CacheKey(action)} on delete")
+    stream.toString should not include (s"invalidating ${CacheKey(action)} on delete")
     stream.reset()
 
     // second request should fetch from cache
