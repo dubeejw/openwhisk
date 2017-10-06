@@ -314,7 +314,10 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
           val manifest = exec.manifest.attached.get
 
           for (i1 <- super.put(db, newDoc);
-               i2 <- attach[A](db, newDoc, i1, manifest.attachmentName, manifest.attachmentType, stream)) yield i2
+               i2 <- attach[A](db, newDoc, i1, manifest.attachmentName, manifest.attachmentType, stream, Some {
+                 a: WhiskAction =>
+                   a.copy(exec = exec.inline(code.getBytes("UTF-8")))
+               })) yield i2
 
         case _ =>
           super.put(db, doc)
@@ -341,11 +344,9 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
         case exec @ CodeExecAsAttachment(_, Attached(attachmentName, _), _, _) =>
           val boas = new ByteArrayOutputStream()
 
-          getAttachment[A](db, action.docinfo, attachmentName, boas).map { _ =>
-            val newAction = action.copy(exec = exec.inline(boas.toByteArray))
-            newAction.revision(action.rev)
-            newAction
-          }
+          getAttachment[A](db, action, action.docinfo, attachmentName, boas, Some { a: WhiskAction =>
+            a.copy(exec = exec.inline(boas.toByteArray))
+          })
 
         case _ =>
           Future.successful(action)
