@@ -575,6 +575,15 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
       Some(action.parameters),
       Some(ActionLimitsOption(Some(action.limits.timeout), Some(action.limits.memory), Some(action.limits.logs))))
     val name = action.name
+    val cacheKey = s"${CacheKey(action)}".replace("(", "\\(").replace(")", "\\)")
+    val expectedPutLog = Seq(
+      s"caching $cacheKey",
+      s"uploading attachment 'jarfile' of document 'id: ${action.namespace}/${action.name}",
+      s"completed uploading attachment 'jarfile' of document 'id: ${action.namespace}/${action.name}",
+      s"caching $cacheKey").mkString("(?s).*")
+    val notExpectedGetLog = Seq(
+      s"finding document: 'id: ${action.namespace}/${action.name}",
+      s"finding attachment 'jarfile' of document 'id: ${action.namespace}/${action.name}").mkString("(?s).*")
 
     // first request invalidates any previous entries and caches new result
     Put(s"$collectionPath/$name", content) ~> Route.seal(routes(creds)(transid())) ~> check {
@@ -591,8 +600,9 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
           action.publish,
           action.annotations ++ Parameters(WhiskAction.execFieldName, JAVA_DEFAULT)))
     }
-    stream.toString should include(s"caching ${CacheKey(action)}")
+
     stream.toString should not include (s"invalidating ${CacheKey(action)} on delete")
+    stream.toString should include regex (expectedPutLog)
     stream.reset()
 
     // second request should fetch from cache
@@ -610,7 +620,9 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
           action.publish,
           action.annotations ++ Parameters(WhiskAction.execFieldName, JAVA_DEFAULT)))
     }
+
     stream.toString should include(s"serving from cache: ${CacheKey(action)}")
+    stream.toString should not include regex(notExpectedGetLog)
     stream.reset()
 
     // delete should invalidate cache

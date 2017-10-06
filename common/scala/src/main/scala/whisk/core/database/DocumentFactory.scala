@@ -170,7 +170,8 @@ trait DocumentFactory[W] extends MultipleReadersSingleWriterCache[W, DocInfo] {
     doc: DocInfo,
     attachmentName: String,
     contentType: ContentType,
-    bytes: InputStream)(implicit transid: TransactionId, notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
+    bytes: InputStream,
+    postProcess: Option[W => W] = None)(implicit transid: TransactionId, notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
 
     Try {
       require(db != null, "db undefined")
@@ -182,9 +183,10 @@ trait DocumentFactory[W] extends MultipleReadersSingleWriterCache[W, DocInfo] {
 
       val key = CacheKey(entity)
       val src = StreamConverters.fromInputStream(() => bytes)
+      val e = postProcess map { _(entity) } getOrElse entity
 
-      cacheUpdate(entity, key, db.attach(doc, attachmentName, contentType, src) map { docinfo =>
-        entity match {
+      cacheUpdate(e, key, db.attach(doc, attachmentName, contentType, src) map { docinfo =>
+        e match {
           // if doc has a revision id, update it with new version
           case w: DocumentRevisionProvider => w.revision[W](docinfo.rev)
         }
@@ -250,26 +252,39 @@ trait DocumentFactory[W] extends MultipleReadersSingleWriterCache[W, DocInfo] {
     }
   }
 
-  def getAttachment[Wsuper >: W](db: ArtifactStore[Wsuper],
-                                 doc: DocInfo,
-                                 attachmentName: String,
-                                 outputStream: OutputStream)(implicit transid: TransactionId): Future[Unit] = {
+  def getAttachment[Wsuper >: W](
+    db: ArtifactStore[Wsuper],
+    entity: W,
+    doc: DocInfo,
+    attachmentName: String,
+    outputStream: OutputStream,
+    postProcess: Option[W => W] = None)(implicit transid: TransactionId, mw: Manifest[W]): Future[W] = {
 
     implicit val ec = db.executionContext
+    implicit val notifier: Option[CacheChangeNotification] = None
 
     Try {
       require(db != null, "db defined")
       require(doc != null, "doc undefined")
     } map { _ =>
+      implicit val logger = db.logging
+      implicit val ec = db.executionContext
+
+      val key = CacheKey(entity)
       val sink = StreamConverters.fromOutputStream(() => outputStream)
+
       db.readAttachment[IOResult](doc, attachmentName, sink).map {
         case (_, r) =>
-          if (!r.wasSuccessful) {
-            // FIXME...
-            // Figure out whether OutputStreams are even a decent model.
+          val e = postProcess map { _(entity) } getOrElse entity
+
+          cacheUpdate(e, key, Future.successful(doc)) map { docinfo =>
+            e match {
+              case w: DocumentRevisionProvider => w.revision[W](docinfo.rev)
+            }
           }
-          ()
+          e
       }
+
     } match {
       case Success(f) => f
       case Failure(t) => Future.failed(t)
