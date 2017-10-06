@@ -37,6 +37,7 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   protected val NODEJS6 = "nodejs:6"
   protected val SWIFT = "swift"
   protected val SWIFT3 = "swift:3"
+  protected val JAVA_DEFAULT = "java"
 
   protected def imagename(name: String) =
     ExecManifest.ImageName(s"${name}action".replace(":", ""), Some("openwhisk"), Some("latest"))
@@ -54,6 +55,13 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
 
   protected def jsDefault(code: String, main: Option[String] = None) = {
     js6(code, main)
+  }
+
+  protected def javaDefault(code: String, main: Option[String] = None) = {
+    CodeExecAsString(
+      RuntimeManifest(JAVA_DEFAULT, imagename(JAVA_DEFAULT), default = Some(true), deprecated = Some(false)),
+      trim(code),
+      main.map(_.trim))
   }
 
   protected def swift(code: String, main: Option[String] = None) = {
