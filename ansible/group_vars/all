@@ -46,20 +46,32 @@ runtimesManifestDefault:
       image:
         name: "nodejs6action"
       deprecated: false
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
     python:
     - kind: "python"
       image:
         name: "python2action"
       deprecated: false
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
     - kind: "python:2"
       default: true
       image:
         name: "python2action"
       deprecated: false
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
     - kind: "python:3"
       image:
         name: "python3action"
       deprecated: false
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
     swift:
     - kind: "swift"
       image:
@@ -69,11 +81,17 @@ runtimesManifestDefault:
       image:
         name: "swift3action"
       deprecated: false
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
     - kind: "swift:3.1.1"
       default: true
       image:
         name: "action-swift-v3.1.1"
       deprecated: false
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
     java:
     - kind: "java"
       default: true
@@ -91,6 +109,9 @@ runtimesManifestDefault:
       deprecated: false
       image:
         name: "action-php-v7.1"
+      attached:
+        attachmentName: "codefile"
+        attachmentType: "text/plain"
   blackboxes:
     - name: "dockerskeleton"
 
