@@ -111,7 +111,10 @@ protected[core] case class CodeExecAsAttachment(manifest: RuntimeManifest,
   override val sentinelledLogs = manifest.sentinelledLogs.getOrElse(true)
   override val deprecated = manifest.deprecated.getOrElse(false)
   override val pull = false
-  override lazy val binary = true
+  override lazy val binary = manifest.attached.map { a =>
+      a.attachmentName != "codefile"
+  } getOrElse false
+
   override def codeAsJson = code.toJson
 
   def inline(bytes: Array[Byte]): CodeExecAsAttachment = {

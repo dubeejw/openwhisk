@@ -19,7 +19,6 @@ package whisk.core.entity
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.util.Base64
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -243,7 +242,7 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
           val newDoc = doc.copy(exec = exec.attach)
           newDoc.revision(doc.rev)
 
-          val stream = new ByteArrayInputStream(Base64.getDecoder().decode(code))
+          val stream = new ByteArrayInputStream(code.getBytes)
           val manifest = exec.manifest.attached.get
 
           for (i1 <- super.put(db, newDoc);
@@ -273,10 +272,8 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
       action.exec match {
         case exec @ CodeExecAsAttachment(_, Attached(attachmentName, _), _) =>
           val boas = new ByteArrayOutputStream()
-          val b64s = Base64.getEncoder().wrap(boas)
 
-          getAttachment[A](db, action.docinfo, attachmentName, b64s).map { _ =>
-            b64s.close()
+          getAttachment[A](db, action.docinfo, attachmentName, boas).map { _ =>
             val newAction = action.copy(exec = exec.inline(boas.toByteArray))
             newAction.revision(action.rev)
             newAction
