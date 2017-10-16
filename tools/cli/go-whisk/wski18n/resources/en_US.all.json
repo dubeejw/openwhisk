@@ -48,6 +48,14 @@
     "translation": "Authorization key is not configured (--auth is required)"
   },
   {
+    "id": "An API host must be provided.\n",
+    "translation": "An API host must be provided.\n"
+  },
+  {
+    "id": "Unable to add route options '{{.options}}'",
+    "translation": "Unable to add route options: {{.options}}"
+  },
+  {
     "id": "Command failed due to an HTTP failure",
     "translation": "Command failed due to an HTTP failure"
   },
@@ -122,5 +130,37 @@
   {
     "id": "The connection failed, or timed out. (HTTP status code {{.code}})",
     "translation": "The connection failed, or timed out. (HTTP status code {{.code}})"
+  },
+  {
+    "id": "Unable to create request URL, because OpenWhisk API host is missing",
+    "translation": "Unable to create request URL, because OpenWhisk API host is missing"
+  },
+  {
+    "id": "Unable to create request URL, because the api host '{{.host}}' is invalid: {{.err}}",
+    "translation": "Unable to create request URL, because the api host '{{.host}}' is invalid: {{.err}}"
+  },
+  {
+    "id": "Unable to enable the certificate checking due to the reason: {{.err}}.\n",
+    "translation": "Unable to enable the certificate checking due to the reason: {{.err}}.\n"
+  },
+  {
+    "id": "Unable to enable the certificate checking, because both of the certificate and the key are missing.\n",
+    "translation": "Unable to enable the certificate checking, because both of the certificate and the key are missing.\n"
+  },
+  {
+    "id": "OpenWhisk API host is missing (Please configure WHISK_APIHOST in .wskprops under the system HOME directory.)",
+    "translation": "OpenWhisk API host is missing (Please configure WHISK_APIHOST in .wskprops under the system HOME directory.)"
+  },
+  {
+    "id": "OpenWhisk API host is missing (Please configure whisk.api.host.proto, whisk.api.host.name and whisk.api.host.port in whisk.properties under the OPENWHISK_HOME directory.)",
+    "translation": "OpenWhisk API host is missing (Please configure whisk.api.host.proto, whisk.api.host.name and whisk.api.host.port in whisk.properties under the OPENWHISK_HOME directory.)"
+  },
+  {
+    "id": "Authentication key is missing (Please configure AUTH in .wskprops under the system HOME directory.)",
+    "translation": "Authentication key is missing (Please configure AUTH in .wskprops under the system HOME directory.)"
+  },
+  {
+    "id": "Authentication key is missing (Please configure testing.auth as the path of the authentication key file in whisk.properties under the OPENWHISK_HOME directory.)",
+    "translation": "Authentication key is missing (Please configure testing.auth as the path of the authentication key file in whisk.properties under the OPENWHISK_HOME directory.)"
   }
 ]

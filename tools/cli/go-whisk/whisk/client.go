@@ -31,11 +31,11 @@ import (
     "reflect"
     "../wski18n"
     "strings"
+    "time"
     "regexp"
 )
 
 const (
-    defaultBaseURL = "openwhisk.ng.bluemix.net"
     AuthRequired = true
     NoAuth = false
     IncludeNamespaceInUrl = true
@@ -48,6 +48,7 @@ const (
     DoNotProcessTimeOut = false
     ExitWithErrorOnTimeout = true
     ExitWithSuccessOnTimeout = false
+    DEFAULT_HTTP_TIMEOUT = 30
 )
 
 type Client struct {
@@ -86,50 +87,88 @@ type ObfuscateSet struct {
 }
 
 var DefaultObfuscateArr = []ObfuscateSet{
-        {
-            Regex: "\"[Pp]assword\":\\s*\".*\"",
-            Replacement: `"password": "******"`,
-        },
+    {
+        Regex: "\"[Pp]assword\":\\s*\".*\"",
+        Replacement: `"password": "******"`,
+    },
+}
+
+func NewClient(httpClient *http.Client, config_input *Config) (*Client, error) {
+
+    var config *Config
+    if config_input == nil {
+        defaultConfig, err := GetDefaultConfig()
+        if err != nil {
+            return nil ,err
+        } else {
+            config = defaultConfig
+        }
+    } else {
+        config = config_input
     }
 
-func NewClient(httpClient *http.Client, config *Config) (*Client, error) {
+    if httpClient == nil {
+        httpClient = &http.Client{
+            Timeout: time.Second * DEFAULT_HTTP_TIMEOUT,
+        }
+    }
 
-    // Disable certificate checking in the dev environment if in insecure mode
+    var err error
+    var errStr = ""
+    if len(config.Host) == 0 {
+        errStr = wski18n.T("Unable to create request URL, because OpenWhisk API host is missing")
+    } else if config.BaseURL == nil {
+        config.BaseURL, err = GetUrlBase(config.Host)
+        if err != nil {
+            Debug(DbgError, "Unable to create request URL, because the api host %s is invalid\n", config.Host, err)
+            errStr = wski18n.T("Unable to create request URL, because the api host '{{.host}}' is invalid: {{.err}}",
+                map[string]interface{}{"host": config.Host, "err": err})
+        }
+    }
+
+    if len(errStr) != 0 {
+        werr := MakeWskError(errors.New(errStr), EXIT_CODE_ERR_GENERAL, DISPLAY_MSG, NO_DISPLAY_USAGE)
+        return nil, werr
+    }
+
+    var tlsConfig *tls.Config
+    // Disable certificate checking in the environment for insecure mode
     if config.Insecure {
         Debug(DbgInfo, "Disabling certificate checking.\n")
-        var tlsConfig *tls.Config
+        tlsConfig = &tls.Config{
+            InsecureSkipVerify: true,
+        }
         if config.Cert != "" && config.Key != "" {
-            if cert, err := tls.LoadX509KeyPair(config.Cert, config.Key); err == nil {
+            if cert, err := ReadX509KeyPair(config.Cert, config.Key); err == nil {
                 tlsConfig = &tls.Config{
                     Certificates: []tls.Certificate{cert},
                     InsecureSkipVerify: true,
                 }
             }
-        }else{
-            tlsConfig = &tls.Config{
-                InsecureSkipVerify: true,
+        }
+    } else {
+        // Enable certificate checking in the environment for secure mode
+        if config.Cert != "" && config.Key != "" {
+            if cert, err := ReadX509KeyPair(config.Cert, config.Key); err == nil {
+                tlsConfig = &tls.Config{
+                    Certificates: []tls.Certificate{cert},
+                }
+            } else {
+                errStr = wski18n.T("Unable to enable the certificate checking due to the reason: {{.err}}.\n",
+                    map[string]interface{}{ "err": err })
             }
+        } else {
+            errStr = wski18n.T("Unable to enable the certificate checking, because both of the certificate and the key are missing.\n")
         }
 
-        http.DefaultClient.Transport = &http.Transport{
-            TLSClientConfig: tlsConfig,
-        }
-    }
-
-    if httpClient == nil {
-        httpClient = http.DefaultClient
-    }
-
-    var err error
-    if config.BaseURL == nil {
-        config.BaseURL, err = url.Parse(defaultBaseURL)
-        if err != nil {
-            Debug(DbgError, "url.Parse(%s) error: %s\n", defaultBaseURL, err)
-            errStr := wski18n.T("Unable to create request URL '{{.url}}': {{.err}}",
-                map[string]interface{}{"url": defaultBaseURL, "err": err})
+        if len(errStr) != 0 {
             werr := MakeWskError(errors.New(errStr), EXIT_CODE_ERR_GENERAL, DISPLAY_MSG, NO_DISPLAY_USAGE)
             return nil, werr
         }
+    }
+
+    httpClient.Transport = &http.Transport{
+        TLSClientConfig: tlsConfig,
     }
 
     if len(config.Namespace) == 0 {
@@ -160,6 +199,10 @@ func NewClient(httpClient *http.Client, config *Config) (*Client, error) {
     c.Apis = &ApiService{client: c}
 
     return c, nil
+}
+
+var ReadX509KeyPair = func(certFile, keyFile string) (tls.Certificate, error) {
+    return tls.LoadX509KeyPair(certFile, keyFile)
 }
 
 ///////////////////////////////
@@ -325,10 +368,10 @@ func (c *Client) Do(req *http.Request, v interface{}, ExitWithErrorOnTimeout boo
     //   NOTE: Need to ignore activation records send in response to 'wsk get activation NNN` as
     //         these will report the same original error giving the appearance that the command failed.
     if (IsHttpRespSuccess(resp) &&                                      // HTTP Status == 200
-        data!=nil &&                                                    // HTTP response body exists
-        v != nil &&
-        !strings.Contains(reflect.TypeOf(v).String(), "Activation") &&  // Request is not `wsk activation get`
-        !IsResponseResultSuccess(data)) {                               // HTTP response body has Whisk error result
+            data!=nil &&                                                    // HTTP response body exists
+            v != nil &&
+            !strings.Contains(reflect.TypeOf(v).String(), "Activation") &&  // Request is not `wsk activation get`
+            !IsResponseResultSuccess(data)) {                               // HTTP response body has Whisk error result
         Debug(DbgInfo, "Got successful HTTP; but activation response reports an error\n")
         return parseErrorResponse(resp, data, v)
     }
@@ -558,7 +601,7 @@ type WhiskResponse struct {
 }
 
 type WhiskResult struct {
-//  Error   *WhiskError     `json:"error"`  // whisk.error(<string>) and whisk.reject({msg:<string>}) result in two different kinds of 'error' JSON objects
+    //  Error   *WhiskError     `json:"error"`  // whisk.error(<string>) and whisk.reject({msg:<string>}) result in two different kinds of 'error' JSON objects
 }
 
 type WhiskError struct {
@@ -599,13 +642,13 @@ func IsResponseResultSuccess(data []byte) bool {
 //   encodeBodyAs   - specifies body encoding (json or form data)
 //   useAuthentication - when true, the basic Authorization is included with the configured authkey as the value
 func (c *Client) NewRequestUrl(
-        method string,
-        urlRelResource *url.URL,
-        body interface{},
-        includeNamespaceInUrl bool,
-        appendOpenWhiskPath bool,
-        encodeBodyAs string,
-        useAuthentication bool) (*http.Request, error) {
+method string,
+urlRelResource *url.URL,
+body interface{},
+includeNamespaceInUrl bool,
+appendOpenWhiskPath bool,
+encodeBodyAs string,
+useAuthentication bool) (*http.Request, error) {
     var requestUrl *url.URL
     var err error
 
