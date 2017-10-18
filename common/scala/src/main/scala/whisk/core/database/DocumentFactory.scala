@@ -164,14 +164,15 @@ trait DocumentFactory[W] extends MultipleReadersSingleWriterCache[W, DocInfo] {
     }
   }
 
-  def attach[Wsuper >: W](
-    db: ArtifactStore[Wsuper],
-    entity: W,
-    doc: DocInfo,
-    attachmentName: String,
-    contentType: ContentType,
-    bytes: InputStream,
-    postProcess: Option[W => W] = None)(implicit transid: TransactionId, notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
+  def attach[Wsuper >: W](db: ArtifactStore[Wsuper],
+                          entity: W,
+                          doc: DocInfo,
+                          attachmentName: String,
+                          contentType: ContentType,
+                          bytes: InputStream,
+                          postProcess: Option[W => W] = None)(
+    implicit transid: TransactionId,
+    notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
 
     Try {
       require(db != null, "db undefined")
@@ -274,7 +275,7 @@ trait DocumentFactory[W] extends MultipleReadersSingleWriterCache[W, DocInfo] {
       val sink = StreamConverters.fromOutputStream(() => outputStream)
 
       db.readAttachment[IOResult](doc, attachmentName, sink).map {
-        case (_, r) =>
+        case _ =>
           val e = postProcess map { _(entity) } getOrElse entity
 
           cacheUpdate(e, key, Future.successful(doc)) map { docinfo =>
