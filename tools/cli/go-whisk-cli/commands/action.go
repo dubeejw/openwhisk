@@ -82,6 +82,13 @@ var actionCreateCmd = &cobra.Command{
                 return whiskErr
         }
 
+
+        if len(args) == 1 {
+          filename := args[0]
+          actionName := strings.Split(filename, ".")[0]
+          args = append([]string{actionName}, args...)
+        }
+
         if action, err = parseAction(cmd, args, false); err != nil {
             return actionParseError(cmd, args, err)
         }
