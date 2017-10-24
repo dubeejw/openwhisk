@@ -1,6 +1,7 @@
 include 'common:scala'
 
 include 'core:controller'
+include 'core:createController'
 include 'core:invoker'
 include 'core:nodejs6Action'
 include 'core:actionProxy'

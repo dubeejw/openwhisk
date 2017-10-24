@@ -118,6 +118,40 @@ controller:
       # at this moment all controllers are seed nodes
       seedNodes: "{{ groups['controllers'] | map('extract', hostvars, 'ansible_host') | list }}"
 
+controllerCRUDActivate:
+  create:
+    basePort: 10003
+  read:
+    basePort: 10004
+  update:
+    basePort: 10005
+  delete:
+    basePort: 10006
+  activate:
+    basePort: 10007
+  heap: "{{ controller_heap | default('2g') }}"
+  arguments: "{{ controller_arguments | default('') }}"
+  blackboxFraction: "{{ controller_blackbox_fraction | default(0.10) }}"
+  instances: "{{ groups['controllers'] | length }}"
+  localBookkeeping: "{{ controller_local_bookkeeping | default('true') }}"
+  akka:
+    provider: cluster
+    cluster:
+      create:
+        basePort: 8001
+      read:
+        basePort: 8002
+      update:
+        basePort: 8003
+      delete:
+        basePort: 8004
+      activate:
+        basePort: 8005
+      host: "{{ groups['controllers'] | map('extract', hostvars, 'ansible_host') | list }}"
+      bindPort: 2551
+      # at this moment all controllers are seed nodes
+      seedNodes: "{{ groups['controllers'] | map('extract', hostvars, 'ansible_host') | list }}"
+
 registry:
   confdir: "{{ config_root_dir }}/registry"
 

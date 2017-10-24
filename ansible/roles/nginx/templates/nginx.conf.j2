@@ -64,6 +64,11 @@ http {
               rewrite    /(.*) /api/v1/web/${namespace}/$1 break;
             }
             proxy_pass http://controllers;
+
+            # if ($request_method = 'PUT) {
+            #     proxy_pass http://{{ groups['controllers']|first }}:{{ 10003 }};
+            # }
+
             proxy_read_timeout 70s; # 60+10 additional seconds to allow controller to terminate request
         }
 
