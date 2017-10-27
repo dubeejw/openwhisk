@@ -27,7 +27,7 @@
 
 - name: create seed nodes list
   set_fact:
-    seed_nodes_list: "{{ seed_nodes_list | default([]) }} + [ \"{{item.1}}:{{controllerCRUDActivate.akka.cluster.delete.basePort+item.0}}\" ]"
+    seed_nodes_list: "{{ seed_nodes_list | default([]) }} + [ \"{{item.1}}:{{controllerCRUDActivate.akka.cluster.updates.basePort+item.0}}\" ]"
   with_indexed_items:
   - "{{ controllerCRUDActivate.akka.cluster.seedNodes }}"
 
@@ -74,7 +74,7 @@
 
       "RUNTIMES_MANIFEST": "{{ runtimesManifest | to_json }}"
       "CONTROLLER_LOCALBOOKKEEPING": "{{ controllerCRUDActivate.localBookkeeping }}"
-      "AKKA_CLUSTER_PORT": "{{ controllerCRUDActivate.akka.cluster.update.basePort + groups['controllers'].index(inventory_hostname) }}"
+      "AKKA_CLUSTER_PORT": "{{ controllerCRUDActivate.akka.cluster.updates.basePort + groups['controllers'].index(inventory_hostname) }}"
       "AKKA_CLUSTER_HOST": "{{ controllerCRUDActivate.akka.cluster.host[groups['controllers'].index(inventory_hostname)] }}"
       "AKKA_CLUSTER_SEED_NODES": "{{seed_nodes_list | join(' ') }}"
       "AKKA_CLUSTER_BIND_PORT": "{{ controllerCRUDActivate.akka.cluster.bindPort }}"
@@ -82,13 +82,13 @@
     volumes:
       - "{{ whisk_logs_dir }}/updatecontroller{{ groups['controllers'].index(inventory_hostname) }}:/logs"
     ports:
-      - "{{ controllerCRUDActivate.update.basePort + groups['controllers'].index(inventory_hostname) }}:8080"
-      - "{{ controllerCRUDActivate.akka.cluster.update.basePort + groups['controllers'].index(inventory_hostname) }}:{{ controllerCRUDActivate.akka.cluster.bindPort }}"
+      - "{{ controllerCRUDActivate.updates.basePort + groups['controllers'].index(inventory_hostname) }}:8080"
+      - "{{ controllerCRUDActivate.akka.cluster.updates.basePort + groups['controllers'].index(inventory_hostname) }}:{{ controllerCRUDActivate.akka.cluster.bindPort }}"
     command: /bin/sh -c "export CONTAINER_IP=$(hostname -I); controller/bin/controller {{ groups['controllers'].index(inventory_hostname) }} >> /logs/updatecontroller{{ groups['controllers'].index(inventory_hostname) }}_logs.log 2>&1"
 
 - name: wait until the Controller in this host is up and running
   uri:
-    url: "http://{{ ansible_host }}:{{ controllerCRUDActivate.update.basePort + groups['controllers'].index(inventory_hostname) }}/ping"
+    url: "http://{{ ansible_host }}:{{ controllerCRUDActivate.updates.basePort + groups['controllers'].index(inventory_hostname) }}/ping"
   register: result
   until: result.status == 200
   retries: 12

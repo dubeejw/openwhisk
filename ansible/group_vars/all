@@ -123,7 +123,7 @@ controllerCRUDActivate:
     basePort: 10003
   read:
     basePort: 10004
-  update:
+  updates:
     basePort: 10005
   delete:
     basePort: 10006
@@ -141,7 +141,7 @@ controllerCRUDActivate:
         basePort: 8001
       read:
         basePort: 8002
-      update:
+      updates:
         basePort: 8003
       delete:
         basePort: 8004
