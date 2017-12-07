@@ -3,6 +3,10 @@
 
 - include: docker_login.yml
 
+- name: Print phone records
+  debug:
+    msg: "User controller{{ groups['all-controllers'].index(inventory_hostname) }}"
+
 - name: "pull the {{ docker.image.tag }} image of controller"
   shell: "docker pull {{ docker_registry }}{{ docker.image.prefix }}/controller:{{ docker.image.tag }}"
   when: docker_registry != ""
@@ -11,7 +15,7 @@
 
 - name: ensure controller log directory is created with permissions
   file:
-    path: "{{ whisk_logs_dir }}/controller{{ groups['controllers'].index(inventory_hostname) }}"
+    path: "{{ whisk_logs_dir }}/controller{{ groups['all-controllers'].index(inventory_hostname) }}"
     state: directory
     mode: 0777
   become: "{{ logs.dir.become }}"
@@ -33,18 +37,18 @@
 
 - name: (re)start controller
   docker_container:
-    name: controller{{ groups['controllers'].index(inventory_hostname) }}
+    name: controller{{ groups['all-controllers'].index(inventory_hostname) }}
     image: "{{ docker_registry }}{{ docker.image.prefix }}/controller:{{ docker.image.tag }}"
     state: started
     recreate: true
     restart_policy: "{{ docker.restart.policy }}"
-    hostname: "controller{{ groups['controllers'].index(inventory_hostname) }}"
+    hostname: "controller{{ groups['all-controllers'].index(inventory_hostname) }}"
     env:
       "JAVA_OPTS": "-Xmx{{ controller.heap }} -XX:+CrashOnOutOfMemoryError -XX:+UseGCOverheadLimit -XX:ErrorFile=/logs/java_error.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/logs"
       "CONTROLLER_OPTS": "{{ controller.arguments }}"
       "CONTROLLER_INSTANCES": "{{ controller.instances }}"
 
-      "COMPONENT_NAME": "controller{{ groups['controllers'].index(inventory_hostname) }}"
+      "COMPONENT_NAME": "controller{{ groups['all-controllers'].index(inventory_hostname) }}"
       "PORT": 8080
 
       "WHISK_VERSION_NAME": "{{ whisk_version_name }}"
@@ -88,8 +92,8 @@
       "CONFIG_whisk_loadbalancer_blackboxFraction": "{{ controller.blackboxFraction }}"
 
       "CONFIG_akka_actor_provider": "{{ controller.akka.provider }}"
-      "CONFIG_akka_remote_netty_tcp_hostname": "{{ controller.akka.cluster.host[groups['controllers'].index(inventory_hostname)] }}"
-      "CONFIG_akka_remote_netty_tcp_port": "{{ controller.akka.cluster.basePort + groups['controllers'].index(inventory_hostname) }}"
+      "CONFIG_akka_remote_netty_tcp_hostname": "{{ controller.akka.cluster.host[groups['all-controllers'].index(inventory_hostname)] }}"
+      "CONFIG_akka_remote_netty_tcp_port": "{{ controller.akka.cluster.basePort + groups['all-controllers'].index(inventory_hostname) }}"
       "CONFIG_akka_remote_netty_tcp_bindPort": "{{ controller.akka.cluster.bindPort }}"
 
       "CONFIG_kamon_statsd_hostname": "{{ metrics.kamon.host }}"
@@ -97,15 +101,15 @@
 
       "CONFIG_whisk_spi_LogStoreProvider": "{{ userLogs.spi }}"
     volumes:
-      - "{{ whisk_logs_dir }}/controller{{ groups['controllers'].index(inventory_hostname) }}:/logs"
+      - "{{ whisk_logs_dir }}/controller{{ groups['all-controllers'].index(inventory_hostname) }}:/logs"
     ports:
-      - "{{ controller.basePort + groups['controllers'].index(inventory_hostname) }}:8080"
-      - "{{ controller.akka.cluster.basePort + groups['controllers'].index(inventory_hostname) }}:{{ controller.akka.cluster.bindPort }}"
-    command: /bin/sh -c "exec /init.sh {{ groups['controllers'].index(inventory_hostname) }} >> /logs/controller{{ groups['controllers'].index(inventory_hostname) }}_logs.log 2>&1"
+      - "{{ controller.basePort + groups['all-controllers'].index(inventory_hostname) }}:8080"
+      - "{{ controller.akka.cluster.basePort + groups['all-controllers'].index(inventory_hostname) }}:{{ controller.akka.cluster.bindPort }}"
+    command: /bin/sh -c "exec /init.sh {{ groups['all-controllers'].index(inventory_hostname) }} >> /logs/controller{{ groups['all-controllers'].index(inventory_hostname) }}_logs.log 2>&1"
 
 - name: wait until the Controller in this host is up and running
   uri:
-    url: "http://{{ ansible_host }}:{{ controller.basePort + groups['controllers'].index(inventory_hostname) }}/ping"
+    url: "http://{{ ansible_host }}:{{ controller.basePort + groups['all-controllers'].index(inventory_hostname) }}/ping"
   register: result
   until: result.status == 200
   retries: 12
