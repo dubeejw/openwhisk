@@ -102,6 +102,7 @@ protected[core] object ActivationResponse extends DefaultJsonProtocol {
   protected[core] case class Timeout() extends ContainerHttpError
 
   protected[core] case class MemoryExhausted() extends ContainerConnectionError
+  protected[core] case class Exited() extends ContainerConnectionError
 
   /**
    * @param statusCode the container HTTP response code (e.g., 200 OK)
@@ -160,6 +161,9 @@ protected[core] object ActivationResponse extends DefaultJsonProtocol {
       case Left(_: MemoryExhausted) =>
         containerError(memoryExhausted)
 
+      case Left(_: Exited) =>
+        containerError(exited)
+
       case Left(e) =>
         // This indicates a terminal failure in the container (it exited prematurely).
         containerError(abnormalInitialization)
@@ -213,6 +217,9 @@ protected[core] object ActivationResponse extends DefaultJsonProtocol {
 
       case Left(_: MemoryExhausted) =>
         containerError(memoryExhausted)
+
+      case Left(_: Exited) =>
+        containerError(exited)
 
       case Left(e) =>
         // This indicates a terminal failure in the container (it exited prematurely).

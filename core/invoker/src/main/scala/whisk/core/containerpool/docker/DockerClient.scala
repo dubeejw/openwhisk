@@ -175,6 +175,9 @@ class DockerClient(dockerHost: Option[String] = None,
   def isOomKilled(id: ContainerId)(implicit transid: TransactionId): Future[Boolean] =
     runCmd(Seq("inspect", id.asString, "--format", "{{.State.OOMKilled}}"), timeouts.inspect).map(_.toBoolean)
 
+  def isExited(id: ContainerId)(implicit transid: TransactionId): Future[Boolean] =
+    runCmd(Seq("inspect", id.asString, "--format", "{{.State.Status}}"), timeouts.inspect).map(_ == "exited")
+
   private def runCmd(args: Seq[String], timeout: Duration)(implicit transid: TransactionId): Future[String] = {
     val cmd = dockerCmd ++ args
     val start = transid.started(
@@ -262,6 +265,9 @@ trait DockerApi {
    * @return a Future containing whether the container was killed or not
    */
   def isOomKilled(id: ContainerId)(implicit transid: TransactionId): Future[Boolean]
+
+
+  def isExited(id: ContainerId)(implicit transid: TransactionId): Future[Boolean]
 }
 
 /** Indicates any error while starting a container that leaves a broken container behind that needs to be removed */

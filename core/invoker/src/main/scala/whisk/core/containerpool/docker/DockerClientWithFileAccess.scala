@@ -140,6 +140,11 @@ class DockerClientWithFileAccess(dockerHost: Option[String] = None,
       .map(_.fields("State").asJsObject.fields("OOMKilled").convertTo[Boolean])
       .recover { case _ => false }
 
+  override def isExited(id: ContainerId)(implicit transid: TransactionId): Future[Boolean] =
+    configFileContents(containerConfigFile(id))
+        .map(_.fields("State").asJsObject.fields("Status").convertTo[Boolean])
+        .recover { case _ => false }
+
   private val readChunkSize = 8192 // bytes
   override def rawContainerLogs(containerId: ContainerId,
                                 fromPos: Long,

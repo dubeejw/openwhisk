@@ -30,7 +30,7 @@ import scala.concurrent.duration._
 import whisk.common.Logging
 import whisk.common.TransactionId
 import whisk.core.containerpool._
-import whisk.core.entity.ActivationResponse.{ConnectionError, MemoryExhausted}
+import whisk.core.entity.ActivationResponse.{ConnectionError, MemoryExhausted, Exited}
 import whisk.core.entity.ByteSize
 import whisk.core.entity.size._
 import akka.stream.scaladsl.{Framing, Source}
@@ -184,6 +184,15 @@ class DockerContainer(protected val id: ContainerId,
     }
   }
 
+  private def isExited(retries: Int = (waitForOomState / filePollInterval).toInt)(
+      implicit transid: TransactionId): Future[Boolean] = {
+    docker.isExited(id)(TransactionId.invoker).flatMap { killed =>
+      if (killed) Future.successful(true)
+      else if (retries > 0) akka.pattern.after(filePollInterval, as.scheduler)(isExited(retries - 1))
+      else Future.successful(false)
+    }
+  }
+
   override protected def callContainer(path: String, body: JsObject, timeout: FiniteDuration, retry: Boolean = false)(
     implicit transid: TransactionId): Future[RunResult] = {
     val started = Instant.now()
@@ -204,6 +213,10 @@ class DockerContainer(protected val id: ContainerId,
           case error: ConnectionError =>
             isOomKilled().map {
               case true  => MemoryExhausted()
+              case false => error
+            }
+            isExited().map {
+              case true  => Exited()
               case false => error
             }
           case other => Future.successful(other)
