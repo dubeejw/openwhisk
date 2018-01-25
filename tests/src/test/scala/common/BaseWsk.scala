@@ -42,7 +42,7 @@ case class WskProps(
     WhiskProperties.getFileRelativeToWhiskHome("ansible/roles/nginx/files/openwhisk-client-key.pem").getAbsolutePath,
   namespace: String = "_",
   apiversion: String = "v1",
-  apihost: String = WhiskProperties.getEdgeHost,
+  apihost: String = WhiskProperties.getApiHost,
   token: String = "") {
   def overrides = Seq("-i", "--apihost", apihost, "--apiversion", apiversion)
   def writeFile(propsfile: File) = {
