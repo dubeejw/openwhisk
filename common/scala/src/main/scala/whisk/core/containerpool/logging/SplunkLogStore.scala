@@ -18,6 +18,7 @@
 package whisk.core.containerpool.logging
 
 import akka.actor.ActorSystem
+
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.client.RequestBuilding.Post
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._

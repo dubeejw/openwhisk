@@ -18,6 +18,7 @@
 package whisk.core.containerpool.logging
 
 import java.nio.file.{Path, Paths}
+import java.nio.file.{Paths}
 import java.time.Instant
 
 import akka.NotUsed
@@ -26,6 +27,18 @@ import akka.stream.alpakka.file.scaladsl.LogRotatorSink
 import akka.stream.{Graph, SinkShape, UniformFanOutShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, MergeHub, Sink, Source}
 import akka.util.ByteString
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.client.RequestBuilding.Post
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.model.HttpRequest
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.model.Uri.Path
+import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.stream.ActorMaterializer
+import akka.stream.OverflowStrategy
+import akka.stream.QueueOfferResult
 
 import whisk.common.TransactionId
 import whisk.core.containerpool.Container
@@ -36,7 +49,18 @@ import whisk.http.Messages
 import spray.json._
 import spray.json.DefaultJsonProtocol._
 
+import whisk.common.AkkaLogging
+import whisk.http.Messages
+
 import scala.concurrent.Future
+import scala.concurrent.Promise
+import scala.util.Failure
+import scala.util.Success
+
+import com.typesafe.sslconfig.akka.AkkaSSLConfig
+
+import spray.json._
+import spray.json.DefaultJsonProtocol._
 
 /**
  * Docker based implementation of a LogStore.
@@ -47,8 +71,20 @@ import scala.concurrent.Future
  *
  * Additionally writes logs to a separate file which can be processed by any backend service asynchronously.
  */
-class DockerToActivationFileLogStore(system: ActorSystem, destinationDirectory: Path = Paths.get("logs"))
+class DockerToActivationFileLogStore(system: ActorSystem, destinationDirectory: java.nio.file.Path = Paths.get("logs"))
     extends DockerToActivationLogStore(system) {
+
+  implicit val as = system
+  implicit val materializer = ActorMaterializer()
+
+  private val logging = new AkkaLogging(system.log)
+
+  val maxPendingRequests = 500
+  val defaultHttpFlow = Http().cachedHostConnectionPoolHttps[Promise[HttpResponse]](
+    host = "logging.stage1.ng.bluemix.net",
+    port = 443,
+    connectionContext =
+      Http().createClientHttpsContext(AkkaSSLConfig().mapSettings(s => s.withLoose(s.loose.withDisableSNI(true)))))
 
   /**
    * End of an event as written to a file. Closes the json-object and also appends a newline.
@@ -132,6 +168,79 @@ class DockerToActivationFileLogStore(system: ActorSystem, destinationDirectory: 
       } else {
         Future.failed(LogCollectingException(logs))
       }
+    }
+  }
+
+  def transcribeLogs(elkResult: JsObject): ActivationLogs = {
+    val hits = elkResult.fields("hits").asJsObject.fields("hits").asInstanceOf[JsArray].elements
+    val logs = hits.map(hit => {
+      val source = hit.asJsObject.fields("_source").asJsObject
+      val timeDate = source.fields("time_date").convertTo[String]
+      val streamSource = source.fields("stream_str").convertTo[String]
+      val msg = source.fields("message").convertTo[String].stripLineEnd
+
+      s"$timeDate $streamSource: $msg"
+    })
+
+    ActivationLogs(logs)
+  }
+
+  def elkLogQuery =
+    JsObject(
+      "query" -> JsObject(
+        "query_string" -> JsObject("query" -> JsString(s"_type: user_logs")
+        //"query" -> JsString(s"_type: user_logs AND activationId_str: ${activation.activationId}")                 // TODO: Really use this query though
+        ))).compactPrint
+
+  def queueElkQuery(query: String, authTokenValue: String) = {
+    val authTokenName = "x-auth-token"
+    //val authTokenValue = "eyJhbGciOiJIUzI1NiIsImtpZCI6ImtleS0xIiwidHlwIjoiSldUIn0.eyJqdGkiOiJkNWY3Y2ZlOTgxNmM0OTE3ODI4ZmM2NzJkY2NiMzA1MiIsInN1YiI6IjRhNDI4ZGFkLWJhY2EtNDQwZi1iMzM4LTA3ODYzNmU3MjliMyIsInNjb3BlIjpbImNsb3VkX2NvbnRyb2xsZXIucmVhZCIsInBhc3N3b3JkLndyaXRlIiwiY2xvdWRfY29udHJvbGxlci53cml0ZSIsIm9wZW5pZCIsInVhYS51c2VyIl0sImNsaWVudF9pZCI6ImNmIiwiY2lkIjoiY2YiLCJhenAiOiJjZiIsImdyYW50X3R5cGUiOiJwYXNzd29yZCIsInVzZXJfaWQiOiI0YTQyOGRhZC1iYWNhLTQ0MGYtYjMzOC0wNzg2MzZlNzI5YjMiLCJvcmlnaW4iOiJ1YWEiLCJ1c2VyX25hbWUiOiJsaW1lQHVzLmlibS5jb20iLCJlbWFpbCI6ImxpbWVAdXMuaWJtLmNvbSIsImlhdCI6MTUxOTM0MjY4NiwiZXhwIjoxNTIwNTUyMjg2LCJpc3MiOiJodHRwczovL3VhYS5zdGFnZTEubmcuYmx1ZW1peC5uZXQvb2F1dGgvdG9rZW4iLCJ6aWQiOiJ1YWEiLCJhdWQiOlsiY2xvdWRfY29udHJvbGxlciIsInBhc3N3b3JkIiwiY2YiLCJ1YWEiLCJvcGVuaWQiXX0.eQZzP8prEnWHSheGZaZG6tIgcKg-PexHncaDsOpaVT0"
+    val authTokenHeader = RawHeader(authTokenName, authTokenValue)
+    val projectIdName = "x-auth-project-id"
+    val projectIdValue = "78bcd3f2-2e1e-4614-bef6-59ff316333a2" // TODO: Get UUID from Basic Auth
+    val projectIdHeader = RawHeader(projectIdName, projectIdValue)
+    val headers = List(authTokenHeader, projectIdHeader)
+    val searchApi = Path / "elasticsearch" / "logstash-78bcd3f2-2e1e-4614-bef6-59ff316333a2-2018.02.22" / "_search" // TODO: figure out UTC date for index
+
+    queueRequest(Post(Uri(path = searchApi)).withEntity(query).withHeaders(headers))
+  }
+
+  override def fetchLogs(user: Identity, activation: WhiskActivation, request: HttpRequest): Future[ActivationLogs] = {
+    logging.info(this, request.toString)
+    logging.info(this, s"ID ${user.uuid}")
+
+    val authTokenValue
+      : String = request.getHeader("x-auth-token").get.value //val header = request.getHeader("x-auth-token"); if header.isPresent .. else ""
+    logging.info(this, s"x-auth-token: $authTokenValue")
+
+    queueElkQuery(elkLogQuery, authTokenValue).flatMap(response => {
+      logging.info(this, s"Log query response ${response}")
+      Unmarshal(response.entity).to[JsObject].map(res => transcribeLogs(res))
+    })
+  }
+
+  //based on http://doc.akka.io/docs/akka-http/10.0.6/scala/http/client-side/host-level.html
+  val queue =
+    Source
+      .queue[(HttpRequest, Promise[HttpResponse])](maxPendingRequests, OverflowStrategy.dropNew)
+      .via(defaultHttpFlow)
+      .toMat(Sink.foreach({
+        case ((Success(resp), p)) => p.success(resp)
+        case ((Failure(e), p))    => p.failure(e)
+      }))(Keep.left)
+      .run()
+
+  def queueRequest(request: HttpRequest): Future[HttpResponse] = {
+    val responsePromise = Promise[HttpResponse]()
+    queue.offer(request -> responsePromise).flatMap {
+      case QueueOfferResult.Enqueued => responsePromise.future
+      case QueueOfferResult.Dropped =>
+        Future.failed(new RuntimeException("Queue overflowed. Try again later."))
+      case QueueOfferResult.Failure(ex) => Future.failed(ex)
+      case QueueOfferResult.QueueClosed =>
+        Future.failed(
+          new RuntimeException(
+            "API Client Queue was closed (pool shut down) while running the request. Try again later."))
     }
   }
 }
