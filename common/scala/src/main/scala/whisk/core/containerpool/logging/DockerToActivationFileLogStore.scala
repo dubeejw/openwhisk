@@ -17,8 +17,8 @@
 
 package whisk.core.containerpool.logging
 
-import java.nio.file.{Path, Paths}
-import java.nio.file.{Paths}
+//import java.nio.file.{Path, Paths}
+import java.nio.file.Paths
 import java.time.Instant
 
 import akka.NotUsed
@@ -33,7 +33,7 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.model.Uri
-import akka.http.scaladsl.model.Uri.Path
+//import akka.http.scaladsl.model.Uri.Path
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.ActorMaterializer
@@ -200,7 +200,7 @@ class DockerToActivationFileLogStore(system: ActorSystem, destinationDirectory: 
     val projectIdValue = "78bcd3f2-2e1e-4614-bef6-59ff316333a2" // TODO: Get UUID from Basic Auth
     val projectIdHeader = RawHeader(projectIdName, projectIdValue)
     val headers = List(authTokenHeader, projectIdHeader)
-    val searchApi = Path / "elasticsearch" / "logstash-78bcd3f2-2e1e-4614-bef6-59ff316333a2-2018.02.22" / "_search" // TODO: figure out UTC date for index
+    val searchApi = akka.http.scaladsl.model.Uri.Path / "elasticsearch" / "logstash-78bcd3f2-2e1e-4614-bef6-59ff316333a2-2018.02.22" / "_search" // TODO: figure out UTC date for index
 
     queueRequest(Post(Uri(path = searchApi)).withEntity(query).withHeaders(headers))
   }
