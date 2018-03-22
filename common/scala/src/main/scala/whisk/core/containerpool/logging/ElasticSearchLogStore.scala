@@ -18,8 +18,6 @@
 package whisk.core.containerpool.logging
 
 import java.nio.file.{Path, Paths}
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Flow
@@ -109,10 +107,7 @@ class ElasticSearchLogStore(
   }
 
   private def generatePath(user: Identity) = {
-    Uri(
-      elasticSearchConfig.path
-        .replace("$UUID", user.uuid.asString)
-        .replace("$DATE", LocalDate.now.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))))
+    Uri(elasticSearchConfig.path.replace("$UUID", user.uuid.asString))
   }
 
   override def fetchLogs(user: Identity, activation: WhiskActivation, request: HttpRequest): Future[ActivationLogs] = {

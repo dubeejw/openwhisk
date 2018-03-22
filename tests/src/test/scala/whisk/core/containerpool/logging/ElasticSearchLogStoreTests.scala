@@ -18,8 +18,6 @@
 package whisk.core.containerpool.logging
 
 import java.time.ZonedDateTime
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -187,20 +185,19 @@ class ElasticSearchLogStoreTests
     await(esLogStore.fetchLogs(user, activation.withoutLogs, requiredHeadersHttpRequest)) shouldBe expectedLogs
   }
 
-  it should "dynamically replace $UUID and $DATE in request path" in {
+  it should "dynamically replace $UUID in request path" in {
     val dynamicPathConfig =
       ElasticSearchLogStoreConfig(
         "https",
         "host",
         443,
-        "/elasticsearch/logstash-$UUID-$DATE/_search",
+        "/elasticsearch/logstash-$UUID*/_search",
         "user_logs",
         "activationId_str",
         "stream_str",
         "action_str")
     val esLogStore = new ElasticSearchLogStore(system, Some(testFlow), elasticSearchConfig = dynamicPathConfig)
-    val date = LocalDate.now.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-    expectedUri = Uri(s"/elasticsearch/logstash-${user.uuid.asString}-$date/_search")
+    expectedUri = Uri(s"/elasticsearch/logstash-${user.uuid.asString}*/_search")
 
     await(esLogStore.fetchLogs(user, activation.withoutLogs, defaultHttpRequest)) shouldBe expectedLogs
   }
