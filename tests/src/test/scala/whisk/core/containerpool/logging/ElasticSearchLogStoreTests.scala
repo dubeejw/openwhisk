@@ -84,7 +84,7 @@ class ElasticSearchLogStoreTests
       "activationId_str",
       "stream_str",
       "action_str",
-      "x-auth-token,x-auth-project-id")
+      Seq("x-auth-token", "x-auth-project-id"))
   private val defaultHeaders: List[HttpHeader] = List(Accept(MediaTypes.`application/json`))
   private val defaultHttpResponse = HttpResponse(
     StatusCodes.OK,
@@ -191,7 +191,7 @@ class ElasticSearchLogStoreTests
         "https",
         "host",
         443,
-        "/elasticsearch/logstash-$UUID*/_search",
+        "/elasticsearch/logstash-%s*/_search",
         "user_logs",
         "activationId_str",
         "stream_str",
@@ -226,7 +226,7 @@ class ElasticSearchLogStoreTests
         "activationId_str",
         "stream_str",
         "action_str",
-        "none")
+        Seq.empty)
 
     a[IllegalArgumentException] should be thrownBy new ElasticSearchLogStore(
       system,

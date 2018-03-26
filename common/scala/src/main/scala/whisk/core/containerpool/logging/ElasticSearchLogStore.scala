@@ -42,7 +42,7 @@ case class ElasticSearchLogStoreConfig(protocol: String,
                                        activationIdField: String,
                                        streamField: String,
                                        actionField: String,
-                                       requiredHeaders: String = "")
+                                       requiredHeaders: Seq[String] = Seq.empty)
 
 /**
  * ElasticSearch based implementation of a DockerToActivationFileLogStore. When using the JSON log driver, docker writes
@@ -58,7 +58,9 @@ class ElasticSearchLogStore(
     extends DockerToActivationFileLogStore(system, destinationDirectory) {
 
   // Schema of logs in ES
-  case class UserLogEntry(message: String, stream: String, time: String, action: String)
+  case class UserLogEntry(message: String, stream: String, time: String, action: String) {
+    def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
+  }
 
   object UserLogEntry extends DefaultJsonProtocol {
     implicit val serdes =
@@ -77,44 +79,34 @@ class ElasticSearchLogStore(
     elasticSearchConfig.host,
     elasticSearchConfig.port,
     httpFlow)
-  private val requiredHeaders = elasticSearchConfig.requiredHeaders match {
-    case headers if !headers.isEmpty => headers.split(",")
-    case _                           => Array.empty[String]
-  }
-  private val logQuery =
-    s"_type: ${elasticSearchConfig.logMessageField} AND ${elasticSearchConfig.activationIdField}: %s"
 
-  private def transcribeLogs(queryResult: EsSearchResult): ActivationLogs = {
-    val logs = queryResult.hits.hits.map(hit => {
-      val userLogEntry = hit.source.convertTo[UserLogEntry]
-      s"${userLogEntry.time} ${userLogEntry.stream}: ${userLogEntry.message.stripLineEnd}"
-    })
-
-    ActivationLogs(logs)
-  }
+  private def transcribeLogs(queryResult: EsSearchResult): ActivationLogs =
+    ActivationLogs(queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString))
 
   private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
     headers.filter {
-      case header: HttpHeader if requiredHeaders.contains(header.lowercaseName) => true
-      case _                                                                    => false
+      case header: HttpHeader if elasticSearchConfig.requiredHeaders.contains(header.lowercaseName) => true
+      case _                                                                                        => false
     }.toList
 
   private def generatePayload(activation: WhiskActivation) = {
-    val queryString = EsQueryString(logQuery.format(activation.activationId))
+    val logQuery =
+      s"_type: ${elasticSearchConfig.logMessageField} AND ${elasticSearchConfig.activationIdField}: ${activation.activationId}"
+    val queryString = EsQueryString(logQuery)
     val queryOrder = EsQueryOrder("time_date", EsOrderAsc)
 
     EsQuery(queryString, Some(queryOrder)).toJson.asJsObject
   }
 
   private def generatePath(user: Identity) = {
-    Uri(elasticSearchConfig.path.replace("$UUID", user.uuid.asString))
+    Uri(elasticSearchConfig.path.format(user.uuid.asString))
   }
 
   override def fetchLogs(user: Identity, activation: WhiskActivation, request: HttpRequest): Future[ActivationLogs] = {
     val headers = extractRequiredHeaders(request.headers)
 
     // Return logs from ElasticSearch, or return logs from activation if required headers are not present
-    if (headers.length == requiredHeaders.length) {
+    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       esClient.query(generatePath(user), headers, Some(generatePayload(activation))).flatMap { response =>
         response match {
           case Right(queryResult) =>
