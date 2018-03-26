@@ -38,9 +38,11 @@ case class ElasticSearchLogStoreConfig(protocol: String,
                                        host: String,
                                        port: Int,
                                        path: String,
-                                       logMessageField: String,
+                                       userLogsField: String,
+                                       messageField: String,
                                        activationIdField: String,
                                        streamField: String,
+                                       timeField: String,
                                        actionField: String,
                                        requiredHeaders: Seq[String] = Seq.empty)
 
@@ -57,7 +59,7 @@ class ElasticSearchLogStore(
     loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.elasticSearch))
     extends DockerToActivationFileLogStore(system, destinationDirectory) {
 
-  // Schema of logs in ES
+  // Schema of resultant logs from ES
   case class UserLogEntry(message: String, stream: String, time: String, action: String) {
     def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
   }
@@ -66,9 +68,9 @@ class ElasticSearchLogStore(
     implicit val serdes =
       jsonFormat(
         UserLogEntry.apply,
-        "message",
+        elasticSearchConfig.messageField,
         elasticSearchConfig.streamField,
-        "time_date",
+        elasticSearchConfig.timeField,
         elasticSearchConfig.actionField)
   }
 
@@ -91,11 +93,11 @@ class ElasticSearchLogStore(
 
   private def generatePayload(activation: WhiskActivation) = {
     val logQuery =
-      s"_type: ${elasticSearchConfig.logMessageField} AND ${elasticSearchConfig.activationIdField}: ${activation.activationId}"
+      s"_type: ${elasticSearchConfig.userLogsField} AND ${elasticSearchConfig.activationIdField}: ${activation.activationId}"
     val queryString = EsQueryString(logQuery)
-    val queryOrder = EsQueryOrder("time_date", EsOrderAsc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig.timeField, EsOrderAsc)
 
-    EsQuery(queryString, Some(queryOrder)).toJson.asJsObject
+    EsQuery(queryString, Some(queryOrder))
   }
 
   private def generatePath(user: Identity) = {
