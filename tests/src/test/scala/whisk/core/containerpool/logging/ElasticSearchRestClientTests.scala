@@ -31,33 +31,11 @@ import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 @RunWith(classOf[JUnitRunner])
 class ElasticSearchRestClientTests extends FlatSpecLike with Matchers with ScalaFutures with StreamLogging {
 
-  it should "construct a query with must with range" in {
-    val queryRange = EsQueryRange("someKey", EsRangeGte, "someValue")
-    val queryTerms = Array(EsQueryBoolMatch("someKey1", "someValue1"), EsQueryBoolMatch("someKey2", "someValue2"))
-    val queryMust = EsQueryMust(queryTerms, Some(queryRange))
-    val query = EsQuery(queryMust)
-
-    query.toJson shouldBe JsObject(
-      "query" ->
-        JsObject(
-          "bool" ->
-            JsObject(
-              "must" ->
-                JsArray(
-                  JsObject("match" -> JsObject("someKey1" -> JsString("someValue1"))),
-                  JsObject("match" -> JsObject("someKey2" -> JsString("someValue2")))),
-              "filter" ->
-                JsObject("range" ->
-                  JsObject("someKey" ->
-                    JsObject("gte" -> "someValue".toJson))))))
-  }
-
-  it should "construct a query with must without range" in {
+  it should "construct a query with must" in {
     val queryTerms = Array(EsQueryBoolMatch("someKey1", "someValue1"), EsQueryBoolMatch("someKey2", "someValue2"))
     val queryMust = EsQueryMust(queryTerms)
-    val query = EsQuery(queryMust)
 
-    query.toJson shouldBe JsObject(
+    EsQuery(queryMust).toJson shouldBe JsObject(
       "query" ->
         JsObject(
           "bool" ->
@@ -66,88 +44,87 @@ class ElasticSearchRestClientTests extends FlatSpecLike with Matchers with Scala
                 JsArray(
                   JsObject("match" -> JsObject("someKey1" -> JsString("someValue1"))),
                   JsObject("match" -> JsObject("someKey2" -> JsString("someValue2")))))))
+
+    // Test must with ranges
+    Seq((EsRangeGte, "gte"), (EsRangeGt, "gt"), (EsRangeLte, "lte"), (EsRangeLt, "lt")).foreach {
+      case (rangeArg, rangeValue) =>
+        val queryRange = EsQueryRange("someKey", rangeArg, "someValue")
+        val queryTerms = Array(EsQueryBoolMatch("someKey1", "someValue1"), EsQueryBoolMatch("someKey2", "someValue2"))
+        val queryMust = EsQueryMust(queryTerms, Some(queryRange))
+
+        EsQuery(queryMust).toJson shouldBe JsObject(
+          "query" ->
+            JsObject(
+              "bool" ->
+                JsObject(
+                  "must" ->
+                    JsArray(
+                      JsObject("match" -> JsObject("someKey1" -> JsString("someValue1"))),
+                      JsObject("match" -> JsObject("someKey2" -> JsString("someValue2")))),
+                  "filter" ->
+                    JsObject("range" ->
+                      JsObject("someKey" ->
+                        JsObject(rangeValue -> "someValue".toJson))))))
+    }
   }
 
-  it should "construct a query with aggregation" in {
-    val queryAgg = EsQueryAggs("someAgg", EsAggMax, "someField")
-    val query = EsQuery(EsQueryAll(), aggs = Some(queryAgg))
+  it should "construct a query with aggregations" in {
+    Seq((EsAggMax, "max"), (EsAggMin, "min")).foreach {
+      case (aggArg, aggValue) =>
+        val queryAgg = EsQueryAggs("someAgg", aggArg, "someField")
 
-    query.toJson shouldBe JsObject(
-      "query" -> JsObject("match_all" -> JsObject()),
-      "aggs" -> JsObject("someAgg" -> JsObject("max" -> JsObject("field" -> "someField".toJson))))
+        EsQuery(EsQueryAll(), aggs = Some(queryAgg)).toJson shouldBe JsObject(
+          "query" -> JsObject("match_all" -> JsObject()),
+          "aggs" -> JsObject("someAgg" -> JsObject(aggValue -> JsObject("field" -> "someField".toJson))))
+    }
   }
 
   it should "construct a query with match" in {
     val queryMatch = EsQueryMatch("someField", "someValue")
-    val query = EsQuery(queryMatch)
 
-    query.toJson shouldBe JsObject(
+    EsQuery(queryMatch).toJson shouldBe JsObject(
       "query" -> JsObject("match" -> JsObject("someField" -> JsObject("query" -> "someValue".toJson))))
-  }
 
-  it should "construct a query with match with type" in {
-    val queryMatch = EsQueryMatch("someField", "someValue", Some(EsMatchPhrase))
-    val query = EsQuery(queryMatch)
+    // Test match with types
+    Seq((EsMatchPhrase, "phrase"), (EsMatchPhrasePrefix, "phrase_prefix")).foreach {
+      case (typeArg, typeValue) =>
+        val queryMatch = EsQueryMatch("someField", "someValue", Some(typeArg))
 
-    query.toJson shouldBe JsObject(
-      "query" -> JsObject(
-        "match" -> JsObject("someField" -> JsObject("query" -> "someValue".toJson, "type" -> "phrase".toJson))))
+        EsQuery(queryMatch).toJson shouldBe JsObject(
+          "query" -> JsObject(
+            "match" -> JsObject("someField" -> JsObject("query" -> "someValue".toJson, "type" -> typeValue.toJson))))
+    }
   }
 
   it should "construct a query with term" in {
     val queryTerm = EsQueryTerm("user", "someUser")
-    val query = EsQuery(queryTerm)
 
-    query.toJson shouldBe JsObject("query" -> JsObject("term" -> JsObject("user" -> JsString("someUser"))))
+    EsQuery(queryTerm).toJson shouldBe JsObject("query" -> JsObject("term" -> JsObject("user" -> JsString("someUser"))))
   }
 
   it should "construct a query with query string" in {
     val queryString = EsQueryString("_type: someType")
-    val query = EsQuery(queryString)
 
-    query.toJson shouldBe JsObject(
+    EsQuery(queryString).toJson shouldBe JsObject(
       "query" -> JsObject("query_string" -> JsObject("query" -> JsString("_type: someType"))))
   }
 
-  it should "construct a query with match and order" in {
-    val queryMatch = EsQueryMatch("someField", "someValue")
-    val queryOrder = EsQueryOrder("time_date", EsOrderDesc)
-    val query = EsQuery(queryMatch, Some(queryOrder))
+  it should "create a query with order" in {
+    Seq((EsOrderAsc, "asc"), (EsOrderDesc, "desc")).foreach {
+      case (orderArg, orderValue) =>
+        val queryOrder = EsQueryOrder("someField", orderArg)
 
-    query.toJson shouldBe JsObject(
-      "query" -> JsObject("match" -> JsObject("someField" -> JsObject("query" -> "someValue".toJson))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))))
+        EsQuery(EsQueryAll(), Some(queryOrder)).toJson shouldBe JsObject(
+          "query" -> JsObject("match_all" -> JsObject()),
+          "sort" -> JsArray(JsObject("someField" -> JsObject("order" -> orderValue.toJson))))
+    }
   }
 
-  it should "construct a query with term and order" in {
-    val queryTerm = EsQueryTerm("user", "someUser")
-    val queryOrder = EsQueryOrder("time_date", EsOrderDesc)
-    val query = EsQuery(queryTerm, Some(queryOrder))
-
-    query.toJson shouldBe JsObject(
-      "query" -> JsObject("term" -> JsObject("user" -> JsString("someUser"))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))))
-  }
-
-  it should "construct a query with query string and order" in {
-    val queryString = EsQueryString("_type: someType")
-    val queryOrder = EsQueryOrder("time_date", EsOrderAsc)
-    val query = EsQuery(queryString, Some(queryOrder))
-
-    query.toJson shouldBe JsObject(
-      "query" -> JsObject("query_string" -> JsObject("query" -> JsString("_type: someType"))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("asc")))))
-  }
-
-  it should "construct a query with match, order, and size" in {
-    val queryMatch = EsQueryMatch("someField", "someValue")
-    val queryOrder = EsQueryOrder("time_date", EsOrderDesc)
+  it should "create query with size" in {
     val querySize = EsQuerySize(1)
-    val query = EsQuery(queryMatch, Some(queryOrder), Some(querySize))
 
-    query.toJson shouldBe JsObject(
-      "query" -> JsObject("match" -> JsObject("someField" -> JsObject("query" -> "someValue".toJson))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+    EsQuery(EsQueryAll(), size = Some(querySize)).toJson shouldBe JsObject(
+      "query" -> JsObject("match_all" -> JsObject()),
       "size" -> JsNumber(1))
   }
 }

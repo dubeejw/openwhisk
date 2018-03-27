@@ -46,17 +46,16 @@ case object EsRangeLt extends EsRange { override def toString = "lt" }
 case object EsAggMax extends EsAgg { override def toString = "max" }
 case object EsAggMin extends EsAgg { override def toString = "min" }
 case object EsMatchPhrase extends EsMatch { override def toString = "phrase" }
-case object EsMatchPrahsePrefix extends EsMatch { override def toString = "phrase_prefix" }
+case object EsMatchPhrasePrefix extends EsMatch { override def toString = "phrase_prefix" }
 
 // Schema of ES queries
-case class EsQueryAggs(aggField: String, operation: EsAgg, field: String)
+case class EsQueryAggs(aggField: String, agg: EsAgg, field: String)
 case class EsQueryRange(key: String, range: EsRange, value: String)
 case class EsQueryBoolMatch(key: String, value: String)
-case class EsQueryBool(must: Array[EsQueryMust])
 case class EsQueryOrder(field: String, kind: EsOrder)
 case class EsQuerySize(size: Integer)
 case class EsQueryAll() extends EsQueryMethod
-case class EsQueryMust(terms: Array[EsQueryBoolMatch], range: Option[EsQueryRange] = None) extends EsQueryMethod
+case class EsQueryMust(matches: Array[EsQueryBoolMatch], range: Option[EsQueryRange] = None) extends EsQueryMethod
 case class EsQueryMatch(field: String, value: String, matchType: Option[EsMatch] = None) extends EsQueryMethod
 case class EsQueryTerm(key: String, value: String) extends EsQueryMethod
 case class EsQueryString(queryString: String) extends EsQueryMethod
@@ -111,9 +110,9 @@ object ElasticSearchJsonProtocol extends DefaultJsonProtocol {
     def read(query: JsValue) = ???
     def write(query: EsQueryMust) = query.range match {
       case Some(range) =>
-        JsObject("bool" -> JsObject("must" -> query.terms.toJson, "filter" -> range.toJson))
+        JsObject("bool" -> JsObject("must" -> query.matches.toJson, "filter" -> range.toJson))
       case None =>
-        JsObject("bool" -> JsObject("must" -> query.terms.toJson))
+        JsObject("bool" -> JsObject("must" -> query.matches.toJson))
     }
   }
 
@@ -131,7 +130,7 @@ object ElasticSearchJsonProtocol extends DefaultJsonProtocol {
   implicit object EsQueryAggsJsonFormat extends RootJsonFormat[EsQueryAggs] {
     def read(query: JsValue) = ???
     def write(query: EsQueryAggs) =
-      JsObject(query.aggField -> JsObject(query.operation.toString -> JsObject("field" -> query.field.toJson)))
+      JsObject(query.aggField -> JsObject(query.agg.toString -> JsObject("field" -> query.field.toJson)))
   }
 
   implicit object EsQueryAllJsonFormat extends RootJsonFormat[EsQueryAll] {
