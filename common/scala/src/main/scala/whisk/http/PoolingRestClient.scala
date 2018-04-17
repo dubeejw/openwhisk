@@ -135,6 +135,7 @@ class PoolingRestClient(
     request0(futureRequest) flatMap { response =>
       if (response.status.isSuccess()) {
         Unmarshal(response.entity.withoutSizeLimit()).to[T].map { o =>
+          println(o)
           Right(o)
         }
       } else {
