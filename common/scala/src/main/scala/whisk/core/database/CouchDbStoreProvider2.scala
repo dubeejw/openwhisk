@@ -27,7 +27,7 @@ import pureconfig._
 
 import scala.reflect.ClassTag
 
-case class CouchDbConfig(provider: String,
+case class CouchDbConfig2(provider: String,
                          protocol: String,
                          host: String,
                          port: Int,
@@ -45,20 +45,22 @@ case class CouchDbConfig(provider: String,
   }
 }
 
-object CouchDbStoreProvider extends ArtifactStoreProvider with ActivationStoreProvider {
+object CouchDbStoreProvider2 extends ArtifactStoreProvider with ActivationStoreProvider {
 
   def makeStore[D <: DocumentSerializer: ClassTag](useBatching: Boolean)(
-    implicit jsonFormat: RootJsonFormat[D],
-    docReader: DocumentReader,
-    actorSystem: ActorSystem,
-    logging: Logging,
-    materializer: ActorMaterializer): ArtifactStore[D] = {
-    val dbConfig = loadConfigOrThrow[CouchDbConfig](ConfigKeys.couchdb)
+      implicit jsonFormat: RootJsonFormat[D],
+      docReader: DocumentReader,
+      actorSystem: ActorSystem,
+      logging: Logging,
+      materializer: ActorMaterializer): ArtifactStore[D] = {
+    val dbConfig = loadConfigOrThrow[CouchDbConfig2](ConfigKeys.couchdb)
     require(
       dbConfig.provider == "Cloudant" || dbConfig.provider == "CouchDB",
       s"Unsupported db.provider: ${dbConfig.provider}")
 
-    new CouchDbRestStore[D](
+    println("aqwertyvubiytredtfguhigfyugefiugweiuhwef")
+
+    new CouchDbRestStore2[D](
       dbConfig.protocol,
       dbConfig.host,
       dbConfig.port,

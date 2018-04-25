@@ -33,6 +33,7 @@ import whisk.common.TransactionId
 import whisk.core.ConfigKeys
 import whisk.core.database.ArtifactStore
 import whisk.core.database.ArtifactStoreProvider
+import whisk.core.database.ActivationStoreProvider
 import whisk.core.database.DocumentRevisionProvider
 import whisk.core.database.DocumentSerializer
 import whisk.core.database.StaleParameter
@@ -107,8 +108,12 @@ object WhiskEntityStore {
 object WhiskActivationStore {
   implicit val docReader = WhiskDocumentReader
 
-  def datastore()(implicit system: ActorSystem, logging: Logging, materializer: ActorMaterializer) =
-    SpiLoader.get[ArtifactStoreProvider].makeStore[WhiskActivation](useBatching = true)
+  println("yuherojaowiefjiohrgpiufpuiahef")
+
+  def datastore()(implicit system: ActorSystem, logging: Logging, materializer: ActorMaterializer) = {
+    SpiLoader.get[ActivationStoreProvider].makeStore[WhiskActivation](useBatching = true)
+  }
+
 }
 
 /**
