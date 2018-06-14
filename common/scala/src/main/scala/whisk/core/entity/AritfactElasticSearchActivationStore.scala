@@ -119,6 +119,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
   // Schema of resultant logs from ES
   case class UserLogEntry(name: String, subject: String, activationId: String, version: String, endDate: String, status: String, timeDate: String, message: String, duration: Int, namespace: String) {
     def toFormattedString = s"$name $subject $activationId $version $endDate $status $timeDate $message $duration $namespace"
+    def toActivation = WhiskActivation(EntityPath(namespace), EntityName(name), Subject(subject), ActivationId(activationId), Instant.now, Instant.now, duration = Some(duration), version = SemVer(version))
   }
 
   object UserLogEntry extends DefaultJsonProtocol {
@@ -148,16 +149,17 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
                            duration: Option[Long] = None)
      */
 
-    val a: Seq[String] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString)
+    val a: Seq[WhiskActivation] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toActivation)
+    a.head
 
-    logging.info(this, s"SOMETHING: $a")
+    /*logging.info(this, s"SOMETHING: $a")
     val namespace = EntityPath("namespace")
     val entity = EntityName("name")
     val subject = Subject()
     val activationId = ActivationId("1b24d673e2524c70a4d673e252bc7061")
     val start = Instant.now
     val end = Instant.now
-    WhiskActivation(namespace, entity, subject, activationId, start, end)
+    WhiskActivation(namespace, entity, subject, activationId, start, end)*/
   }
 
   private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
