@@ -52,19 +52,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
     extends ActivationStore {
   val elasticSearchConfig = loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.elasticSearch)
 
-  // Schema of resultant logs from ES
-  case class UserLogEntry(message: String, stream: String, time: String) {
-    def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
-  }
-
-  object UserLogEntry extends DefaultJsonProtocol {
-    implicit val serdes =
-      jsonFormat(
-        UserLogEntry.apply,
-        elasticSearchConfig.logSchema.message,
-        elasticSearchConfig.logSchema.stream,
-        elasticSearchConfig.logSchema.time)
-  }
 
   implicit val executionContext = actorSystem.dispatcher
   implicit val system = actorSystem
@@ -128,6 +115,19 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
 }
 
    */
+
+  // Schema of resultant logs from ES
+  case class UserLogEntry(name: String, subject: String, activationId: String, version: String, endDate: String, status: String, timeDate: String, message: String, duration: Int, namespace: String) {
+    def toFormattedString = s"$name $subject $activationId $version $endDate $status $timeDate $message $duration $namespace"
+  }
+
+  object UserLogEntry extends DefaultJsonProtocol {
+    implicit val serdes =
+      jsonFormat(
+        UserLogEntry.apply,
+        "name", "subject", "activationId", "version", "end_date", "status", "time_date", "message", "duration_int", "namespace")
+  }
+
   private def transcribeLogs(queryResult: EsSearchResult): WhiskActivation = {
     //val b: Seq[Any] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry])
     //val a: Seq[String] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString)
@@ -147,6 +147,10 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
                            annotations: Parameters = Parameters(),
                            duration: Option[Long] = None)
      */
+
+    val a: Seq[String] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString)
+
+    logging.info(this, s"SOMETHING: $a")
     val namespace = EntityPath("namespace")
     val entity = EntityName("name")
     val subject = Subject()
@@ -178,7 +182,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
   }
 
   def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[WhiskActivation] = {
-    val query = s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 084102f943d949928102f943d9299276"
+    val query = s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 5ad1c25d24ee4ee691c25d24ee8ee649"
     logging.info(this, s"QUERY STRING: $query")
     val payload = EsQuery(EsQueryString(query))
     val uuid = elasticSearchConfig.path.format(user.get.uuid.asString)
