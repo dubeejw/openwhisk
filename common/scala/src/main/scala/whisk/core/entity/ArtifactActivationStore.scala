@@ -20,10 +20,9 @@ package whisk.core.entity
 import java.time.Instant
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.HttpRequest
 import akka.stream.ActorMaterializer
-
 import spray.json.JsObject
-
 import whisk.common.{Logging, TransactionId}
 import whisk.core.database.{ArtifactStore, CacheChangeNotification, StaleParameter}
 
@@ -56,7 +55,7 @@ class ArtifactActivationStore(actorSystem: ActorSystem, actorMaterializer: Actor
     res
   }
 
-  def get(activationId: ActivationId)(implicit transid: TransactionId): Future[WhiskActivation] = {
+  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[WhiskActivation] = {
     WhiskActivation.get(artifactStore, DocId(activationId.asString))
   }
 

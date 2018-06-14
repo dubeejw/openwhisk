@@ -185,10 +185,11 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
     implicit transid: TransactionId) = {
     val docid = DocId(WhiskEntity.qualifiedName(namespace, activationId))
     pathEndOrSingleSlash {
-      getEntity(
-        activationStore.get(ActivationId(docid.asString)),
-        postProcess = Some((activation: WhiskActivation) => complete(activation.toExtendedJson)))
-
+      extractRequest { request =>
+        getEntity(
+          activationStore.get(ActivationId(docid.asString), Some(user), Some(request)),
+          postProcess = Some((activation: WhiskActivation) => complete(activation.toExtendedJson)))
+      }
     } ~ (pathPrefix(resultPath) & pathEnd) { fetchResponse(docid) } ~
       (pathPrefix(logsPath) & pathEnd) { fetchLogs(user, docid) }
   }
