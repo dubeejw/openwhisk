@@ -31,6 +31,7 @@ import spray.json._
 import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
+import whisk.core.containerpool.logging._
 import whisk.core.database.{ArtifactStore, CacheChangeNotification, StaleParameter}
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
@@ -141,6 +142,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
 
   def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
+    println(s"ACTIVATION ID: $activationId")
     val query =
       s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 5ad1c25d24ee4ee691c25d24ee8ee649"
     logging.info(this, s"QUERY STRING: $query")
@@ -210,8 +212,35 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                  limit: Int,
                                  includeDocs: Boolean = false,
                                  since: Option[Instant] = None,
-                                 upto: Option[Instant] = None)(
+                                 upto: Option[Instant] = None,
+                                 user: Option[Identity] = None,
+                                 request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
+
+    //val querySince = EsQueryRange("@timestamp", EsRangeGt, since.get.toString)
+    //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, upto.get.toString)
+
+    val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-15T19:30:39.115Z")
+    val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-15T19:50:39.115Z")
+    val queryTerms = Vector(EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord))
+    val queryMust = EsQueryMust(queryTerms, Some(Vector(querySince, queryUpto)))
+
+    val payload = EsQuery(queryMust)
+    logging.info(this, s"PAYLOAD: $payload")
+    logging.info(this, s"PAYLOAD: ${payload.toJson}")
+    //val payload = EsQuery(queryMust, Some(EsOrderAsc), Some(querySize), Some(queryFrom))
+
+    val uuid = elasticSearchConfig.path.format(user.get.uuid.asString)
+    val headers = extractRequiredHeaders(request.get.headers)
+
+    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        logging.info(this, s"QUERY RESULT: $queryResult")
+        Future.successful(transcribeActivation(queryResult))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+
     WhiskActivation.listCollectionInNamespace(
       artifactStore,
       namespace,
