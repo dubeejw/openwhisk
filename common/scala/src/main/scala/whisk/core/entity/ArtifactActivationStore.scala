@@ -55,7 +55,8 @@ class ArtifactActivationStore(actorSystem: ActorSystem, actorMaterializer: Actor
     res
   }
 
-  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[WhiskActivation] = {
+  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
+    implicit transid: TransactionId): Future[WhiskActivation] = {
     WhiskActivation.get(artifactStore, DocId(activationId.asString))
   }
 

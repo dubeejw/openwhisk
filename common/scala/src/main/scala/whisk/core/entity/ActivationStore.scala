@@ -49,7 +49,8 @@ trait ActivationStore {
    * @param transid transaction ID for request
    * @return Future containing the retrieved WhiskActivation
    */
-  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[WhiskActivation]
+  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
+    implicit transid: TransactionId): Future[WhiskActivation]
 
   /**
    * Deletes an activation corresponding to the provided activation ID.

@@ -22,8 +22,11 @@ import java.time.Instant
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model._
+
 import pureconfig.loadConfigOrThrow
-import spray.json.{DefaultJsonProtocol, JsObject}
+
+import spray.json.DefaultJsonProtocol
+import spray.json._
 
 import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
@@ -48,118 +51,72 @@ case class ElasticSearchLogStoreConfig(protocol: String,
                                        logSchema: ElasticSearchLogFieldConfig,
                                        requiredHeaders: Seq[String] = Seq.empty)
 
-class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMaterializer: ActorMaterializer, logging: Logging)
+class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
+                                           actorMaterializer: ActorMaterializer,
+                                           logging: Logging)
     extends ActivationStore {
   val elasticSearchConfig = loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.elasticSearch)
-
 
   implicit val executionContext = actorSystem.dispatcher
   implicit val system = actorSystem
 
   private val artifactStore: ArtifactStore[WhiskActivation] =
     WhiskActivationStore.datastore()(actorSystem, logging, actorMaterializer)
-  private val esClient = new ElasticSearchRestClient(
-    elasticSearchConfig.protocol,
-    elasticSearchConfig.host,
-    elasticSearchConfig.port)
+  private val esClient =
+    new ElasticSearchRestClient(elasticSearchConfig.protocol, elasticSearchConfig.host, elasticSearchConfig.port)
 
-  /*
-  {
-    "namespace": "lime@us.ibm.com",
-    "name": "logs",
-    "version": "0.0.1",
-    "subject": "lime@us.ibm.com",
-    "activationId": "1b24d673e2524c70a4d673e252bc7061",
-    "start": 1529001213883,
-    "end": 1529001214403,
-    "duration": 520,
-    "response": {
-        "status": "success",
-        "statusCode": 0,
-        "success": true,
-        "result": {
-            "yee": "haww"
-        }
-    },
-    "logs": [
-        "2018-06-14T18:33:34.392390114Z stdout: some log stuff",
-        "2018-06-14T18:33:34.397493528Z stdout: more logs"
-    ],
-    "annotations": [
-        {
-            "key": "path",
-            "value": "lime@us.ibm.com/logs"
-        },
-        {
-            "key": "waitTime",
-            "value": 68
-        },
-        {
-            "key": "kind",
-            "value": "nodejs:6"
-        },
-        {
-            "key": "limits",
-            "value": {
-                "logs": 10,
-                "memory": 256,
-                "timeout": 60000
-            }
-        },
-        {
-            "key": "initTime",
-            "value": 486
-        }
-    ],
-    "publish": false
-}
+  // Schema of resultant activations from ES
+  case class ActivationEntry(name: String,
+                             subject: String,
+                             activationId: String,
+                             version: String,
+                             endDate: String,
+                             status: String,
+                             timeDate: String,
+                             message: String,
+                             duration: Int,
+                             namespace: String) {
+    //def toFormattedString = s"$name $subject $activationId $version $endDate $status $timeDate $message $duration $namespace"
 
-   */
+    def toActivation = {
+      // TODO:
+      // activation errors?
+      // Start and end times?
+      // Annotations are in Elasticsearch...
 
-  // Schema of resultant logs from ES
-  case class UserLogEntry(name: String, subject: String, activationId: String, version: String, endDate: String, status: String, timeDate: String, message: String, duration: Int, namespace: String) {
-    def toFormattedString = s"$name $subject $activationId $version $endDate $status $timeDate $message $duration $namespace"
-    def toActivation = WhiskActivation(EntityPath(namespace), EntityName(name), Subject(subject), ActivationId(activationId), Instant.now, Instant.now, duration = Some(duration), version = SemVer(version))
+      val result = ActivationResponse.success(Some(message.parseJson.asJsObject))
+
+      WhiskActivation(
+        EntityPath(namespace),
+        EntityName(name),
+        Subject(subject),
+        ActivationId(activationId),
+        Instant.now,
+        Instant.now,
+        response = result,
+        duration = Some(duration),
+        version = SemVer(version))
+    }
   }
 
-  object UserLogEntry extends DefaultJsonProtocol {
+  object ActivationEntry extends DefaultJsonProtocol {
     implicit val serdes =
       jsonFormat(
-        UserLogEntry.apply,
-        "name", "subject", "activationId", "version", "end_date", "status", "time_date", "message", "duration_int", "namespace")
+        ActivationEntry.apply,
+        "name",
+        "subject",
+        "activationId",
+        "version",
+        "end_date",
+        "status",
+        "time_date",
+        "message",
+        "duration_int",
+        "namespace")
   }
 
-  private def transcribeLogs(queryResult: EsSearchResult): WhiskActivation = {
-    //val b: Seq[Any] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry])
-    //val a: Seq[String] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString)
-    //println(b.message)
-    /*
-    case class WhiskActivation(namespace: EntityPath,
-                           override val name: EntityName,
-                           subject: Subject,
-                           activationId: ActivationId,
-                           start: Instant,
-                           end: Instant,
-                           cause: Option[ActivationId] = None,
-                           response: ActivationResponse = ActivationResponse.success(),
-                           logs: ActivationLogs = ActivationLogs(),
-                           version: SemVer = SemVer(),
-                           publish: Boolean = false,
-                           annotations: Parameters = Parameters(),
-                           duration: Option[Long] = None)
-     */
-
-    val a: Seq[WhiskActivation] = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toActivation)
-    a.head
-
-    /*logging.info(this, s"SOMETHING: $a")
-    val namespace = EntityPath("namespace")
-    val entity = EntityName("name")
-    val subject = Subject()
-    val activationId = ActivationId("1b24d673e2524c70a4d673e252bc7061")
-    val start = Instant.now
-    val end = Instant.now
-    WhiskActivation(namespace, entity, subject, activationId, start, end)*/
+  private def transcribeActivation(queryResult: EsSearchResult): WhiskActivation = {
+    queryResult.hits.hits.map(_.source.convertTo[ActivationEntry].toActivation).head
   }
 
   private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
@@ -167,7 +124,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
 
   def store(activation: WhiskActivation)(implicit transid: TransactionId,
                                          notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
-
     logging.debug(this, s"recording activation '${activation.activationId}'")
 
     val res = WhiskActivation.put(artifactStore, activation)
@@ -183,8 +139,10 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
     res
   }
 
-  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[WhiskActivation] = {
-    val query = s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 5ad1c25d24ee4ee691c25d24ee8ee649"
+  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
+    implicit transid: TransactionId): Future[WhiskActivation] = {
+    val query =
+      s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 5ad1c25d24ee4ee691c25d24ee8ee649"
     logging.info(this, s"QUERY STRING: $query")
     val payload = EsQuery(EsQueryString(query))
     val uuid = elasticSearchConfig.path.format(user.get.uuid.asString)
@@ -193,7 +151,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         logging.info(this, s"QUERY RESULT: $queryResult")
-        Future.successful(transcribeLogs(queryResult))
+        Future.successful(transcribeActivation(queryResult))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
@@ -202,9 +160,9 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
   }
 
   /**
-    * Here there is added overhead of retrieving the specified activation before deleting it, so this method should not
-    * be used in production or performance related code.
-    */
+   * Here there is added overhead of retrieving the specified activation before deleting it, so this method should not
+   * be used in production or performance related code.
+   */
   def delete(activationId: ActivationId)(implicit transid: TransactionId,
                                          notifier: Option[CacheChangeNotification]): Future[Boolean] = {
     WhiskActivation.get(artifactStore, DocId(activationId.asString)) flatMap { doc =>
@@ -234,7 +192,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
                                   includeDocs: Boolean = false,
                                   since: Option[Instant] = None,
                                   upto: Option[Instant] = None)(
-                                     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
+    implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
     WhiskActivation.listActivationsMatchingName(
       artifactStore,
       namespace,
@@ -253,7 +211,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem, actorMateri
                                  includeDocs: Boolean = false,
                                  since: Option[Instant] = None,
                                  upto: Option[Instant] = None)(
-                                    implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
+    implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
     WhiskActivation.listCollectionInNamespace(
       artifactStore,
       namespace,
