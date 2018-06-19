@@ -220,8 +220,8 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     //val querySince = EsQueryRange("@timestamp", EsRangeGt, since.get.toString)
     //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, upto.get.toString)
 
-    val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-15T19:30:39.115Z")
-    val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-15T19:50:39.115Z")
+    val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
+    val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
     val queryTerms = Vector(EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord))
     val queryMust = EsQueryMust(queryTerms, Some(Vector(querySince, queryUpto)))
 
