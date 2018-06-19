@@ -77,7 +77,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                              message: String,
                              duration: Int,
                              namespace: String) {
-    //def toFormattedString = s"$name $subject $activationId $version $endDate $status $timeDate $message $duration $namespace"
 
     def toActivation = {
       // TODO:
@@ -157,8 +156,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
-
-    //WhiskActivation.get(artifactStore, DocId(activationId.asString))
   }
 
   /**
@@ -213,15 +210,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
-    /*
-    WhiskActivation.countCollectionInNamespace(
-      artifactStore,
-      name.map(p => namespace.addPath(p)).getOrElse(namespace),
-      skip,
-      since,
-      upto,
-      StaleParameter.UpdateAfter,
-      name.map(_ => WhiskActivation.filtersView).getOrElse(WhiskActivation.view))*/
   }
 
   def listActivationsMatchingName(namespace: EntityPath,
@@ -259,17 +247,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
-
-    /*WhiskActivation.listActivationsMatchingName(
-      artifactStore,
-      namespace,
-      name,
-      skip,
-      limit,
-      includeDocs,
-      since,
-      upto,
-      StaleParameter.UpdateAfter)*/
   }
 
   def listActivationsInNamespace(namespace: EntityPath,
