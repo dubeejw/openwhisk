@@ -147,7 +147,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 5ad1c25d24ee4ee691c25d24ee8ee649"
     logging.info(this, s"QUERY STRING: $query")
     val payload = EsQuery(EsQueryString(query))
-    val uuid = elasticSearchConfig.path.format(user.get.uuid.asString)
+    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
@@ -230,7 +230,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     logging.info(this, s"PAYLOAD: ${payload.toJson}")
     //val payload = EsQuery(queryMust, Some(EsOrderAsc), Some(querySize), Some(queryFrom))
 
-    val uuid = elasticSearchConfig.path.format(user.get.uuid.asString)
+    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
