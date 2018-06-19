@@ -32,7 +32,7 @@ import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
 import whisk.core.containerpool.logging._
-import whisk.core.database.{ArtifactStore, CacheChangeNotification, StaleParameter}
+import whisk.core.database.{ArtifactStore, CacheChangeNotification}
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
 import scala.concurrent.Future
@@ -180,6 +180,44 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     upto: Option[Instant] = None,
     user: Option[Identity] = None,
     request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
+
+    val queryMust = name match {
+      case Some(name) =>
+        //val querySince = EsQueryRange("@timestamp", EsRangeGt, since.get.toString)
+        //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, upto.get.toString)
+
+        //val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
+        //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
+        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord)
+        val entityMatch = EsQueryBoolMatch("name", name.toString) // TODO: name_str
+        //val queryMust = EsQueryMust(Vector(activationMatch, entityMatch), Some(Vector(querySince, queryUpto)))
+        EsQueryMust(Vector(activationMatch, entityMatch))
+      case None =>
+        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord)
+        EsQueryMust(Vector(activationMatch))
+    }
+
+    val payload = EsQuery(queryMust)
+    logging.info(this, s"PAYLOAD: $payload")
+    logging.info(this, s"PAYLOAD: ${payload.toJson}")
+
+    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
+    val headers = extractRequiredHeaders(request.get.headers)
+
+    esClient.search[EsSearchResultCount](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        logging.info(this, s"QUERY RESULT: $queryResult")
+        //queryResult.hits.hits.map(_.source.convertTo[ActivationEntry].toActivation).toList
+
+        //Future.successful(Right(transcribeActivations(queryResult)))
+        val total = queryResult.hits.total
+        println(s"TOTAL2: $total")
+        logging.info(this, s"TOTAL: $total")
+        Future.successful(JsObject("activations" -> total.toJson))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+    /*
     WhiskActivation.countCollectionInNamespace(
       artifactStore,
       name.map(p => namespace.addPath(p)).getOrElse(namespace),
@@ -187,7 +225,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       since,
       upto,
       StaleParameter.UpdateAfter,
-      name.map(_ => WhiskActivation.filtersView).getOrElse(WhiskActivation.view))
+      name.map(_ => WhiskActivation.filtersView).getOrElse(WhiskActivation.view))*/
   }
 
   def listActivationsMatchingName(namespace: EntityPath,

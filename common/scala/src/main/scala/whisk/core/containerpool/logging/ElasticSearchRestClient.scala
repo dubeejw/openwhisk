@@ -74,6 +74,9 @@ case class EsSearchHit(source: JsObject)
 case class EsSearchHits(hits: Vector[EsSearchHit])
 case class EsSearchResult(hits: EsSearchHits)
 
+case class EsSearchHitsCount(total: Int)
+case class EsSearchResultCount(hits: EsSearchHitsCount)
+
 object ElasticSearchJsonProtocol extends DefaultJsonProtocol {
 
   implicit object EsQueryMatchJsonFormat extends RootJsonFormat[EsQueryMatch] {
@@ -152,6 +155,15 @@ object ElasticSearchJsonProtocol extends DefaultJsonProtocol {
   implicit val esSearchHitFormat = jsonFormat(EsSearchHit.apply _, "_source")
   implicit val esSearchHitsFormat = jsonFormat1(EsSearchHits.apply)
   implicit val esSearchResultFormat = jsonFormat1(EsSearchResult.apply)
+
+  implicit val esSearchHitsCountFormat = jsonFormat1(EsSearchHitsCount.apply)
+  implicit val esSearchResultCountFormat = jsonFormat1(EsSearchResultCount.apply)
+
+  /*
+  case class EsSearchHitsCount(total: String)
+  case class EsSearchResultCount(hits: EsSearchHitsCount)
+
+ */
 }
 
 class ElasticSearchRestClient(
@@ -176,6 +188,7 @@ class ElasticSearchRestClient(
 
   def search[T: RootJsonReader](index: String,
                                 payload: EsQuery = EsQuery(EsQueryAll()),
-                                headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, T]] =
+                                headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, T]] = {
     requestJson[T](mkJsonRequest(POST, Uri(index), payload.toJson.asJsObject, baseHeaders ++ headers))
+  }
 }
