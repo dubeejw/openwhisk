@@ -116,8 +116,8 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
         "namespace")
   }
 
-  private def transcribeActivation(queryResult: EsSearchResult): WhiskActivation = {
-    queryResult.hits.hits.map(_.source.convertTo[ActivationEntry].toActivation).head
+  private def transcribeActivations(queryResult: EsSearchResult): List[WhiskActivation] = {
+    queryResult.hits.hits.map(_.source.convertTo[ActivationEntry].toActivation).toList
   }
 
   private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
@@ -144,7 +144,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     implicit transid: TransactionId): Future[WhiskActivation] = {
     println(s"ACTIVATION ID: $activationId")
     val query =
-      s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: 5ad1c25d24ee4ee691c25d24ee8ee649"
+      s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: c799e822ffbb41e499e822ffbb81e466"
     logging.info(this, s"QUERY STRING: $query")
     val payload = EsQuery(EsQueryString(query))
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
@@ -153,7 +153,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         logging.info(this, s"QUERY RESULT: $queryResult")
-        Future.successful(transcribeActivation(queryResult))
+        Future.successful(transcribeActivations(queryResult).head)
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
@@ -172,11 +172,14 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     }
   }
 
-  def countActivationsInNamespace(namespace: EntityPath,
-                                  name: Option[EntityPath] = None,
-                                  skip: Int,
-                                  since: Option[Instant] = None,
-                                  upto: Option[Instant] = None)(implicit transid: TransactionId): Future[JsObject] = {
+  def countActivationsInNamespace(
+    namespace: EntityPath,
+    name: Option[EntityPath] = None,
+    skip: Int,
+    since: Option[Instant] = None,
+    upto: Option[Instant] = None,
+    user: Option[Identity] = None,
+    request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
     WhiskActivation.countCollectionInNamespace(
       artifactStore,
       name.map(p => namespace.addPath(p)).getOrElse(namespace),
@@ -193,9 +196,37 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                   limit: Int,
                                   includeDocs: Boolean = false,
                                   since: Option[Instant] = None,
-                                  upto: Option[Instant] = None)(
+                                  upto: Option[Instant] = None,
+                                  user: Option[Identity] = None,
+                                  request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-    WhiskActivation.listActivationsMatchingName(
+
+    //val querySince = EsQueryRange("@timestamp", EsRangeGt, since.get.toString)
+    //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, upto.get.toString)
+
+    //val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
+    //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
+    val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord)
+    val entityMatch = EsQueryBoolMatch("name", name.toString) // TODO: name_str
+    //val queryMust = EsQueryMust(Vector(activationMatch, entityMatch), Some(Vector(querySince, queryUpto)))
+    val queryMust = EsQueryMust(Vector(activationMatch, entityMatch))
+
+    val payload = EsQuery(queryMust)
+    logging.info(this, s"PAYLOAD: $payload")
+    logging.info(this, s"PAYLOAD: ${payload.toJson}")
+
+    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
+    val headers = extractRequiredHeaders(request.get.headers)
+
+    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        logging.info(this, s"QUERY RESULT: $queryResult")
+        Future.successful(Right(transcribeActivations(queryResult)))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+
+    /*WhiskActivation.listActivationsMatchingName(
       artifactStore,
       namespace,
       name,
@@ -204,7 +235,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       includeDocs,
       since,
       upto,
-      StaleParameter.UpdateAfter)
+      StaleParameter.UpdateAfter)*/
   }
 
   def listActivationsInNamespace(namespace: EntityPath,
@@ -228,7 +259,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     val payload = EsQuery(queryMust)
     logging.info(this, s"PAYLOAD: $payload")
     logging.info(this, s"PAYLOAD: ${payload.toJson}")
-    //val payload = EsQuery(queryMust, Some(EsOrderAsc), Some(querySize), Some(queryFrom))
 
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
@@ -236,20 +266,10 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         logging.info(this, s"QUERY RESULT: $queryResult")
-        Future.successful(transcribeActivation(queryResult))
+        Future.successful(Right(transcribeActivations(queryResult)))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
-
-    WhiskActivation.listCollectionInNamespace(
-      artifactStore,
-      namespace,
-      skip,
-      limit,
-      includeDocs,
-      since,
-      upto,
-      StaleParameter.UpdateAfter)
   }
 
 }

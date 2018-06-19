@@ -106,8 +106,7 @@ class ElasticSearchRestClientTests
                       JsObject("match" -> JsObject("someKey1" -> JsString("someValue1"))),
                       JsObject("match" -> JsObject("someKey2" -> JsString("someValue2")))),
                   "filter" ->
-                      JsArray(
-                    JsObject("range" ->
+                    JsArray(JsObject("range" ->
                       JsObject("someKey" ->
                         JsObject(rangeValue -> "someValue".toJson)))))))
     }

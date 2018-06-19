@@ -26,8 +26,8 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport.sprayJsonMarsha
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.unmarshalling._
-
 import spray.json.DefaultJsonProtocol.RootJsObjectFormat
+import spray.json.JsObject
 import whisk.common.TransactionId
 import whisk.core.containerpool.logging.LogStore
 import whisk.core.controller.RestApiCommons.{ListLimit, ListSkip}
@@ -158,14 +158,30 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
         'upto.as[Instant] ?) { (skip, limit, count, docs, name, since, upto) =>
         if (count && !docs) {
           countEntities {
-            activationStore.countActivationsInNamespace(namespace, name.flatten, skip.n, since, upto)
+            activationStore.countActivationsInNamespace(
+              namespace,
+              name.flatten,
+              skip.n,
+              since,
+              upto,
+              Some(user),
+              Some(request))
           }
         } else if (count && docs) {
           terminate(BadRequest, Messages.docsNotAllowedWithCount)
         } else {
-          val activations = name.flatten match {
+          val activations: Future[Either[List[JsObject], List[WhiskActivation]]] = name.flatten match {
             case Some(action) =>
-              activationStore.listActivationsMatchingName(namespace, action, skip.n, limit.n, docs, since, upto)
+              activationStore.listActivationsMatchingName(
+                namespace,
+                action,
+                skip.n,
+                limit.n,
+                docs,
+                since,
+                upto,
+                Some(user),
+                Some(request))
             case None =>
               activationStore.listActivationsInNamespace(
                 namespace,

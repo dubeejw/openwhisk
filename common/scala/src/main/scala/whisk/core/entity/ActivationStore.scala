@@ -74,11 +74,14 @@ trait ActivationStore {
    * @param transid transaction ID for request
    * @return Future containing number of activations returned from query in JSON format
    */
-  def countActivationsInNamespace(namespace: EntityPath,
-                                  name: Option[EntityPath] = None,
-                                  skip: Int,
-                                  since: Option[Instant] = None,
-                                  upto: Option[Instant] = None)(implicit transid: TransactionId): Future[JsObject]
+  def countActivationsInNamespace(
+    namespace: EntityPath,
+    name: Option[EntityPath] = None,
+    skip: Int,
+    since: Option[Instant] = None,
+    upto: Option[Instant] = None,
+    user: Option[Identity] = None,
+    request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject]
 
   /**
    * Returns activations corresponding to provided entity name.
@@ -100,7 +103,9 @@ trait ActivationStore {
                                   limit: Int,
                                   includeDocs: Boolean = false,
                                   since: Option[Instant] = None,
-                                  upto: Option[Instant] = None)(
+                                  upto: Option[Instant] = None,
+                                  user: Option[Identity] = None,
+                                  request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]]
 
   /**
