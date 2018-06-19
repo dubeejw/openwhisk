@@ -204,14 +204,10 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
-    esClient.search[EsSearchResultCount](uuid, payload, headers).flatMap {
+    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         logging.info(this, s"QUERY RESULT: $queryResult")
-        //queryResult.hits.hits.map(_.source.convertTo[ActivationEntry].toActivation).toList
-
-        //Future.successful(Right(transcribeActivations(queryResult)))
         val total = queryResult.hits.total
-        println(s"TOTAL2: $total")
         logging.info(this, s"TOTAL: $total")
         Future.successful(JsObject("activations" -> total.toJson))
       case Left(code) =>
