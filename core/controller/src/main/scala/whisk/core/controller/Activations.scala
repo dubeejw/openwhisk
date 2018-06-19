@@ -209,7 +209,6 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
    */
   private def fetch(user: Identity, namespace: EntityPath, activationId: ActivationId)(
     implicit transid: TransactionId) = {
-    println(s"ACTIVATION ID 2 $activationId")
     val docid = DocId(WhiskEntity.qualifiedName(namespace, activationId))
     pathEndOrSingleSlash {
       extractRequest { request =>

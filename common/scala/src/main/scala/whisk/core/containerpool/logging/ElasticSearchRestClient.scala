@@ -111,7 +111,6 @@ object ElasticSearchJsonProtocol extends DefaultJsonProtocol {
     def write(query: EsQueryMust) = {
       val boolQuery = Map("must" -> query.matches.toJson) ++ query.range.map(r => "filter" -> r.toJson)
       JsObject("bool" -> boolQuery.toJson)
-      //JsObject("bool" -> JsObject("must" -> query.matches.toJson, "filter" -> query.range.toJson))
     }
   }
 
@@ -167,17 +166,15 @@ class ElasticSearchRestClient(
 
   private val baseHeaders: List[HttpHeader] = List(Accept(MediaTypes.`application/json`))
 
-  def info(headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, JsObject]] = {
+  def info(headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, JsObject]] =
     requestJson[JsObject](mkRequest(GET, Uri./, headers = baseHeaders ++ headers))
-  }
 
-  def index(index: String, headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, JsObject]] = {
+  def index(index: String, headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, JsObject]] =
     requestJson[JsObject](mkRequest(GET, Uri(index), headers = baseHeaders ++ headers))
-  }
 
   def search[T: RootJsonReader](index: String,
                                 payload: EsQuery = EsQuery(EsQueryAll()),
-                                headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, T]] = {
+                                headers: List[HttpHeader] = List.empty): Future[Either[StatusCode, T]] =
     requestJson[T](mkJsonRequest(POST, Uri(index), payload.toJson.asJsObject, baseHeaders ++ headers))
-  }
+
 }
