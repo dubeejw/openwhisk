@@ -38,25 +38,24 @@ import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-case class ElasticSearchLogFieldConfig(userLogs: String,
-                                       message: String,
+case class ElasticSearchActivationFieldConfig(message: String,
                                        activationId: String,
                                        activationRecord: String,
                                        stream: String,
                                        time: String)
 
-case class ElasticSearchLogStoreConfig(protocol: String,
+case class ElasticSearchActivationStoreConfig(protocol: String,
                                        host: String,
                                        port: Int,
                                        path: String,
-                                       logSchema: ElasticSearchLogFieldConfig,
+                                       schema: ElasticSearchActivationFieldConfig,
                                        requiredHeaders: Seq[String] = Seq.empty)
 
 class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                            actorMaterializer: ActorMaterializer,
                                            logging: Logging)
     extends ActivationStore {
-  val elasticSearchConfig = loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.elasticSearch)
+  val elasticSearchConfig = loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore)
 
   implicit val executionContext = actorSystem.dispatcher
   implicit val system = actorSystem
@@ -143,7 +142,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     implicit transid: TransactionId): Future[WhiskActivation] = {
     println(s"ACTIVATION ID: $activationId")
     val query =
-      s"_type: ${elasticSearchConfig.logSchema.activationRecord} AND ${elasticSearchConfig.logSchema.activationId}: c799e822ffbb41e499e822ffbb81e466"
+      s"_type: ${elasticSearchConfig.schema.activationRecord} AND ${elasticSearchConfig.schema.activationId}: c799e822ffbb41e499e822ffbb81e466"
     logging.info(this, s"QUERY STRING: $query")
     val payload = EsQuery(EsQueryString(query))
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
@@ -185,12 +184,12 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
 
         //val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
         //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
-        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord)
+        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
         val entityMatch = EsQueryBoolMatch("name", name.toString) // TODO: name_str
         //val queryMust = EsQueryMust(Vector(activationMatch, entityMatch), Some(Vector(querySince, queryUpto)))
         EsQueryMust(Vector(activationMatch, entityMatch))
       case None =>
-        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord)
+        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
         EsQueryMust(Vector(activationMatch))
     }
 
@@ -228,7 +227,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
 
     //val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
     //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
-    val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord)
+    val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
     val entityMatch = EsQueryBoolMatch("name", name.toString) // TODO: name_str
     //val queryMust = EsQueryMust(Vector(activationMatch, entityMatch), Some(Vector(querySince, queryUpto)))
     val queryMust = EsQueryMust(Vector(activationMatch, entityMatch))
@@ -264,7 +263,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
 
     val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
     val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
-    val queryTerms = Vector(EsQueryBoolMatch("_type", elasticSearchConfig.logSchema.activationRecord))
+    val queryTerms = Vector(EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord))
     val queryMust = EsQueryMust(queryTerms, Some(Vector(querySince, queryUpto)))
 
     val payload = EsQuery(queryMust)
