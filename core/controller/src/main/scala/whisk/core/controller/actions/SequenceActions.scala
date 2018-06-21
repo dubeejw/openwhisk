@@ -161,7 +161,8 @@ protected[actions] trait SequenceActions {
         (Right(seqActivation), accounting.atomicActionCnt)
       }
       .andThen {
-        case Success((Right(seqActivation), _)) => activationStore.store(seqActivation)(transid, notifier = None)
+        case Success((Right(seqActivation), _)) =>
+          activationStore.store(seqActivation, user.namespace.uuid)(transid, notifier = None)
 
         // This should never happen; in this case, there is no activation record created or stored:
         // should there be?

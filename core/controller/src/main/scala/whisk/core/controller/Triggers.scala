@@ -146,7 +146,9 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
             Instant.EPOCH,
             response = ActivationResponse.success(payload orElse Some(JsObject.empty)),
             version = trigger.version,
-            duration = None)
+            duration = None,
+            annotations =
+              Parameters(WhiskActivation.pathAnnotation, JsString(trigger.fullyQualifiedName(false).asString)))
 
           // List of active rules associated with the trigger
           val activeRules: Map[FullyQualifiedEntityName, ReducedRule] =
@@ -163,7 +165,7 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
                   triggerActivation
               }
               .map { activation =>
-                activationStore.store(activation)
+                activationStore.store(activation, user.namespace.uuid)
               }
             complete(Accepted, triggerActivationId.toJsObject)
           } else {
