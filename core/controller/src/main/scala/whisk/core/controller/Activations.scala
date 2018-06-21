@@ -135,7 +135,6 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
             case _    => reject // should not get here
           }
       }
-    }
   }
 
   /**
@@ -172,7 +171,6 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
           case None =>
             activationStore.listActivationsInNamespace(namespace, skip.n, limit.n, docs, since, upto, context)
         }
-        listEntities(activations map (_.fold((js) => js, (wa) => wa.map(_.toExtendedJson))))
       }
     }
   }

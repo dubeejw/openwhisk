@@ -203,7 +203,7 @@ class InvokerReactive(
           val name = msg.action.name
           val actionid = FullyQualifiedEntityName(namespace, name).toDocId.asDocInfo(msg.revision)
           val subject = msg.user.subject
-
+          val user = msg.user.namespace.uuid
           logging.debug(this, s"${actionid.id} $subject ${msg.activationId}")
 
           // caching is enabled since actions have revision id and an updated

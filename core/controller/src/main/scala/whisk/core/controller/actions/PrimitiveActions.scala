@@ -21,6 +21,7 @@ import java.time.{Clock, Instant}
 
 import akka.actor.ActorSystem
 import akka.event.Logging.InfoLevel
+import akka.http.scaladsl.model.HttpRequest
 import spray.json._
 import whisk.common.{Logging, LoggingMarkers, TransactionId}
 import whisk.common.tracing.WhiskTracerProvider

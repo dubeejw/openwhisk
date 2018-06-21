@@ -94,6 +94,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         start = Instant.now,
         end = Instant.now)
     }.toList
+    val user = UUID()
     try {
       (notExpectedActivations ++ activations).foreach(storeActivation(_, context))
       waitOnListActivationsInNamespace(namespace, 2, context)
@@ -176,6 +177,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         end = Instant.now,
         response = ActivationResponse.success(Some(JsNumber(5))))
     }.toList
+    val user = UUID()
 
     try {
       (notExpectedActivations ++ activations).foreach(storeActivation(_, context))
@@ -251,6 +253,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = now.plusSeconds(30),
         end = now.plusSeconds(30))) // should match
+    val user = UUID()
 
     try {
       (notExpectedActivations ++ activations).foreach(storeActivation(_, context))
@@ -361,6 +364,8 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         end = Instant.now,
         annotations = Parameters("path", s"${namespace.asString}/pkg/xyz"))
     }.toList
+    val user = UUID()
+
     try {
       (notExpectedActivations ++ activations ++ activationsInPackage).foreach(storeActivation(_, context))
       waitOnListActivationsMatchingName(namespace, EntityPath("xyz"), activations.length, context)
@@ -479,6 +484,8 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
+    val user = UUID()
+
     try {
       storeActivation(activation, context)
 
@@ -516,6 +523,8 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
+    val user = UUID()
+
     try {
       storeActivation(activation, context)
 
@@ -540,6 +549,8 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
+    val user = UUID()
+
     try {
       storeActivation(activation, context)
 
@@ -565,6 +576,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         start = Instant.now,
         end = Instant.now)
     storeActivation(activation, context)
+
     try {
 
       Get(s"$collectionPath/${activation.activationId.asString}/bogus") ~> Route.seal(routes(creds)) ~> check {
