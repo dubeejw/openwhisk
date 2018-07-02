@@ -26,7 +26,6 @@ import whisk.common.{Logging, LoggingMarkers, TransactionId}
 import whisk.common.tracing.WhiskTracerProvider
 import whisk.core.connector.ActivationMessage
 import whisk.core.controller.WhiskServices
-import whisk.core.database.NoDocumentException
 import whisk.core.entitlement.{Resource, _}
 import whisk.core.entity._
 import whisk.core.entity.size.SizeInt
@@ -38,7 +37,6 @@ import scala.collection.mutable.Buffer
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success}
 
 protected[actions] trait PrimitiveActions {
   /** The core collections require backend services to be injected in this trait. */
@@ -564,45 +562,14 @@ protected[actions] trait PrimitiveActions {
     //    in case of an incomplete active-ack (record too large for example).
     activeAckResponse.foreach {
       case Right(activation) => result.trySuccess(Right(activation))
-      case _                 => pollActivation(docid, result, i => 1.seconds + (2.seconds * i), maxRetries = 4)
+      case _                 => logging.info(this, "Did not receive active ack")
     }
 
-    // 2. Poll the database slowly in case the active-ack never arrives
-    pollActivation(docid, result, _ => 15.seconds)
-
-    // 3. Timeout forces a fallback to activationId
+    // 2. Timeout forces a fallback to activationId
     val timeout = actorSystem.scheduler.scheduleOnce(totalWaitTime)(result.trySuccess(Left(activationId)))
 
     result.future.andThen {
       case _ => timeout.cancel()
-    }
-  }
-
-  /**
-   * Polls the database for an activation.
-   *
-   * Does not use Future composition because an early exit is wanted, once any possible external source resolved the
-   * Promise.
-   *
-   * @param docid the docid to poll for
-   * @param result promise to resolve on result. Is also used to abort polling once completed.
-   */
-  private def pollActivation(docid: DocId,
-                             result: Promise[Either[ActivationId, WhiskActivation]],
-                             wait: Int => FiniteDuration,
-                             retries: Int = 0,
-                             maxRetries: Int = Int.MaxValue)(implicit transid: TransactionId): Unit = {
-    if (!result.isCompleted && retries < maxRetries) {
-      val schedule = actorSystem.scheduler.scheduleOnce(wait(retries)) {
-        activationStore.get(ActivationId(docid.asString)).onComplete {
-          case Success(activation)             => result.trySuccess(Right(activation))
-          case Failure(_: NoDocumentException) => pollActivation(docid, result, wait, retries + 1, maxRetries)
-          case Failure(t: Throwable)           => result.tryFailure(t)
-        }
-      }
-
-      // Halt the schedule if the result is provided during one execution
-      result.future.onComplete(_ => schedule.cancel())
     }
   }
 
