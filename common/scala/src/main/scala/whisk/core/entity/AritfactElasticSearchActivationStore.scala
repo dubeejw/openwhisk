@@ -32,30 +32,31 @@ import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
 import whisk.core.containerpool.logging._
-import whisk.core.database.{ArtifactStore, CacheChangeNotification}
+import whisk.core.database.{ArtifactStore, CacheChangeNotification, NoDocumentException}
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 case class ElasticSearchActivationFieldConfig(message: String,
-                                       activationId: String,
-                                       activationRecord: String,
-                                       stream: String,
-                                       time: String)
+                                              activationId: String,
+                                              activationRecord: String,
+                                              stream: String,
+                                              time: String)
 
 case class ElasticSearchActivationStoreConfig(protocol: String,
-                                       host: String,
-                                       port: Int,
-                                       path: String,
-                                       schema: ElasticSearchActivationFieldConfig,
-                                       requiredHeaders: Seq[String] = Seq.empty)
+                                              host: String,
+                                              port: Int,
+                                              path: String,
+                                              schema: ElasticSearchActivationFieldConfig,
+                                              requiredHeaders: Seq[String] = Seq.empty)
 
 class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                            actorMaterializer: ActorMaterializer,
                                            logging: Logging)
     extends ActivationStore {
-  val elasticSearchConfig = loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore)
+  val elasticSearchConfig =
+    loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore)
 
   implicit val executionContext = actorSystem.dispatcher
   implicit val system = actorSystem
@@ -81,7 +82,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       // TODO:
       // activation errors?
       // Start and end times?
-      // Annotations are in Elasticsearch...
+      // Annotations are not in Elasticsearch...
 
       val result = ActivationResponse.success(Some(message.parseJson.asJsObject))
 
@@ -142,7 +143,8 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     implicit transid: TransactionId): Future[WhiskActivation] = {
     println(s"ACTIVATION ID: $activationId")
     val query =
-      s"_type: ${elasticSearchConfig.schema.activationRecord} AND ${elasticSearchConfig.schema.activationId}: c799e822ffbb41e499e822ffbb81e466"
+      s"_type: ${elasticSearchConfig.schema.activationRecord} AND ${elasticSearchConfig.schema.activationId}: ${activationId.asString
+        .substring(activationId.asString.indexOf("/") + 1)}"
     logging.info(this, s"QUERY STRING: $query")
     val payload = EsQuery(EsQueryString(query))
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
@@ -151,7 +153,14 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         logging.info(this, s"QUERY RESULT: $queryResult")
-        Future.successful(transcribeActivations(queryResult).head)
+        val res = transcribeActivations(queryResult)
+
+        if (res.nonEmpty) {
+          Future.successful(res.head)
+        } else {
+          Future.failed(new NoDocumentException("Document not found"))
+        }
+
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
@@ -258,13 +267,22 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                  request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
 
+    logging.info(this, s"since ${since.getOrElse("asdf")}")
+    logging.info(this, s"upto ${upto.getOrElse("asdf")}")
     //val querySince = EsQueryRange("@timestamp", EsRangeGt, since.get.toString)
     //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, upto.get.toString)
 
-    val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
-    val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
+    val sinceRange: Vector[EsQueryRange] = since.map { time =>
+      Vector(EsQueryRange("@timestamp", EsRangeGt, time.toString))
+    } getOrElse Vector.empty
+    val uptoRange: Vector[EsQueryRange] = upto.map { time =>
+      Vector(EsQueryRange("@timestamp", EsRangeLt, time.toString))
+    } getOrElse Vector.empty
+
+    //val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
+    //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
     val queryTerms = Vector(EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord))
-    val queryMust = EsQueryMust(queryTerms, Some(Vector(querySince, queryUpto)))
+    val queryMust = EsQueryMust(queryTerms, sinceRange ++ uptoRange)
 
     val payload = EsQuery(queryMust)
     logging.info(this, s"PAYLOAD: $payload")
