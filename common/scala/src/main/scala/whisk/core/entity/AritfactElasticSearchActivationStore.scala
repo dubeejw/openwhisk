@@ -243,7 +243,8 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     val queryMust = EsQueryMust(queryTerms, sinceRange ++ uptoRange)
     val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
     val querySize = EsQuerySize(limit)
-    val payload = EsQuery(queryMust, Some(queryOrder), Some(querySize))
+    val queryFrom = EsQueryFrom(skip)
+    val payload = EsQuery(queryMust, Some(queryOrder), Some(querySize), from = Some(queryFrom))
 
     logging.info(this, s"PAYLOAD: $payload")
     logging.info(this, s"PAYLOAD: ${payload.toJson}")
@@ -282,7 +283,8 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     val queryMust = EsQueryMust(queryTerms, sinceRange ++ uptoRange)
     val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
     val querySize = EsQuerySize(limit)
-    val payload = EsQuery(queryMust, Some(queryOrder), Some(querySize))
+    val queryFrom = EsQueryFrom(skip)
+    val payload = EsQuery(queryMust, Some(queryOrder), Some(querySize), from = Some(queryFrom))
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
