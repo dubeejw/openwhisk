@@ -188,21 +188,23 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
 
     val queryMust = name match {
       case Some(name) =>
-        //val querySince = EsQueryRange("@timestamp", EsRangeGt, since.get.toString)
-        //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, upto.get.toString)
-
-        //val querySince = EsQueryRange("@timestamp", EsRangeGt, "2018-06-19T14:19:55.230Z")
-        //val queryUpto = EsQueryRange("@timestamp", EsRangeLt, "2018-06-19T17:19:55.230Z")
+        val sinceRange: Vector[EsQueryRange] = since.map { time =>
+          Vector(EsQueryRange("@timestamp", EsRangeGt, time.toString))
+        } getOrElse Vector.empty
+        val uptoRange: Vector[EsQueryRange] = upto.map { time =>
+          Vector(EsQueryRange("@timestamp", EsRangeLt, time.toString))
+        } getOrElse Vector.empty
         val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
+        val queryTerms = Vector(activationMatch)
+        val queryMust = EsQueryMust(queryTerms, sinceRange ++ uptoRange)
         val entityMatch = EsQueryBoolMatch("name", name.toString) // TODO: name_str
-        //val queryMust = EsQueryMust(Vector(activationMatch, entityMatch), Some(Vector(querySince, queryUpto)))
-        EsQueryMust(Vector(activationMatch, entityMatch))
+        val queryFrom = EsQueryFrom(skip)
+        val payload = EsQuery(queryMust, from = Some(queryFrom))
       case None =>
         val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
         EsQueryMust(Vector(activationMatch))
     }
 
-    val payload = EsQuery(queryMust)
     logging.info(this, s"PAYLOAD: $payload")
     logging.info(this, s"PAYLOAD: ${payload.toJson}")
 
@@ -287,8 +289,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     val payload = EsQuery(queryMust, Some(queryOrder), Some(querySize), from = Some(queryFrom))
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
-
-    // TODO: implement skip
 
     logging.info(this, s"PAYLOAD: $payload")
     logging.info(this, s"PAYLOAD: ${payload.toJson}")
