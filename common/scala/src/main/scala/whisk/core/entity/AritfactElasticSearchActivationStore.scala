@@ -186,41 +186,6 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     user: Option[Identity] = None,
     request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
 
-    /*val queryMust = name match {
-      case Some(name) =>
-        val sinceRange: Vector[EsQueryRange] = since.map { time =>
-          Vector(EsQueryRange("@timestamp", EsRangeGt, time.toString))
-        } getOrElse Vector.empty
-        val uptoRange: Vector[EsQueryRange] = upto.map { time =>
-          Vector(EsQueryRange("@timestamp", EsRangeLt, time.toString))
-        } getOrElse Vector.empty
-        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
-        val queryTerms = Vector(activationMatch)
-        val queryMust = EsQueryMust(queryTerms, sinceRange ++ uptoRange)
-        val entityMatch = EsQueryBoolMatch("name", name.toString) // TODO: name_str
-        val queryFrom = EsQueryFrom(skip)
-        val payload = EsQuery(queryMust, from = Some(queryFrom))
-      case None =>
-        val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
-        EsQueryMust(Vector(activationMatch))
-    }
-
-    logging.info(this, s"PAYLOAD: $payload")
-    logging.info(this, s"PAYLOAD: ${payload.toJson}")
-
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
-
-    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-      case Right(queryResult) =>
-        logging.info(this, s"QUERY RESULT: $queryResult")
-        val total = queryResult.hits.total
-        logging.info(this, s"TOTAL: $total")
-        Future.successful(JsObject("activations" -> total.toJson))
-      case Left(code) =>
-        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
-    }*/
-
     val sinceRange: Vector[EsQueryRange] = since.map { time =>
       Vector(EsQueryRange("@timestamp", EsRangeGt, time.toString))
     } getOrElse Vector.empty
