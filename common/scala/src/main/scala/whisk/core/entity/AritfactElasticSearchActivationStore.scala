@@ -186,7 +186,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     user: Option[Identity] = None,
     request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
 
-    val queryMust = name match {
+    /*val queryMust = name match {
       case Some(name) =>
         val sinceRange: Vector[EsQueryRange] = since.map { time =>
           Vector(EsQueryRange("@timestamp", EsRangeGt, time.toString))
@@ -216,6 +216,37 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
         logging.info(this, s"QUERY RESULT: $queryResult")
         val total = queryResult.hits.total
         logging.info(this, s"TOTAL: $total")
+        Future.successful(JsObject("activations" -> total.toJson))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }*/
+
+    val sinceRange: Vector[EsQueryRange] = since.map { time =>
+      Vector(EsQueryRange("@timestamp", EsRangeGt, time.toString))
+    } getOrElse Vector.empty
+    val uptoRange: Vector[EsQueryRange] = upto.map { time =>
+      Vector(EsQueryRange("@timestamp", EsRangeLt, time.toString))
+    } getOrElse Vector.empty
+    val activationMatch = EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord)
+    val entityMatch = name.map { n =>
+      Vector(EsQueryBoolMatch("name", name.toString)) // TODO: name_str
+    } getOrElse Vector.empty
+    val queryTerms = Vector(activationMatch) ++ entityMatch
+    val queryMust = EsQueryMust(queryTerms, sinceRange ++ uptoRange)
+    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
+    val queryFrom = EsQueryFrom(skip)
+    val payload = EsQuery(queryMust, Some(queryOrder), from = Some(queryFrom))
+
+    logging.info(this, s"PAYLOAD: $payload")
+    logging.info(this, s"PAYLOAD: ${payload.toJson}")
+
+    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
+    val headers = extractRequiredHeaders(request.get.headers)
+
+    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        logging.info(this, s"QUERY RESULT: $queryResult")
+        val total = queryResult.hits.total - skip
         Future.successful(JsObject("activations" -> total.toJson))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
