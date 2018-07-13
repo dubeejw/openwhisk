@@ -186,13 +186,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
     user: Option[Identity] = None,
     request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
 
-    val sinceRange: Option[EsQueryRange] = since.map { time =>
-      Some(EsQueryRange("@timestamp", EsRangeGt, time.toString))
-    } getOrElse None
-    val uptoRange: Option[EsQueryRange] = upto.map { time =>
-      Some(EsQueryRange("@timestamp", EsRangeLt, time.toString))
-    } getOrElse None
-    val queryRanges = Vector(sinceRange, uptoRange).flatten
+    val queryRanges = getRanges(since, upto)
 
     val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord))
     val entityMatch: Option[EsQueryBoolMatch] = name.map { n =>
@@ -232,13 +226,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                   request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
 
-    val sinceRange: Option[EsQueryRange] = since.map { time =>
-      Some(EsQueryRange("@timestamp", EsRangeGt, time.toString))
-    } getOrElse None
-    val uptoRange: Option[EsQueryRange] = upto.map { time =>
-      Some(EsQueryRange("@timestamp", EsRangeLt, time.toString))
-    } getOrElse None
-    val queryRanges = Vector(sinceRange, uptoRange).flatten
+    val queryRanges = getRanges(since, upto)
 
     val queryTerms = Vector(
       EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
@@ -275,13 +263,7 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
                                  request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
 
-    val sinceRange: Option[EsQueryRange] = since.map { time =>
-      Some(EsQueryRange("@timestamp", EsRangeGt, time.toString))
-    } getOrElse None
-    val uptoRange: Option[EsQueryRange] = upto.map { time =>
-      Some(EsQueryRange("@timestamp", EsRangeLt, time.toString))
-    } getOrElse None
-    val queryRanges = Vector(sinceRange, uptoRange).flatten
+    val queryRanges = getRanges(since, upto)
 
     val queryTerms = Vector(
       EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
@@ -306,6 +288,17 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
+  }
+
+  private def getRanges(since: Option[Instant] = None, upto: Option[Instant] = None) = {
+    val sinceRange: Option[EsQueryRange] = since.map { time =>
+      Some(EsQueryRange("@timestamp", EsRangeGt, time.toString))
+    } getOrElse None
+    val uptoRange: Option[EsQueryRange] = upto.map { time =>
+      Some(EsQueryRange("@timestamp", EsRangeLt, time.toString))
+    } getOrElse None
+
+    Vector(sinceRange, uptoRange).flatten
   }
 
 }
