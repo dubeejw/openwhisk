@@ -35,8 +35,10 @@ import whisk.core.containerpool.logging._
 import whisk.core.database.{ArtifactStore, CacheChangeNotification, NoDocumentException}
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
-import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
+import scala.concurrent.{Future, Promise}
+
+import akka.stream.scaladsl.Flow
 
 case class ElasticSearchActivationFieldConfig(message: String,
                                               activationId: String,
@@ -51,12 +53,14 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
                                               schema: ElasticSearchActivationFieldConfig,
                                               requiredHeaders: Seq[String] = Seq.empty)
 
-class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
-                                           actorMaterializer: ActorMaterializer,
-                                           logging: Logging)
+class ArtifactElasticSearchActivationStore(
+  actorSystem: ActorSystem,
+  actorMaterializer: ActorMaterializer,
+  logging: Logging,
+  httpFlow: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
+  elasticSearchConfig: ElasticSearchActivationStoreConfig =
+    loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore))
     extends ActivationStore {
-  val elasticSearchConfig =
-    loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore)
 
   implicit val executionContext = actorSystem.dispatcher
   implicit val system = actorSystem
@@ -64,7 +68,11 @@ class ArtifactElasticSearchActivationStore(actorSystem: ActorSystem,
   private val artifactStore: ArtifactStore[WhiskActivation] =
     WhiskActivationStore.datastore()(actorSystem, logging, actorMaterializer)
   private val esClient =
-    new ElasticSearchRestClient(elasticSearchConfig.protocol, elasticSearchConfig.host, elasticSearchConfig.port)
+    new ElasticSearchRestClient(
+      elasticSearchConfig.protocol,
+      elasticSearchConfig.host,
+      elasticSearchConfig.port,
+      httpFlow)
 
   // Schema of resultant activations from ES
   case class ActivationEntry(name: String,
