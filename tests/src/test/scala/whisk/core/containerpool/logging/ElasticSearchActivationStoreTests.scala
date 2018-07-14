@@ -140,4 +140,15 @@ class ElasticSearchActivationStoreTests
       logging)
   }
 
+  it should "error when configuration protocol is invalid" in {
+    val invalidHostConfig =
+      ElasticSearchActivationStoreConfig("protocol", "host", 443, "/whisk_user_logs", defaultSchema, Seq.empty)
+
+    a[IllegalArgumentException] should be thrownBy new ArtifactElasticSearchActivationStore(
+      system,
+      materializer,
+      logging,
+      elasticSearchConfig = invalidHostConfig)
+  }
+
 }
