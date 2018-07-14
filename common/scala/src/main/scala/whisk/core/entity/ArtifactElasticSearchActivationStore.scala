@@ -99,14 +99,15 @@ class ArtifactElasticSearchActivationStore(
         EntityName(name),
         Subject(subject),
         ActivationId(activationId),
-        Instant.now,
-        Instant.now,
+        Instant.parse(timeDate),
+        Instant.parse(endDate),
         response = result,
         duration = Some(duration),
         version = SemVer(version))
     }
   }
 
+  // TODO read schema from config
   object ActivationEntry extends DefaultJsonProtocol {
     implicit val serdes =
       jsonFormat(
