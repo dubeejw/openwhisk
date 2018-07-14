@@ -74,7 +74,13 @@ class ElasticSearchActivationStoreTests
     StatusCodes.OK,
     entity = HttpEntity(
       ContentTypes.`application/json`,
-      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":3,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536841193]}]}}"""))
+      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536841193]}]}}"""))
+
+  private val defaultHttpResponse2 = HttpResponse(
+    StatusCodes.OK,
+    entity = HttpEntity(
+      ContentTypes.`application/json`,
+      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536846075]}]}}"""))
 
   private val defaultPayload = JsObject(
     "query" -> JsObject(
@@ -126,7 +132,7 @@ class ElasticSearchActivationStoreTests
       esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
   }
 
-  it should "get user logs from ElasticSearch when there are no required headers needed" in {
+  it should "test listActivationsMatchingName" in {
     val payload = JsObject(
       "query" -> JsObject(
         "bool" -> JsObject(
@@ -159,6 +165,76 @@ class ElasticSearchActivationStoreTests
         0,
         user = Some(user),
         request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+  }
+
+  it should "test listActivationsMatchingName with skip" in {
+    val payload = JsObject(
+      "query" -> JsObject(
+        "bool" -> JsObject(
+          "must" -> JsArray(
+            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
+            JsObject("match" -> JsObject("name" -> JsString(name.name)))))),
+      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+      "size" -> JsNumber(0),
+      "from" -> JsNumber(1)).compactPrint
+
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, payload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse2, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    await(
+      esActivationStore.listActivationsMatchingName(
+        user.namespace.name.toPath,
+        name.toPath,
+        1,
+        0,
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation))
+  }
+
+  it should "test listActivationsMatchingName with limit" in {
+    val payload = JsObject(
+      "query" -> JsObject(
+        "bool" -> JsObject(
+          "must" -> JsArray(
+            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
+            JsObject("match" -> JsObject("name" -> JsString(name.name)))))),
+      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+      "size" -> JsNumber(1),
+      "from" -> JsNumber(0)).compactPrint
+
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, payload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse2, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    await(
+      esActivationStore.listActivationsMatchingName(
+        user.namespace.name.toPath,
+        name.toPath,
+        0,
+        1,
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation))
   }
 
   it should "forward errors from ElasticSearch" in {
