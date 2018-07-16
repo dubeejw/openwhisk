@@ -205,19 +205,24 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
-    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-      case Right(queryResult) =>
-        logging.info(this, s"QUERY RESULT: $queryResult")
-        val res = transcribeActivations(queryResult)
+    // Return activation from ElasticSearch or from artifact store if required headers are not present
+    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
+      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+        case Right(queryResult) =>
+          logging.info(this, s"QUERY RESULT: $queryResult")
+          val res = transcribeActivations(queryResult)
 
-        if (res.nonEmpty) {
-          Future.successful(res.head)
-        } else {
-          Future.failed(new NoDocumentException("Document not found"))
-        }
+          if (res.nonEmpty) {
+            Future.successful(res.head)
+          } else {
+            Future.failed(new NoDocumentException("Document not found"))
+          }
 
-      case Left(code) =>
-        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+        case Left(code) =>
+          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+      }
+    } else {
+      super.get(activationId, user, request)
     }
   }
 
@@ -233,12 +238,16 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
-    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-      case Right(queryResult) =>
-        val total = Math.max(0, queryResult.hits.total - skip)
-        Future.successful(JsObject("activations" -> total.toJson))
-      case Left(code) =>
-        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
+      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+        case Right(queryResult) =>
+          val total = Math.max(0, queryResult.hits.total - skip)
+          Future.successful(JsObject("activations" -> total.toJson))
+        case Left(code) =>
+          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+      }
+    } else {
+      super.countActivationsInNamespace(namespace, name, skip, since, upto, user, request)
     }
   }
 
@@ -256,11 +265,15 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
-    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-      case Right(queryResult) =>
-        Future.successful(Right(transcribeActivations(queryResult)))
-      case Left(code) =>
-        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
+      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+        case Right(queryResult) =>
+          Future.successful(Right(transcribeActivations(queryResult)))
+        case Left(code) =>
+          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+      }
+    } else {
+      super.listActivationsMatchingName(namespace, name, skip, limit, includeDocs, since, upto, user, request)
     }
   }
 
@@ -277,11 +290,15 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
-    esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-      case Right(queryResult) =>
-        Future.successful(Right(transcribeActivations(queryResult)))
-      case Left(code) =>
-        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
+      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+        case Right(queryResult) =>
+          Future.successful(Right(transcribeActivations(queryResult)))
+        case Left(code) =>
+          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+      }
+    } else {
+      super.listActivationsInNamespace(namespace, skip, limit, includeDocs, since, upto, user, request)
     }
   }
 
