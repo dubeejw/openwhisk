@@ -40,11 +40,18 @@ import scala.concurrent.{Future, Promise}
 
 import akka.stream.scaladsl.Flow
 
-case class ElasticSearchActivationFieldConfig(message: String,
+case class ElasticSearchActivationFieldConfig(name: String,
+                                              namespace: String,
+                                              subject: String,
+                                              version: String,
+                                              start: String,
+                                              end: String,
+                                              status: String,
+                                              duration: String,
+                                              message: String,
                                               activationId: String,
                                               activationRecord: String,
-                                              stream: String,
-                                              time: String)
+                                              stream: String)
 
 case class ElasticSearchActivationStoreConfig(protocol: String,
                                               host: String,
@@ -89,7 +96,6 @@ class ArtifactElasticSearchActivationStore(
     def toActivation = {
       // TODO:
       // activation errors?
-      // Start and end times?
       // Annotations are not in Elasticsearch...
 
       val result = ActivationResponse.success(Some(message.parseJson.asJsObject))
@@ -107,21 +113,29 @@ class ArtifactElasticSearchActivationStore(
     }
   }
 
+  /*
+  case class ElasticSearchActivationFieldConfig(name: String,
+                                              message: String,
+                                              activationId: String,
+                                              activationRecord: String,
+                                              stream: String,
+                                              time: String)
+   */
   // TODO read schema from config
   object ActivationEntry extends DefaultJsonProtocol {
     implicit val serdes =
       jsonFormat(
         ActivationEntry.apply,
-        "name",
-        "subject",
-        "activationId",
-        "version",
-        "end_date",
-        "status",
-        "time_date",
-        "message",
-        "duration_int",
-        "namespace")
+        elasticSearchConfig.schema.name,
+        elasticSearchConfig.schema.subject, // subject_str
+        elasticSearchConfig.schema.activationId,
+        elasticSearchConfig.schema.version, // version_str
+        elasticSearchConfig.schema.end, // end_date
+        elasticSearchConfig.schema.status, // status_str
+        elasticSearchConfig.schema.start,
+        elasticSearchConfig.schema.message,
+        elasticSearchConfig.schema.duration, // duration_int
+        elasticSearchConfig.schema.namespace) // namespace_str
   }
 
   private def transcribeActivations(queryResult: EsSearchResult): List[WhiskActivation] = {
@@ -157,12 +171,11 @@ class ArtifactElasticSearchActivationStore(
     val queryRanges = getRanges(since, upto)
     val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord))
     val entityMatch: Option[EsQueryBoolMatch] = name.map { n =>
-      Some(EsQueryBoolMatch("name", n.toString)) // TODO: name_str
+      Some(EsQueryBoolMatch(elasticSearchConfig.schema.name, n.toString))
     } getOrElse None
-    println(entityMatch)
     val queryTerms = Vector(activationMatch, entityMatch).flatten
     val queryMust = EsQueryMust(queryTerms, queryRanges)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderDesc)
 
     EsQuery(queryMust, Some(queryOrder), from = skip)
   }
@@ -175,9 +188,9 @@ class ArtifactElasticSearchActivationStore(
     val queryRanges = getRanges(since, upto)
     val queryTerms = Vector(
       EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
-      EsQueryBoolMatch("name", name.toString)) // TODO: name_str
+      EsQueryBoolMatch(elasticSearchConfig.schema.name, name.toString))
     val queryMust = EsQueryMust(queryTerms, queryRanges)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderDesc)
 
     EsQuery(queryMust, Some(queryOrder), Some(limit), from = skip)
   }
@@ -190,9 +203,9 @@ class ArtifactElasticSearchActivationStore(
     val queryRanges = getRanges(since, upto)
     val queryTerms = Vector(
       EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
-      EsQueryBoolMatch("subject", namespace.asString))
+      EsQueryBoolMatch(elasticSearchConfig.schema.subject, namespace.asString))
     val queryMust = EsQueryMust(queryTerms, queryRanges)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderDesc)
 
     EsQuery(queryMust, Some(queryOrder), Some(limit), from = skip)
   }

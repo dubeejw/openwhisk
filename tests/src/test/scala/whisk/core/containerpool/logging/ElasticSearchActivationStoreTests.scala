@@ -66,8 +66,46 @@ class ElasticSearchActivationStoreTests
   private val start = ZonedDateTime.now.toInstant
   private val end = ZonedDateTime.now.toInstant
 
+  /*
+          ActivationEntry.apply,
+        elasticSearchConfig.schema.name,
+        elasticSearchConfig.schema.subject,              // subject_str
+        elasticSearchConfig.schema.activationId,
+        elasticSearchConfig.schema.version,              // version_str
+        elasticSearchConfig.schema.end,             // end_date
+        elasticSearchConfig.schema.status,               // status_str
+        elasticSearchConfig.schema.start,
+        elasticSearchConfig.schema.message,
+        elasticSearchConfig.schema.duration,         // duration_int
+        elasticSearchConfig.schema.namespace)           // namespace_str
+
+        case class ElasticSearchActivationFieldConfig(name: String,
+                                              namespace: String,
+                                              subject: String,
+                                              version: String,
+                                              start: String,
+                                              end: String,
+                                              status: String,
+                                              duration: String,
+                                              message: String,
+                                              activationId: String,
+                                              activationRecord: String,
+                                              stream: String)
+   */
   private val defaultSchema =
-    ElasticSearchActivationFieldConfig("message", "activationId_str", "activation_record", "stream_str", "time_date")
+    ElasticSearchActivationFieldConfig(
+      "name_str",
+      "namespace_str",
+      "subject_str",
+      "version_str",
+      "time_date",
+      "end_date",
+      "status_string",
+      "duration_int",
+      "message",
+      "activationId_str",
+      "activation_record",
+      "stream_str")
   private val defaultConfig =
     ElasticSearchActivationStoreConfig("https", "host", 443, "/whisk_user_logs/_search", defaultSchema)
 
@@ -75,13 +113,7 @@ class ElasticSearchActivationStoreTests
     StatusCodes.OK,
     entity = HttpEntity(
       ContentTypes.`application/json`,
-      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536841193]}]}}"""))
-
-  private val defaultHttpResponse2 = HttpResponse(
-    StatusCodes.OK,
-    entity = HttpEntity(
-      ContentTypes.`application/json`,
-      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"activation_record","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"name":"$name","subject":"$subject","activationId":"$activationId","version":"0.0.1","namespace":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"activation_record","time_date":"$start","end_date":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","status":"0","message":"{\\"result key\\":\\"result value\\"}","duration_int":101},"sort":[1531536846075]}]}}"""))
+      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536841193]}]}}"""))
 
   private val defaultPayload = JsObject(
     "query" -> JsObject(
@@ -136,8 +168,8 @@ class ElasticSearchActivationStoreTests
   it should "get an activation" in {
     val payload = JsObject(
       "query" -> JsObject(
-        "query_string" -> JsObject(
-          "query" -> JsString(s"_type: activation_record AND activationId_str: $activationId"))),
+        "query_string" -> JsObject("query" -> JsString(
+          s"_type: ${defaultConfig.schema.activationRecord} AND ${defaultConfig.schema.activationId}: $activationId"))),
       "from" -> JsNumber(0)).compactPrint
     val httpRequest = HttpRequest(
       POST,
@@ -162,12 +194,12 @@ class ElasticSearchActivationStoreTests
       "query" -> JsObject(
         "bool" -> JsObject(
           "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
-            JsObject("match" -> JsObject("name" -> JsString(name.name)))),
+            JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
+            JsObject("match" -> JsObject(defaultConfig.schema.name -> JsString(name.name)))),
           "filter" -> JsArray(
             JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
             JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
       "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
       POST,
@@ -200,12 +232,12 @@ class ElasticSearchActivationStoreTests
       "query" -> JsObject(
         "bool" -> JsObject(
           "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
-            JsObject("match" -> JsObject("name" -> JsString(name.name)))),
+            JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
+            JsObject("match" -> JsObject(defaultConfig.schema.name -> JsString(name.name)))),
           "filter" -> JsArray(
             JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
             JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
       "size" -> JsNumber(2),
       "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
@@ -240,12 +272,12 @@ class ElasticSearchActivationStoreTests
       "query" -> JsObject(
         "bool" -> JsObject(
           "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
-            JsObject("match" -> JsObject("subject" -> JsString(user.namespace.name.asString)))),
+            JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
+            JsObject("match" -> JsObject(defaultConfig.schema.subject -> JsString(user.namespace.name.asString)))),
           "filter" -> JsArray(
             JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
             JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
       "size" -> JsNumber(2),
       "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
