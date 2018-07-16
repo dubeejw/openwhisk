@@ -17,7 +17,7 @@
 
 package whisk.core.containerpool.logging
 
-import java.time.ZonedDateTime
+import java.time.{Instant, ZonedDateTime}
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -35,6 +35,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import pureconfig.error.ConfigReaderException
 import spray.json._
 import whisk.core.entity._
+
 //import whisk.core.entity.size._
 import whisk.common.TransactionId
 
@@ -132,23 +133,64 @@ class ElasticSearchActivationStoreTests
       esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
   }
 
-  it should "test listActivationsMatchingName" in {
+  it should "count activations in namespace" in {
+    val since = Instant.now
+    val upto = Instant.now
     val payload = JsObject(
       "query" -> JsObject(
         "bool" -> JsObject(
           "must" -> JsArray(
             JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
-            JsObject("match" -> JsObject("name" -> JsString(name.name)))))),
+            JsObject("match" -> JsObject("name" -> JsString(name.name)))),
+          "filter" -> JsArray(
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
       "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
-      "size" -> JsNumber(0),
-      "from" -> JsNumber(0)).compactPrint
-
+      "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
       POST,
       Uri(s"/whisk_user_logs/_search"),
       List(Accept(MediaTypes.`application/json`)),
       HttpEntity(ContentTypes.`application/json`, payload))
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = defaultConfig)
 
+    await(
+      esActivationStore.countActivationsInNamespace(
+        user.namespace.name.toPath,
+        Some(name.toPath),
+        1,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+  }
+
+  it should "list activations matching entity name" in {
+    val since = Instant.now
+    val upto = Instant.now
+    val payload = JsObject(
+      "query" -> JsObject(
+        "bool" -> JsObject(
+          "must" -> JsArray(
+            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
+            JsObject("match" -> JsObject("name" -> JsString(name.name)))),
+          "filter" -> JsArray(
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
+      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
+      "size" -> JsNumber(2),
+      "from" -> JsNumber(1)).compactPrint
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, payload))
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
@@ -161,80 +203,51 @@ class ElasticSearchActivationStoreTests
       esActivationStore.listActivationsMatchingName(
         user.namespace.name.toPath,
         name.toPath,
-        0,
-        0,
+        1,
+        2,
+        since = Some(since),
+        upto = Some(upto),
         user = Some(user),
         request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
-  it should "test listActivationsMatchingName with skip" in {
+  it should "list activations in namespace" in {
+    val since = Instant.now
+    val upto = Instant.now
     val payload = JsObject(
       "query" -> JsObject(
         "bool" -> JsObject(
           "must" -> JsArray(
             JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
-            JsObject("match" -> JsObject("name" -> JsString(name.name)))))),
+            JsObject("match" -> JsObject("subject" -> JsString(user.namespace.name.asString)))),
+          "filter" -> JsArray(
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
       "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
-      "size" -> JsNumber(0),
+      "size" -> JsNumber(2),
       "from" -> JsNumber(1)).compactPrint
-
     val httpRequest = HttpRequest(
       POST,
       Uri(s"/whisk_user_logs/_search"),
       List(Accept(MediaTypes.`application/json`)),
       HttpEntity(ContentTypes.`application/json`, payload))
-
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
         materializer,
         logging,
-        Some(testFlow(defaultHttpResponse2, httpRequest)),
+        Some(testFlow(defaultHttpResponse, httpRequest)),
         elasticSearchConfig = defaultConfig)
 
     await(
-      esActivationStore.listActivationsMatchingName(
+      esActivationStore.listActivationsInNamespace(
         user.namespace.name.toPath,
-        name.toPath,
         1,
-        0,
+        2,
+        since = Some(since),
+        upto = Some(upto),
         user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation))
-  }
-
-  it should "test listActivationsMatchingName with limit" in {
-    val payload = JsObject(
-      "query" -> JsObject(
-        "bool" -> JsObject(
-          "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString("activation_record"))),
-            JsObject("match" -> JsObject("name" -> JsString(name.name)))))),
-      "sort" -> JsArray(JsObject("time_date" -> JsObject("order" -> JsString("desc")))),
-      "size" -> JsNumber(1),
-      "from" -> JsNumber(0)).compactPrint
-
-    val httpRequest = HttpRequest(
-      POST,
-      Uri(s"/whisk_user_logs/_search"),
-      List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, payload))
-
-    val esActivationStore =
-      new ArtifactElasticSearchActivationStore(
-        system,
-        materializer,
-        logging,
-        Some(testFlow(defaultHttpResponse2, httpRequest)),
-        elasticSearchConfig = defaultConfig)
-
-    await(
-      esActivationStore.listActivationsMatchingName(
-        user.namespace.name.toPath,
-        name.toPath,
-        0,
-        1,
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation))
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
   it should "forward errors from ElasticSearch" in {
