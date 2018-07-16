@@ -94,6 +94,54 @@ class ElasticSearchActivationStoreTests
       "query_string" -> JsObject("query" -> JsString(
         s"_type: ${defaultConfig.schema.activationRecord} AND ${defaultConfig.schema.activationId}: $activationId"))),
     "from" -> JsNumber(0)).compactPrint
+
+  val since = Instant.now
+  val upto = Instant.now
+
+  private val defaultGetPayload = JsObject(
+    "query" -> JsObject(
+      "query_string" -> JsObject("query" -> JsString(
+        s"_type: ${defaultConfig.schema.activationRecord} AND ${defaultConfig.schema.activationId}: $activationId"))),
+    "from" -> JsNumber(0)).compactPrint
+
+  private val defaultCountPayload = JsObject(
+    "query" -> JsObject(
+      "bool" -> JsObject(
+        "must" -> JsArray(
+          JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
+          JsObject("match" -> JsObject(defaultConfig.schema.name -> JsString(name.name)))),
+        "filter" -> JsArray(
+          JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+          JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
+    "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
+    "from" -> JsNumber(1)).compactPrint
+
+  private val defaultListEntityPayload = JsObject(
+    "query" -> JsObject(
+      "bool" -> JsObject(
+        "must" -> JsArray(
+          JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
+          JsObject("match" -> JsObject(defaultConfig.schema.name -> JsString(name.name)))),
+        "filter" -> JsArray(
+          JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+          JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
+    "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
+    "size" -> JsNumber(2),
+    "from" -> JsNumber(1)).compactPrint
+
+  private val defaultListPayload = JsObject(
+    "query" -> JsObject(
+      "bool" -> JsObject(
+        "must" -> JsArray(
+          JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
+          JsObject("match" -> JsObject(defaultConfig.schema.subject -> JsString(user.namespace.name.asString)))),
+        "filter" -> JsArray(
+          JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+          JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
+    "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
+    "size" -> JsNumber(2),
+    "from" -> JsNumber(1)).compactPrint
+
   private val defaultHttpRequest = HttpRequest(
     POST,
     Uri(s"/whisk_user_logs/_search"),
@@ -137,16 +185,11 @@ class ElasticSearchActivationStoreTests
   }
 
   it should "get an activation" in {
-    val payload = JsObject(
-      "query" -> JsObject(
-        "query_string" -> JsObject("query" -> JsString(
-          s"_type: ${defaultConfig.schema.activationRecord} AND ${defaultConfig.schema.activationId}: $activationId"))),
-      "from" -> JsNumber(0)).compactPrint
     val httpRequest = HttpRequest(
       POST,
       Uri(s"/whisk_user_logs/_search"),
       List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, payload))
+      HttpEntity(ContentTypes.`application/json`, defaultGetPayload))
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
@@ -159,24 +202,11 @@ class ElasticSearchActivationStoreTests
   }
 
   it should "count activations in namespace" in {
-    val since = Instant.now
-    val upto = Instant.now
-    val payload = JsObject(
-      "query" -> JsObject(
-        "bool" -> JsObject(
-          "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
-            JsObject("match" -> JsObject(defaultConfig.schema.name -> JsString(name.name)))),
-          "filter" -> JsArray(
-            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
-            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
-      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
-      "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
       POST,
       Uri(s"/whisk_user_logs/_search"),
       List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, payload))
+      HttpEntity(ContentTypes.`application/json`, defaultCountPayload))
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
@@ -197,25 +227,11 @@ class ElasticSearchActivationStoreTests
   }
 
   it should "list activations matching entity name" in {
-    val since = Instant.now
-    val upto = Instant.now
-    val payload = JsObject(
-      "query" -> JsObject(
-        "bool" -> JsObject(
-          "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
-            JsObject("match" -> JsObject(defaultConfig.schema.name -> JsString(name.name)))),
-          "filter" -> JsArray(
-            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
-            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
-      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
-      "size" -> JsNumber(2),
-      "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
       POST,
       Uri(s"/whisk_user_logs/_search"),
       List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, payload))
+      HttpEntity(ContentTypes.`application/json`, defaultListEntityPayload))
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
@@ -237,25 +253,11 @@ class ElasticSearchActivationStoreTests
   }
 
   it should "list activations in namespace" in {
-    val since = Instant.now
-    val upto = Instant.now
-    val payload = JsObject(
-      "query" -> JsObject(
-        "bool" -> JsObject(
-          "must" -> JsArray(
-            JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord))),
-            JsObject("match" -> JsObject(defaultConfig.schema.subject -> JsString(user.namespace.name.asString)))),
-          "filter" -> JsArray(
-            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
-            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
-      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
-      "size" -> JsNumber(2),
-      "from" -> JsNumber(1)).compactPrint
     val httpRequest = HttpRequest(
       POST,
       Uri(s"/whisk_user_logs/_search"),
       List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, payload))
+      HttpEntity(ContentTypes.`application/json`, defaultListPayload))
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
@@ -291,6 +293,111 @@ class ElasticSearchActivationStoreTests
     a[RuntimeException] should be thrownBy await(
       esActivationStore.listActivationsMatchingName(EntityPath(""), EntityPath(""), 0, 0))
     a[RuntimeException] should be thrownBy await(esActivationStore.countActivationsInNamespace(EntityPath(""), None, 0))
+  }
+
+  it should "dynamically replace $UUID in request path1" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultGetPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
+
+    await(esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest))) shouldBe activation
+  }
+
+  it should "dynamically replace $UUID in request path2" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultCountPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
+
+    await(
+      esActivationStore.countActivationsInNamespace(
+        user.namespace.name.toPath,
+        Some(name.toPath),
+        1,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+  }
+
+  it should "dynamically replace $UUID in request path3" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultListEntityPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
+
+    await(
+      esActivationStore.listActivationsMatchingName(
+        user.namespace.name.toPath,
+        name.toPath,
+        1,
+        2,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+  }
+
+  it should "dynamically replace $UUID in request path4" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultListPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
+
+    await(
+      esActivationStore.listActivationsInNamespace(
+        user.namespace.name.toPath,
+        1,
+        2,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
   it should "fail when loading out of box configs since whisk.activationstore.elasticsearch does not exist" in {
