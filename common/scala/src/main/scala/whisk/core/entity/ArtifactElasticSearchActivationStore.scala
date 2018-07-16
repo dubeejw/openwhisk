@@ -60,6 +60,9 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
                                               schema: ElasticSearchActivationFieldConfig,
                                               requiredHeaders: Seq[String] = Seq.empty)
 
+// TODO:
+// activation errors?
+// Annotations are not in Elasticsearch...
 class ArtifactElasticSearchActivationStore(
   actorSystem: ActorSystem,
   actorMaterializer: ActorMaterializer,
@@ -94,10 +97,6 @@ class ArtifactElasticSearchActivationStore(
                              namespace: String) {
 
     def toActivation = {
-      // TODO:
-      // activation errors?
-      // Annotations are not in Elasticsearch...
-
       val result = ActivationResponse.success(Some(message.parseJson.asJsObject))
 
       WhiskActivation(
@@ -113,29 +112,20 @@ class ArtifactElasticSearchActivationStore(
     }
   }
 
-  /*
-  case class ElasticSearchActivationFieldConfig(name: String,
-                                              message: String,
-                                              activationId: String,
-                                              activationRecord: String,
-                                              stream: String,
-                                              time: String)
-   */
-  // TODO read schema from config
   object ActivationEntry extends DefaultJsonProtocol {
     implicit val serdes =
       jsonFormat(
         ActivationEntry.apply,
         elasticSearchConfig.schema.name,
-        elasticSearchConfig.schema.subject, // subject_str
+        elasticSearchConfig.schema.subject,
         elasticSearchConfig.schema.activationId,
-        elasticSearchConfig.schema.version, // version_str
-        elasticSearchConfig.schema.end, // end_date
-        elasticSearchConfig.schema.status, // status_str
+        elasticSearchConfig.schema.version,
+        elasticSearchConfig.schema.end,
+        elasticSearchConfig.schema.status,
         elasticSearchConfig.schema.start,
         elasticSearchConfig.schema.message,
-        elasticSearchConfig.schema.duration, // duration_int
-        elasticSearchConfig.schema.namespace) // namespace_str
+        elasticSearchConfig.schema.duration,
+        elasticSearchConfig.schema.namespace)
   }
 
   private def transcribeActivations(queryResult: EsSearchResult): List[WhiskActivation] = {
@@ -230,9 +220,6 @@ class ArtifactElasticSearchActivationStore(
   def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
     val payload = generateGetPayload(activationId)
-
-    logging.info(this, s"PAYLOAD: $payload")
-
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
@@ -272,18 +259,12 @@ class ArtifactElasticSearchActivationStore(
     upto: Option[Instant] = None,
     user: Option[Identity] = None,
     request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
-
     val payload = generateCountActivationsInNamespacePayload(name, skip, since, upto)
-
-    logging.info(this, s"PAYLOAD: $payload")
-    logging.info(this, s"PAYLOAD: ${payload.toJson}")
-
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
-        logging.info(this, s"QUERY RESULT: $queryResult")
         val total = Math.max(0, queryResult.hits.total - skip)
         Future.successful(JsObject("activations" -> total.toJson))
       case Left(code) =>
@@ -301,18 +282,12 @@ class ArtifactElasticSearchActivationStore(
                                   user: Option[Identity] = None,
                                   request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-
     val payload = generateListActiationsMatchNamePayload(name, skip, limit, since, upto)
-
-    logging.info(this, s"PAYLOAD: $payload")
-    logging.info(this, s"PAYLOAD: ${payload.toJson}")
-
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
-        logging.info(this, s"QUERY RESULT: $queryResult")
         Future.successful(Right(transcribeActivations(queryResult)))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
@@ -328,18 +303,12 @@ class ArtifactElasticSearchActivationStore(
                                  user: Option[Identity] = None,
                                  request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-
     val payload = generateListActivationsInNamespacePayload(namespace, skip, limit, since, upto)
-
-    logging.info(this, s"PAYLOAD: $payload")
-    logging.info(this, s"PAYLOAD: ${payload.toJson}")
-
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
     esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
-        logging.info(this, s"QUERY RESULT: $queryResult")
         Future.successful(Right(transcribeActivations(queryResult)))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))

@@ -66,32 +66,6 @@ class ElasticSearchActivationStoreTests
   private val start = ZonedDateTime.now.toInstant
   private val end = ZonedDateTime.now.toInstant
 
-  /*
-          ActivationEntry.apply,
-        elasticSearchConfig.schema.name,
-        elasticSearchConfig.schema.subject,              // subject_str
-        elasticSearchConfig.schema.activationId,
-        elasticSearchConfig.schema.version,              // version_str
-        elasticSearchConfig.schema.end,             // end_date
-        elasticSearchConfig.schema.status,               // status_str
-        elasticSearchConfig.schema.start,
-        elasticSearchConfig.schema.message,
-        elasticSearchConfig.schema.duration,         // duration_int
-        elasticSearchConfig.schema.namespace)           // namespace_str
-
-        case class ElasticSearchActivationFieldConfig(name: String,
-                                              namespace: String,
-                                              subject: String,
-                                              version: String,
-                                              start: String,
-                                              end: String,
-                                              status: String,
-                                              duration: String,
-                                              message: String,
-                                              activationId: String,
-                                              activationRecord: String,
-                                              stream: String)
-   */
   private val defaultSchema =
     ElasticSearchActivationFieldConfig(
       "name_str",
@@ -129,7 +103,6 @@ class ElasticSearchActivationStoreTests
     HttpRequest(method = GET, uri = "https://some.url", entity = HttpEntity.Empty)
 
   private val expectedLogs = ActivationLogs(Vector.empty)
-
   private val activation = WhiskActivation(
     namespace = namespace,
     name = name,
@@ -147,8 +120,6 @@ class ElasticSearchActivationStoreTests
     Flow[(HttpRequest, Promise[HttpResponse])]
       .mapAsyncUnordered(1) {
         case (request, userContext) =>
-          println(request)
-          println(httpRequest)
           request shouldBe httpRequest
           Future.successful((Success(httpResponse), userContext))
       }
@@ -304,7 +275,7 @@ class ElasticSearchActivationStoreTests
         request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
-  it should "forward errors from ElasticSearch" in {
+  it should "forward errors from Elasticsearch" in {
     val httpResponse = HttpResponse(StatusCodes.InternalServerError)
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
