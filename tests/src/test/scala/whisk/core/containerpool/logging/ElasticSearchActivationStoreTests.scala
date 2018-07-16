@@ -133,6 +133,28 @@ class ElasticSearchActivationStoreTests
       esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
   }
 
+  it should "get an activation" in {
+    val payload = JsObject(
+      "query" -> JsObject(
+        "query_string" -> JsObject(
+          "query" -> JsString(s"_type: activation_record AND activationId_str: $activationId"))),
+      "from" -> JsNumber(0)).compactPrint
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, payload))
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activation
+  }
+
   it should "count activations in namespace" in {
     val since = Instant.now
     val upto = Instant.now
@@ -262,6 +284,10 @@ class ElasticSearchActivationStoreTests
 
     a[RuntimeException] should be thrownBy await(
       esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
+    a[RuntimeException] should be thrownBy await(esActivationStore.listActivationsInNamespace(EntityPath(""), 0, 0))
+    a[RuntimeException] should be thrownBy await(
+      esActivationStore.listActivationsMatchingName(EntityPath(""), EntityPath(""), 0, 0))
+    a[RuntimeException] should be thrownBy await(esActivationStore.countActivationsInNamespace(EntityPath(""), None, 0))
   }
 
   it should "fail when loading out of box configs since whisk.activationstore.elasticsearch does not exist" in {
