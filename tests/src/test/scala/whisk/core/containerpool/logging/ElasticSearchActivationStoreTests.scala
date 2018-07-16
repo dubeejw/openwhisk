@@ -43,6 +43,11 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await /*, ExecutionContext*/, Future, Promise}
 import scala.util.{Success, Try}
 
+/*
+TODO:
+Required headers
+Not found activations
+ */
 @RunWith(classOf[JUnitRunner])
 class ElasticSearchActivationStoreTests
     extends TestKit(ActorSystem("ElasticSearchActivationStore"))
@@ -220,6 +225,39 @@ class ElasticSearchActivationStoreTests
         user.namespace.name.toPath,
         Some(name.toPath),
         1,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+  }
+
+  it should "count activations in namespace with no entity name" in {
+    val payload = JsObject(
+      "query" -> JsObject(
+        "bool" -> JsObject(
+          "must" -> JsArray(JsObject("match" -> JsObject("_type" -> JsString(defaultConfig.schema.activationRecord)))),
+          "filter" -> JsArray(
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("gt" -> JsString(since.toString)))),
+            JsObject("range" -> JsObject("@timestamp" -> JsObject("lt" -> JsString(upto.toString))))))),
+      "sort" -> JsArray(JsObject(defaultConfig.schema.start -> JsObject("order" -> JsString("desc")))),
+      "from" -> JsNumber(1)).compactPrint
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, payload))
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    await(
+      esActivationStore.countActivationsInNamespace(
+        user.namespace.name.toPath,
+        skip = 1,
         since = Some(since),
         upto = Some(upto),
         user = Some(user),
