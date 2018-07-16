@@ -142,19 +142,25 @@ class ArtifactElasticSearchActivationStore(
     Vector(sinceRange, uptoRange).flatten
   }
 
+  private def generateGetPayload(activationId: ActivationId) = {
+    val query =
+      s"_type: ${elasticSearchConfig.schema.activationRecord} AND ${elasticSearchConfig.schema.activationId}: ${activationId.asString
+        .substring(activationId.asString.indexOf("/") + 1)}"
+
+    EsQuery(EsQueryString(query))
+  }
+
   private def generateCountActivationsInNamespacePayload(name: Option[EntityPath],
                                                          skip: Int,
                                                          since: Option[Instant] = None,
                                                          upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
-
     val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord))
     val entityMatch: Option[EsQueryBoolMatch] = name.map { n =>
       Some(EsQueryBoolMatch("name", n.toString)) // TODO: name_str
     } getOrElse None
     println(entityMatch)
     val queryTerms = Vector(activationMatch, entityMatch).flatten
-
     val queryMust = EsQueryMust(queryTerms, queryRanges)
     val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
 
@@ -182,13 +188,12 @@ class ArtifactElasticSearchActivationStore(
                                                         since: Option[Instant] = None,
                                                         upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
-
     val queryTerms = Vector(
       EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
       EsQueryBoolMatch("subject", namespace.asString))
-
     val queryMust = EsQueryMust(queryTerms, queryRanges)
     val queryOrder = EsQueryOrder(elasticSearchConfig.schema.time, EsOrderDesc)
+
     EsQuery(queryMust, Some(queryOrder), Some(limit), from = skip)
   }
 
@@ -211,13 +216,10 @@ class ArtifactElasticSearchActivationStore(
 
   def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
-    println(s"ACTIVATION ID: $activationId")
-    val query =
-      s"_type: ${elasticSearchConfig.schema.activationRecord} AND ${elasticSearchConfig.schema.activationId}: ${activationId.asString
-        .substring(activationId.asString.indexOf("/") + 1)}"
-    logging.info(this, s"QUERY STRING: $query")
+    val payload = generateGetPayload(activationId)
 
-    val payload = EsQuery(EsQueryString(query))
+    logging.info(this, s"PAYLOAD: $payload")
+
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
     val headers = extractRequiredHeaders(request.get.headers)
 
