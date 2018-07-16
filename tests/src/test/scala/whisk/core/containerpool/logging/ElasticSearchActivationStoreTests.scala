@@ -35,6 +35,7 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import pureconfig.error.ConfigReaderException
 import spray.json._
 import whisk.core.entity._
+import whisk.core.database.NoDocumentException
 
 //import whisk.core.entity.size._
 import whisk.common.TransactionId
@@ -46,7 +47,7 @@ import scala.util.{Success, Try}
 /*
 TODO:
 Required headers
-Not found activations
+No found activations
  */
 @RunWith(classOf[JUnitRunner])
 class ElasticSearchActivationStoreTests
@@ -94,6 +95,11 @@ class ElasticSearchActivationStoreTests
       ContentTypes.`application/json`,
       s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536841193]}]}}"""))
 
+  private val emptyHttpResponse = HttpResponse(
+    StatusCodes.OK,
+    entity = HttpEntity(
+      ContentTypes.`application/json`,
+      s"""{"took":2,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":0,"max_score":null,"hits":[]}}"""))
   private val defaultPayload = JsObject(
     "query" -> JsObject(
       "query_string" -> JsObject("query" -> JsString(
@@ -206,6 +212,44 @@ class ElasticSearchActivationStoreTests
     await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activation
   }
 
+  it should "error when getting an activation that does not exist" in {
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultGetPayload))
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(emptyHttpResponse, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    a[NoDocumentException] should be thrownBy await(
+      esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest)))
+  }
+
+  it should "dynamically replace $UUID when getting an activation" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultGetPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
+
+    await(esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest))) shouldBe activation
+  }
+
   it should "count activations in namespace" in {
     val httpRequest = HttpRequest(
       POST,
@@ -264,6 +308,59 @@ class ElasticSearchActivationStoreTests
         request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
   }
 
+  it should "count zero activations in when there are not any activations that match entity" in {
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultCountPayload))
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(emptyHttpResponse, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    await(
+      esActivationStore.countActivationsInNamespace(
+        user.namespace.name.toPath,
+        Some(name.toPath),
+        1,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(0))
+  }
+
+  it should "dynamically replace $UUID in request when counting activations" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultCountPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
+
+    await(
+      esActivationStore.countActivationsInNamespace(
+        user.namespace.name.toPath,
+        Some(name.toPath),
+        1,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+  }
+
   it should "list activations matching entity name" in {
     val httpRequest = HttpRequest(
       POST,
@@ -277,6 +374,61 @@ class ElasticSearchActivationStoreTests
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
         elasticSearchConfig = defaultConfig)
+
+    await(
+      esActivationStore.listActivationsMatchingName(
+        user.namespace.name.toPath,
+        name.toPath,
+        1,
+        2,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+  }
+
+  it should "display empty activations list when there are not any activations that match entity name" in {
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultListEntityPayload))
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(emptyHttpResponse, httpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    await(
+      esActivationStore.listActivationsMatchingName(
+        user.namespace.name.toPath,
+        name.toPath,
+        1,
+        2,
+        since = Some(since),
+        upto = Some(upto),
+        user = Some(user),
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List.empty)
+  }
+
+  it should "dynamically replace $UUID in request when getting activations matching entity name" in {
+    val dynamicPathConfig =
+      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultListEntityPayload))
+
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(defaultHttpResponse, httpRequest)),
+        elasticSearchConfig = dynamicPathConfig)
 
     await(
       esActivationStore.listActivationsMatchingName(
@@ -315,102 +467,32 @@ class ElasticSearchActivationStoreTests
         request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
-  it should "forward errors from Elasticsearch" in {
-    val httpResponse = HttpResponse(StatusCodes.InternalServerError)
+  it should "display empty activations list when there are not any activations in namespace" in {
+    val httpRequest = HttpRequest(
+      POST,
+      Uri(s"/whisk_user_logs/_search"),
+      List(Accept(MediaTypes.`application/json`)),
+      HttpEntity(ContentTypes.`application/json`, defaultListPayload))
     val esActivationStore =
       new ArtifactElasticSearchActivationStore(
         system,
         materializer,
         logging,
-        Some(testFlow(httpResponse, defaultHttpRequest)),
+        Some(testFlow(emptyHttpResponse, httpRequest)),
         elasticSearchConfig = defaultConfig)
 
-    a[RuntimeException] should be thrownBy await(
-      esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
-    a[RuntimeException] should be thrownBy await(esActivationStore.listActivationsInNamespace(EntityPath(""), 0, 0))
-    a[RuntimeException] should be thrownBy await(
-      esActivationStore.listActivationsMatchingName(EntityPath(""), EntityPath(""), 0, 0))
-    a[RuntimeException] should be thrownBy await(esActivationStore.countActivationsInNamespace(EntityPath(""), None, 0))
-  }
-
-  it should "dynamically replace $UUID in request path1" in {
-    val dynamicPathConfig =
-      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
-    val httpRequest = HttpRequest(
-      POST,
-      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
-      List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, defaultGetPayload))
-
-    val esActivationStore =
-      new ArtifactElasticSearchActivationStore(
-        system,
-        materializer,
-        logging,
-        Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
-
-    await(esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest))) shouldBe activation
-  }
-
-  it should "dynamically replace $UUID in request path2" in {
-    val dynamicPathConfig =
-      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
-    val httpRequest = HttpRequest(
-      POST,
-      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
-      List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, defaultCountPayload))
-
-    val esActivationStore =
-      new ArtifactElasticSearchActivationStore(
-        system,
-        materializer,
-        logging,
-        Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
-
     await(
-      esActivationStore.countActivationsInNamespace(
+      esActivationStore.listActivationsInNamespace(
         user.namespace.name.toPath,
-        Some(name.toPath),
-        1,
-        since = Some(since),
-        upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
-  }
-
-  it should "dynamically replace $UUID in request path3" in {
-    val dynamicPathConfig =
-      ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
-    val httpRequest = HttpRequest(
-      POST,
-      Uri(s"/elasticsearch/logstash-${user.namespace.uuid.asString}*/_search"),
-      List(Accept(MediaTypes.`application/json`)),
-      HttpEntity(ContentTypes.`application/json`, defaultListEntityPayload))
-
-    val esActivationStore =
-      new ArtifactElasticSearchActivationStore(
-        system,
-        materializer,
-        logging,
-        Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
-
-    await(
-      esActivationStore.listActivationsMatchingName(
-        user.namespace.name.toPath,
-        name.toPath,
         1,
         2,
         since = Some(since),
         upto = Some(upto),
         user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List.empty)
   }
 
-  it should "dynamically replace $UUID in request path4" in {
+  it should "dynamically replace $UUID in request when listing activations in namespace" in {
     val dynamicPathConfig =
       ElasticSearchActivationStoreConfig("https", "host", 443, "/elasticsearch/logstash-%s*/_search", defaultSchema)
     val httpRequest = HttpRequest(
@@ -436,6 +518,24 @@ class ElasticSearchActivationStoreTests
         upto = Some(upto),
         user = Some(user),
         request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+  }
+
+  it should "forward errors from Elasticsearch" in {
+    val httpResponse = HttpResponse(StatusCodes.InternalServerError)
+    val esActivationStore =
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        Some(testFlow(httpResponse, defaultHttpRequest)),
+        elasticSearchConfig = defaultConfig)
+
+    a[RuntimeException] should be thrownBy await(
+      esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
+    a[RuntimeException] should be thrownBy await(esActivationStore.listActivationsInNamespace(EntityPath(""), 0, 0))
+    a[RuntimeException] should be thrownBy await(
+      esActivationStore.listActivationsMatchingName(EntityPath(""), EntityPath(""), 0, 0))
+    a[RuntimeException] should be thrownBy await(esActivationStore.countActivationsInNamespace(EntityPath(""), None, 0))
   }
 
   it should "fail when loading out of box configs since whisk.activationstore.elasticsearch does not exist" in {
