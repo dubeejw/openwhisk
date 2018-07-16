@@ -32,10 +32,10 @@ import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
 import whisk.core.containerpool.logging._
-import whisk.core.database.{ArtifactStore, CacheChangeNotification, NoDocumentException}
+import whisk.core.database.{ArtifactStore, NoDocumentException}
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 import scala.concurrent.{Future, Promise}
 
 import akka.stream.scaladsl.Flow
@@ -70,9 +70,8 @@ class ArtifactElasticSearchActivationStore(
   httpFlow: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
   elasticSearchConfig: ElasticSearchActivationStoreConfig =
     loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore))
-    extends ActivationStore {
+    extends ArtifactActivationStore(actorSystem, actorMaterializer, logging) {
 
-  implicit val executionContext = actorSystem.dispatcher
   implicit val system = actorSystem
 
   private val artifactStore: ArtifactStore[WhiskActivation] =
@@ -200,24 +199,7 @@ class ArtifactElasticSearchActivationStore(
     EsQuery(queryMust, Some(queryOrder), Some(limit), from = skip)
   }
 
-  def store(activation: WhiskActivation)(implicit transid: TransactionId,
-                                         notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
-    logging.debug(this, s"recording activation '${activation.activationId}'")
-
-    val res = WhiskActivation.put(artifactStore, activation)
-
-    res onComplete {
-      case Success(id) => logging.debug(this, s"recorded activation")
-      case Failure(t) =>
-        logging.error(
-          this,
-          s"failed to record activation ${activation.activationId} with error ${t.getLocalizedMessage}")
-    }
-
-    res
-  }
-
-  def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
+  override def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
     val payload = generateGetPayload(activationId)
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
@@ -239,19 +221,7 @@ class ArtifactElasticSearchActivationStore(
     }
   }
 
-  /**
-   * Here there is added overhead of retrieving the specified activation before deleting it, so this method should not
-   * be used in production or performance related code.
-   */
-  def delete(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
-    implicit transid: TransactionId,
-    notifier: Option[CacheChangeNotification]): Future[Boolean] = {
-    WhiskActivation.get(artifactStore, DocId(activationId.asString)) flatMap { doc =>
-      WhiskActivation.del(artifactStore, doc.docinfo)
-    }
-  }
-
-  def countActivationsInNamespace(
+  override def countActivationsInNamespace(
     namespace: EntityPath,
     name: Option[EntityPath] = None,
     skip: Int,
@@ -272,15 +242,15 @@ class ArtifactElasticSearchActivationStore(
     }
   }
 
-  def listActivationsMatchingName(namespace: EntityPath,
-                                  name: EntityPath,
-                                  skip: Int,
-                                  limit: Int,
-                                  includeDocs: Boolean = false,
-                                  since: Option[Instant] = None,
-                                  upto: Option[Instant] = None,
-                                  user: Option[Identity] = None,
-                                  request: Option[HttpRequest] = None)(
+  override def listActivationsMatchingName(namespace: EntityPath,
+                                           name: EntityPath,
+                                           skip: Int,
+                                           limit: Int,
+                                           includeDocs: Boolean = false,
+                                           since: Option[Instant] = None,
+                                           upto: Option[Instant] = None,
+                                           user: Option[Identity] = None,
+                                           request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
     val payload = generateListActiationsMatchNamePayload(name, skip, limit, since, upto)
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
@@ -294,14 +264,14 @@ class ArtifactElasticSearchActivationStore(
     }
   }
 
-  def listActivationsInNamespace(namespace: EntityPath,
-                                 skip: Int,
-                                 limit: Int,
-                                 includeDocs: Boolean = false,
-                                 since: Option[Instant] = None,
-                                 upto: Option[Instant] = None,
-                                 user: Option[Identity] = None,
-                                 request: Option[HttpRequest] = None)(
+  override def listActivationsInNamespace(namespace: EntityPath,
+                                          skip: Int,
+                                          limit: Int,
+                                          includeDocs: Boolean = false,
+                                          since: Option[Instant] = None,
+                                          upto: Option[Instant] = None,
+                                          user: Option[Identity] = None,
+                                          request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
     val payload = generateListActivationsInNamespacePayload(namespace, skip, limit, since, upto)
     val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
