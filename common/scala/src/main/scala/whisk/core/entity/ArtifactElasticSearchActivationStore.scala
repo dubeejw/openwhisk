@@ -61,7 +61,7 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
                                               requiredHeaders: Seq[String] = Seq.empty)
 
 // TODO:
-// activation errors?
+// Splice logs in to activations
 // Annotations are not in Elasticsearch...
 class ArtifactElasticSearchActivationStore(
   actorSystem: ActorSystem,
@@ -96,7 +96,12 @@ class ArtifactElasticSearchActivationStore(
                              namespace: String) {
 
     def toActivation = {
-      val result = ActivationResponse.success(Some(message.parseJson.asJsObject))
+      val result = status match {
+        case "0" => ActivationResponse.success(Some(message.parseJson.asJsObject))
+        case "1" => ActivationResponse.applicationError(message.parseJson.asJsObject)
+        case "2" => ActivationResponse.containerError(message.parseJson.asJsObject)
+        case "3" => ActivationResponse.whiskError(message.parseJson.asJsObject)
+      }
 
       WhiskActivation(
         EntityPath(namespace),

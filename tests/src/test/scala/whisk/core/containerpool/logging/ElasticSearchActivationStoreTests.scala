@@ -47,7 +47,7 @@ import scala.util.{Success, Try}
 /*
 TODO:
 Required headers
-No found activations
+Logs test...
  */
 @RunWith(classOf[JUnitRunner])
 class ElasticSearchActivationStoreTests
@@ -94,7 +94,6 @@ class ElasticSearchActivationStoreTests
     entity = HttpEntity(
       ContentTypes.`application/json`,
       s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536841193]}]}}"""))
-
   private val emptyHttpResponse = HttpResponse(
     StatusCodes.OK,
     entity = HttpEntity(
@@ -172,6 +171,7 @@ class ElasticSearchActivationStoreTests
     response = ActivationResponse.success(Some(message)),
     logs = expectedLogs,
     duration = Some(101L))
+
   //annotations = Parameters("limits", ActionLimits(TimeLimit(1.second), MemoryLimit(128.MB), LogLimit(1.MB)).toJson))
 
   private def testFlow(httpResponse: HttpResponse = HttpResponse(), httpRequest: HttpRequest = HttpRequest())
@@ -210,6 +210,46 @@ class ElasticSearchActivationStoreTests
         elasticSearchConfig = defaultConfig)
 
     await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activation
+  }
+
+  it should "get an activation with error response" in {
+    val activationResponses = Seq(
+      (0, ActivationResponse.success(Some(message))),
+      (1, ActivationResponse.applicationError(message)),
+      (2, ActivationResponse.containerError(message)),
+      (3, ActivationResponse.whiskError(message)))
+
+    activationResponses.foreach {
+      case (status, activationResponse) =>
+        val content =
+          s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"$status","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]}]}}"""
+        val activationWithError = WhiskActivation(
+          namespace = namespace,
+          name = name,
+          subject,
+          activationId = activationId,
+          start = start,
+          end = end,
+          response = activationResponse,
+          logs = expectedLogs,
+          duration = Some(101L))
+        val defaultHttpErrorResponse =
+          HttpResponse(StatusCodes.OK, entity = HttpEntity(ContentTypes.`application/json`, content))
+        val httpRequest = HttpRequest(
+          POST,
+          Uri(s"/whisk_user_logs/_search"),
+          List(Accept(MediaTypes.`application/json`)),
+          HttpEntity(ContentTypes.`application/json`, defaultGetPayload))
+        val esActivationStore =
+          new ArtifactElasticSearchActivationStore(
+            system,
+            materializer,
+            logging,
+            Some(testFlow(defaultHttpErrorResponse, httpRequest)),
+            elasticSearchConfig = defaultConfig)
+
+        await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activationWithError
+    }
   }
 
   it should "error when getting an activation that does not exist" in {
