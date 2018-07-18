@@ -93,7 +93,7 @@ class ArtifactElasticSearchActivationStore(
                              duration: Int,
                              namespace: String) {
 
-    def toActivation = {
+    def toActivation(logs: ActivationLogs = ActivationLogs()) = {
       val result = status match {
         case "0" => ActivationResponse.success(Some(message.parseJson.asJsObject))
         case "1" => ActivationResponse.applicationError(message.parseJson.asJsObject.fields("error"))
@@ -109,6 +109,7 @@ class ArtifactElasticSearchActivationStore(
         Instant.parse(timeDate),
         Instant.parse(endDate),
         response = result,
+        logs = logs,
         duration = Some(duration),
         version = SemVer(version))
     }
@@ -130,6 +131,62 @@ class ArtifactElasticSearchActivationStore(
         elasticSearchConfig.schema.namespace)
   }
 
+  // Schema of resultant logs from ES
+  case class UserLogEntry(message: String, stream: String, time: String) {
+    def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
+  }
+
+  object UserLogEntry extends DefaultJsonProtocol {
+    implicit val serdes =
+      jsonFormat(
+        UserLogEntry.apply,
+        elasticSearchConfig.schema.message,
+        elasticSearchConfig.schema.stream,
+        elasticSearchConfig.schema.start)
+  }
+
+  /*
+
+  implicit object EsQueryTermJsonFormat extends RootJsonFormat[EsQueryTerm] {
+    def read(query: JsValue) = ???
+    def write(query: EsQueryTerm) = JsObject("term" -> JsObject(query.key -> query.value.toJson))
+  }
+
+   */
+
+  /*object SomethingJsonProtocol extends DefaultJsonProtocol {
+    implicit object UserLogEntryJsonFormat extends RootJsonFormat[UserLogEntry] {
+      def read(entry: JsValue) = {
+        entry.asJsObject.getFields(elasticSearchConfig.schema.message, elasticSearchConfig.schema.stream, elasticSearchConfig.schema.start) match {
+          case Seq(JsString(message), JsString(stream), JsString(start)) =>
+            new UserLogEntry(message, stream, start)
+          case _ =>  throw new DeserializationException("Color expected")
+        }
+      }
+      def write(entry: UserLogEntry) = {
+        JsObject(
+          elasticSearchConfig.schema.message -> JsString(entry.message),
+          elasticSearchConfig.schema.stream -> JsString(entry.stream),
+          elasticSearchConfig.schema.start -> JsString(entry.time)
+        )
+      }
+    }
+  }*/
+
+  //import SomethingJsonProtocol._
+
+  private def transcribeLogs(queryResult: EsSearchResult): ActivationLogs = {
+    val b = queryResult.hits.hits.map { a =>
+      try {
+        Some(a.source.convertTo[UserLogEntry].toFormattedString)
+      } catch {
+        case _: Exception => None
+      }
+    }
+
+    ActivationLogs(b.flatten)
+  }
+
   private def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
     queryResult.hits.hits.map(_.source.convertTo[ActivationEntry]).toList
   }
@@ -146,6 +203,15 @@ class ArtifactElasticSearchActivationStore(
     } getOrElse None
 
     Vector(sinceRange, uptoRange).flatten
+  }
+
+  private def generateLogPayload(activationId: ActivationId) = {
+    val logQuery =
+      s"_type: user_logs AND ${elasticSearchConfig.schema.activationId}: ${activationId.asString}"
+    val queryString = EsQueryString(logQuery)
+    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderAsc)
+
+    EsQuery(queryString, Some(queryOrder))
   }
 
   private def generateGetPayload(activationId: ActivationId) = {
@@ -216,7 +282,15 @@ class ArtifactElasticSearchActivationStore(
           val res = transcribeActivations(queryResult)
 
           if (res.nonEmpty) {
-            Future.successful(res.head.toActivation)
+            esClient
+              .search[EsSearchResult](uuid, generateLogPayload(ActivationId(res.head.activationId)), headers)
+              .flatMap {
+                case Right(queryResult) =>
+                  logging.info(this, s"$queryResult")
+                  Future.successful(res.head.toActivation(transcribeLogs(queryResult)))
+                case Left(code) =>
+                  Future.failed(new RuntimeException(s"Status code '$code' was returned from log store"))
+              }
           } else {
             Future.failed(new NoDocumentException("Document not found"))
           }
@@ -271,7 +345,7 @@ class ArtifactElasticSearchActivationStore(
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
         case Right(queryResult) =>
-          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation)))
+          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation())))
         case Left(code) =>
           Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
       }
@@ -296,7 +370,7 @@ class ArtifactElasticSearchActivationStore(
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
         case Right(queryResult) =>
-          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation)))
+          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation())))
         case Left(code) =>
           Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
       }

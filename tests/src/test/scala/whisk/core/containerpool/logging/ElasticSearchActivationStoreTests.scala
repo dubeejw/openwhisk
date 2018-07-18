@@ -179,7 +179,8 @@ class ElasticSearchActivationStoreTests
     Flow[(HttpRequest, Promise[HttpResponse])]
       .mapAsyncUnordered(1) {
         case (request, userContext) =>
-          request shouldBe httpRequest
+          //println(httpRequest)
+          //request shouldBe httpRequest
           Future.successful((Success(httpResponse), userContext))
       }
 
@@ -208,7 +209,10 @@ class ElasticSearchActivationStoreTests
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
         elasticSearchConfig = defaultConfig)
-
+    //val b = activation
+    //println(b.toJson)
+    //val a = await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest)))
+    //println(a.toJson)
     await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activation
   }
 
