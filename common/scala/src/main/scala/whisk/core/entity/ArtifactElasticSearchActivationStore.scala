@@ -22,12 +22,9 @@ import java.time.Instant
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model._
-
 import pureconfig.loadConfigOrThrow
-
 import spray.json.DefaultJsonProtocol
 import spray.json._
-
 import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
@@ -36,8 +33,7 @@ import whisk.core.database.NoDocumentException
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
 import scala.util.Try
-import scala.concurrent.{Future, Promise}
-
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import akka.stream.scaladsl.Flow
 
 case class ElasticSearchActivationFieldConfig(name: String,
@@ -63,23 +59,22 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
 // TODO:
 // Splice logs in to activations
 // Annotations are not in Elasticsearch...
-class ArtifactElasticSearchActivationStore(
-  actorSystem: ActorSystem,
-  actorMaterializer: ActorMaterializer,
-  logging: Logging,
-  httpFlow: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
-  elasticSearchConfig: ElasticSearchActivationStoreConfig =
-    loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore))
-    extends ArtifactActivationStore(actorSystem, actorMaterializer, logging) {
 
-  implicit val system = actorSystem
+trait ElasticSearchActivationRestClient {
 
-  private val esClient =
+  implicit val executionContext: ExecutionContext
+  //implicit val actorSystem = system
+
+  implicit val system: ActorSystem
+  val httpFlow2: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]]
+  val elasticSearchConfig2: ElasticSearchActivationStoreConfig
+
+  protected val esClient2 =
     new ElasticSearchRestClient(
-      elasticSearchConfig.protocol,
-      elasticSearchConfig.host,
-      elasticSearchConfig.port,
-      httpFlow)
+      elasticSearchConfig2.protocol,
+      elasticSearchConfig2.host,
+      elasticSearchConfig2.port,
+      httpFlow2)
 
   // Schema of resultant activations from ES
   case class ActivationEntry(name: String,
@@ -119,82 +114,26 @@ class ArtifactElasticSearchActivationStore(
     implicit val serdes =
       jsonFormat(
         ActivationEntry.apply,
-        elasticSearchConfig.schema.name,
-        elasticSearchConfig.schema.subject,
-        elasticSearchConfig.schema.activationId,
-        elasticSearchConfig.schema.version,
-        elasticSearchConfig.schema.end,
-        elasticSearchConfig.schema.status,
-        elasticSearchConfig.schema.start,
-        elasticSearchConfig.schema.message,
-        elasticSearchConfig.schema.duration,
-        elasticSearchConfig.schema.namespace)
+        elasticSearchConfig2.schema.name,
+        elasticSearchConfig2.schema.subject,
+        elasticSearchConfig2.schema.activationId,
+        elasticSearchConfig2.schema.version,
+        elasticSearchConfig2.schema.end,
+        elasticSearchConfig2.schema.status,
+        elasticSearchConfig2.schema.start,
+        elasticSearchConfig2.schema.message,
+        elasticSearchConfig2.schema.duration,
+        elasticSearchConfig2.schema.namespace)
   }
 
-  // Schema of resultant logs from ES
-  case class UserLogEntry(message: String, stream: String, time: String) {
-    def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
-  }
-
-  object UserLogEntry extends DefaultJsonProtocol {
-    implicit val serdes =
-      jsonFormat(
-        UserLogEntry.apply,
-        elasticSearchConfig.schema.message,
-        elasticSearchConfig.schema.stream,
-        elasticSearchConfig.schema.start)
-  }
-
-  /*
-
-  implicit object EsQueryTermJsonFormat extends RootJsonFormat[EsQueryTerm] {
-    def read(query: JsValue) = ???
-    def write(query: EsQueryTerm) = JsObject("term" -> JsObject(query.key -> query.value.toJson))
-  }
-
-   */
-
-  /*object SomethingJsonProtocol extends DefaultJsonProtocol {
-    implicit object UserLogEntryJsonFormat extends RootJsonFormat[UserLogEntry] {
-      def read(entry: JsValue) = {
-        entry.asJsObject.getFields(elasticSearchConfig.schema.message, elasticSearchConfig.schema.stream, elasticSearchConfig.schema.start) match {
-          case Seq(JsString(message), JsString(stream), JsString(start)) =>
-            new UserLogEntry(message, stream, start)
-          case _ =>  throw new DeserializationException("Color expected")
-        }
-      }
-      def write(entry: UserLogEntry) = {
-        JsObject(
-          elasticSearchConfig.schema.message -> JsString(entry.message),
-          elasticSearchConfig.schema.stream -> JsString(entry.stream),
-          elasticSearchConfig.schema.start -> JsString(entry.time)
-        )
-      }
-    }
-  }*/
-
-  //import SomethingJsonProtocol._
-
-  private def transcribeLogs(queryResult: EsSearchResult): ActivationLogs = {
-    val b = queryResult.hits.hits.map { a =>
-      try {
-        Some(a.source.convertTo[UserLogEntry].toFormattedString)
-      } catch {
-        case _: Exception => None
-      }
-    }
-
-    ActivationLogs(b.flatten)
-  }
-
-  private def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
+  protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
     queryResult.hits.hits.map(_.source.convertTo[ActivationEntry]).toList
   }
 
-  private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
-    headers.filter(h => elasticSearchConfig.requiredHeaders.contains(h.lowercaseName)).toList
+  protected def extractRequiredHeaders2(headers: Seq[HttpHeader]) =
+    headers.filter(h => elasticSearchConfig2.requiredHeaders.contains(h.lowercaseName)).toList
 
-  private def getRanges(since: Option[Instant] = None, upto: Option[Instant] = None) = {
+  protected def getRanges(since: Option[Instant] = None, upto: Option[Instant] = None) = {
     val sinceRange: Option[EsQueryRange] = since.map { time =>
       Some(EsQueryRange("@timestamp", EsRangeGt, time.toString))
     } getOrElse None
@@ -205,99 +144,161 @@ class ArtifactElasticSearchActivationStore(
     Vector(sinceRange, uptoRange).flatten
   }
 
-  private def generateLogPayload(activationId: ActivationId) = {
+  protected def generateLogPayload(activationId: ActivationId) = {
     val logQuery =
-      s"_type: user_logs AND ${elasticSearchConfig.schema.activationId}: ${activationId.asString}"
+      s"_type: user_logs AND ${elasticSearchConfig2.schema.activationId}: ${activationId.asString}"
     val queryString = EsQueryString(logQuery)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderAsc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderAsc)
 
     EsQuery(queryString, Some(queryOrder))
   }
 
-  private def generateGetPayload(activationId: ActivationId) = {
+  protected def generateGetPayload(activationId: ActivationId) = {
     val query =
-      s"_type: ${elasticSearchConfig.schema.activationRecord} AND ${elasticSearchConfig.schema.activationId}: ${activationId.asString
+      s"_type: ${elasticSearchConfig2.schema.activationRecord} AND ${elasticSearchConfig2.schema.activationId}: ${activationId.asString
         .substring(activationId.asString.indexOf("/") + 1)}"
 
     EsQuery(EsQueryString(query))
   }
 
-  private def generateCountActivationsInNamespacePayload(name: Option[EntityPath],
-                                                         skip: Int,
-                                                         since: Option[Instant] = None,
-                                                         upto: Option[Instant] = None) = {
+  protected def generateGetPayload2(activationId: String) = {
+    val query =
+      s"_type: ${elasticSearchConfig2.schema.activationRecord} AND ${elasticSearchConfig2.schema.activationId}: $activationId"
+
+    EsQuery(EsQueryString(query))
+  }
+
+  protected def generateCountActivationsInNamespacePayload(name: Option[EntityPath],
+                                                           skip: Int,
+                                                           since: Option[Instant] = None,
+                                                           upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
-    val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord))
+    val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord))
     val entityMatch: Option[EsQueryBoolMatch] = name.map { n =>
-      Some(EsQueryBoolMatch(elasticSearchConfig.schema.name, n.toString))
+      Some(EsQueryBoolMatch(elasticSearchConfig2.schema.name, n.toString))
     } getOrElse None
     val queryTerms = Vector(activationMatch, entityMatch).flatten
     val queryMust = EsQueryMust(queryTerms, queryRanges)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderDesc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderDesc)
 
     EsQuery(queryMust, Some(queryOrder), from = skip)
   }
 
-  private def generateListActiationsMatchNamePayload(name: EntityPath,
-                                                     skip: Int,
-                                                     limit: Int,
-                                                     since: Option[Instant] = None,
-                                                     upto: Option[Instant] = None) = {
+  protected def generateListActiationsMatchNamePayload(name: String,
+                                                       skip: Int,
+                                                       limit: Int,
+                                                       since: Option[Instant] = None,
+                                                       upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
     val queryTerms = Vector(
-      EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
-      EsQueryBoolMatch(elasticSearchConfig.schema.name, name.toString))
+      EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord),
+      EsQueryBoolMatch(elasticSearchConfig2.schema.name, name))
     val queryMust = EsQueryMust(queryTerms, queryRanges)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderDesc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderDesc)
 
     EsQuery(queryMust, Some(queryOrder), Some(limit), from = skip)
   }
 
-  private def generateListActivationsInNamespacePayload(namespace: EntityPath,
-                                                        skip: Int,
-                                                        limit: Int,
-                                                        since: Option[Instant] = None,
-                                                        upto: Option[Instant] = None) = {
+  protected def generateListActivationsInNamespacePayload(namespace: String,
+                                                          skip: Int,
+                                                          limit: Int,
+                                                          since: Option[Instant] = None,
+                                                          upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
     val queryTerms = Vector(
-      EsQueryBoolMatch("_type", elasticSearchConfig.schema.activationRecord),
-      EsQueryBoolMatch(elasticSearchConfig.schema.subject, namespace.asString))
+      EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord),
+      EsQueryBoolMatch(elasticSearchConfig2.schema.subject, namespace))
     val queryMust = EsQueryMust(queryTerms, queryRanges)
-    val queryOrder = EsQueryOrder(elasticSearchConfig.schema.start, EsOrderDesc)
+    val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderDesc)
 
     EsQuery(queryMust, Some(queryOrder), Some(limit), from = skip)
   }
+
+  def getActivation(activationId: String, uuid: String, headers: List[HttpHeader] = List.empty)(
+    implicit transid: TransactionId): Future[ActivationEntry] = {
+    val payload = generateGetPayload2(activationId)
+
+    esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        val res = transcribeActivations(queryResult)
+
+        if (res.nonEmpty) {
+          Future.successful(res.head)
+        } else {
+          Future.failed(new NoDocumentException("Document not found"))
+        }
+
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+  }
+
+  def listActivationMatching(
+    uuid: String,
+    name: String,
+    skip: Int,
+    limit: Int,
+    since: Option[Instant] = None,
+    upto: Option[Instant] = None,
+    headers: List[HttpHeader] = List.empty)(implicit transid: TransactionId): Future[List[ActivationEntry]] = {
+    val payload = generateListActiationsMatchNamePayload(name, skip, limit, since, upto)
+
+    esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        Future.successful(transcribeActivations(queryResult))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+  }
+
+  def listActivationsNamespace(
+    uuid: String,
+    namespace: String,
+    skip: Int,
+    limit: Int,
+    since: Option[Instant] = None,
+    upto: Option[Instant] = None,
+    headers: List[HttpHeader] = List.empty)(implicit transid: TransactionId): Future[List[ActivationEntry]] = {
+    val payload = generateListActivationsInNamespacePayload(namespace, skip, limit, since, upto)
+
+    esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        Future.successful(transcribeActivations(queryResult))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+  }
+
+}
+
+class ArtifactElasticSearchActivationStore(
+  override val system: ActorSystem,
+  actorMaterializer: ActorMaterializer,
+  logging: Logging,
+  override val httpFlow2: Option[
+    Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
+  override val httpFlow: Option[
+    Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
+  override val elasticSearchConfig2: ElasticSearchActivationStoreConfig =
+    loadConfigOrThrow[ElasticSearchActivationStoreConfig](ConfigKeys.elasticSearchActivationStore),
+  override val elasticSearchConfig: ElasticSearchLogStoreConfig =
+    loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.logStoreElasticSearch))
+    extends ArtifactActivationStore(system, actorMaterializer, logging)
+    with ElasticSearchActivationRestClient
+    with ElasticSearchLogRestClient {
 
   override def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
-    val payload = generateGetPayload(activationId)
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+    val headers = extractRequiredHeaders2(request.get.headers)
 
     // Return activation from ElasticSearch or from artifact store if required headers are not present
-    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-        case Right(queryResult) =>
-          logging.info(this, s"QUERY RESULT: $queryResult")
-          val res = transcribeActivations(queryResult)
+    if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
+      val uuid = elasticSearchConfig2.path.format(user.get.namespace.uuid.asString)
+      val headers = extractRequiredHeaders2(request.get.headers)
+      val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
-          if (res.nonEmpty) {
-            esClient
-              .search[EsSearchResult](uuid, generateLogPayload(ActivationId(res.head.activationId)), headers)
-              .flatMap {
-                case Right(queryResult) =>
-                  logging.info(this, s"$queryResult")
-                  Future.successful(res.head.toActivation(transcribeLogs(queryResult)))
-                case Left(code) =>
-                  Future.failed(new RuntimeException(s"Status code '$code' was returned from log store"))
-              }
-          } else {
-            Future.failed(new NoDocumentException("Document not found"))
-          }
-
-        case Left(code) =>
-          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
-      }
+      getActivation(id, uuid, headers).flatMap(activation =>
+        fetchLogs3(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs))))
     } else {
       super.get(activationId, user, request)
     }
@@ -312,11 +313,11 @@ class ArtifactElasticSearchActivationStore(
     user: Option[Identity] = None,
     request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
     val payload = generateCountActivationsInNamespacePayload(name, skip, since, upto)
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+    val uuid = elasticSearchConfig2.path.format(user.get.namespace.uuid.asString)
+    val headers = extractRequiredHeaders2(request.get.headers)
 
-    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+    if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
+      esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
         case Right(queryResult) =>
           val total = Math.max(0, queryResult.hits.total - skip)
           Future.successful(JsObject("activations" -> total.toJson))
@@ -338,16 +339,16 @@ class ArtifactElasticSearchActivationStore(
                                            user: Option[Identity] = None,
                                            request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-    val payload = generateListActiationsMatchNamePayload(name, skip, limit, since, upto)
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+    val uuid = elasticSearchConfig2.path.format(user.get.namespace.uuid.asString)
+    val headers = extractRequiredHeaders2(request.get.headers)
 
-    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-        case Right(queryResult) =>
-          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation())))
-        case Left(code) =>
-          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
+      listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).flatMap { activationList =>
+        Future
+          .sequence(activationList.map { act =>
+            fetchLogs3(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+          })
+          .map(Right(_))
       }
     } else {
       super.listActivationsMatchingName(namespace, name, skip, limit, includeDocs, since, upto, user, request)
@@ -363,16 +364,16 @@ class ArtifactElasticSearchActivationStore(
                                           user: Option[Identity] = None,
                                           request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-    val payload = generateListActivationsInNamespacePayload(namespace, skip, limit, since, upto)
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+    val uuid = elasticSearchConfig2.path.format(user.get.namespace.uuid.asString)
+    val headers = extractRequiredHeaders2(request.get.headers)
 
-    if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-        case Right(queryResult) =>
-          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation())))
-        case Left(code) =>
-          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
+      listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).flatMap { activationList =>
+        Future
+          .sequence(activationList.map { act =>
+            fetchLogs3(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+          })
+          .map(Right(_))
       }
     } else {
       super.listActivationsInNamespace(namespace, skip, limit, includeDocs, since, upto, user, request)

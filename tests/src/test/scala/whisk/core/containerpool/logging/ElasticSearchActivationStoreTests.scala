@@ -89,6 +89,11 @@ class ElasticSearchActivationStoreTests
   private val defaultConfig =
     ElasticSearchActivationStoreConfig("https", "host", 443, "/whisk_user_logs/_search", defaultSchema)
 
+  private val defaultLogSchema =
+    ElasticSearchLogFieldConfig("user_logs", "message", "activationId_str", "stream_str", "time_date")
+  private val defaultLogConfig =
+    ElasticSearchLogStoreConfig("https", "host", 443, "/whisk_user_logs/_search", defaultLogSchema)
+
   private val defaultHttpResponse = HttpResponse(
     StatusCodes.OK,
     entity = HttpEntity(
@@ -104,6 +109,23 @@ class ElasticSearchActivationStoreTests
       "query_string" -> JsObject("query" -> JsString(
         s"_type: ${defaultConfig.schema.activationRecord} AND ${defaultConfig.schema.activationId}: $activationId"))),
     "from" -> JsNumber(0)).compactPrint
+
+  private val defaultLogHttpResponse = HttpResponse(
+    StatusCodes.OK,
+    entity = HttpEntity(
+      ContentTypes.`application/json`,
+      s"""{"took":799,"timed_out":false,"_shards":{"total":204,"successful":204,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"logstash-2018.03.05.02","_type":"user_logs","_id":"1c00007f-ecb9-4083-8d2e-4d5e2849621f","_score":null,"_source":{"time_date":"2018-03-05T02:10:38.196689522Z","accountId":null,"message":"some log stuff\\n","type":"user_logs","event_uuid":"1c00007f-ecb9-4083-8d2e-4d5e2849621f","${defaultConfig.schema.activationId}":"$activationId","action_str":"user@email.com/logs","tenantId":"tenantId","logmet_cluster":"topic1-elasticsearch_1","@timestamp":"2018-03-05T02:11:37.687Z","@version":"1","stream_str":"stdout","timestamp":"2018-03-05T02:10:39.131Z"},"sort":[1520215897687]},{"_index":"logstash-2018.03.05.02","_type":"user_logs","_id":"14c2a5b7-8cad-4ec0-992e-70fab1996465","_score":null,"_source":{"time_date":"2018-03-05T02:10:38.196754258Z","accountId":null,"message":"more logs\\n","type":"user_logs","event_uuid":"14c2a5b7-8cad-4ec0-992e-70fab1996465","${defaultConfig.schema.activationId}":"$activationId","action_str":"user@email.com/logs","tenantId":"tenant","logmet_cluster":"topic1-elasticsearch_1","@timestamp":"2018-03-05T02:11:37.701Z","@version":"1","stream_str":"stdout","timestamp":"2018-03-05T02:10:39.131Z"},"sort":[1520215897701]}]}}"""))
+  private val defaultLogPayload = JsObject(
+    "query" -> JsObject("query_string" -> JsObject("query" -> JsString(
+      s"_type: ${defaultLogConfig.logSchema.userLogs} AND ${defaultLogConfig.logSchema.activationId}: $activationId"))),
+    "sort" -> JsArray(JsObject(defaultLogConfig.logSchema.time -> JsObject("order" -> JsString("asc")))),
+    "from" -> JsNumber(0)).compactPrint
+
+  private val defaultLogHttpRequest = HttpRequest(
+    POST,
+    Uri(s"/whisk_user_logs/_search"),
+    List(Accept(MediaTypes.`application/json`)),
+    HttpEntity(ContentTypes.`application/json`, defaultLogPayload))
 
   val since = Instant.now
   val upto = Instant.now
@@ -160,7 +182,10 @@ class ElasticSearchActivationStoreTests
   private val defaultLogStoreHttpRequest =
     HttpRequest(method = GET, uri = "https://some.url", entity = HttpEntity.Empty)
 
-  private val expectedLogs = ActivationLogs(Vector.empty)
+  //private val expectedLogs = ActivationLogs(Vector.empty)
+  private val expectedLogs = ActivationLogs(
+    Vector("2018-03-05T02:10:38.196689522Z stdout: some log stuff", "2018-03-05T02:10:38.196754258Z stdout: more logs"))
+
   private val activation = WhiskActivation(
     namespace = namespace,
     name = name,
@@ -180,7 +205,7 @@ class ElasticSearchActivationStoreTests
       .mapAsyncUnordered(1) {
         case (request, userContext) =>
           //println(httpRequest)
-          //request shouldBe httpRequest
+          request shouldBe httpRequest
           Future.successful((Success(httpResponse), userContext))
       }
 
@@ -190,7 +215,12 @@ class ElasticSearchActivationStoreTests
 
   it should "fail to connect to invalid host" in {
     val esActivationStore =
-      new ArtifactElasticSearchActivationStore(system, materializer, logging, elasticSearchConfig = defaultConfig)
+      new ArtifactElasticSearchActivationStore(
+        system,
+        materializer,
+        logging,
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     a[Throwable] should be thrownBy await(
       esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
@@ -208,11 +238,10 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
-    //val b = activation
-    //println(b.toJson)
-    //val a = await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest)))
-    //println(a.toJson)
+        Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
+
     await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activation
   }
 
@@ -250,7 +279,9 @@ class ElasticSearchActivationStoreTests
             materializer,
             logging,
             Some(testFlow(defaultHttpErrorResponse, httpRequest)),
-            elasticSearchConfig = defaultConfig)
+            Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+            elasticSearchConfig = defaultLogConfig,
+            elasticSearchConfig2 = defaultConfig)
 
         await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activationWithError
     }
@@ -268,7 +299,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(emptyHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     a[NoDocumentException] should be thrownBy await(
       esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest)))
@@ -289,7 +321,9 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
+        Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = dynamicPathConfig)
 
     await(esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest))) shouldBe activation
   }
@@ -306,7 +340,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.countActivationsInNamespace(
@@ -340,7 +375,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.countActivationsInNamespace(
@@ -364,7 +400,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(emptyHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.countActivationsInNamespace(
@@ -392,7 +429,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = dynamicPathConfig)
 
     await(
       esActivationStore.countActivationsInNamespace(
@@ -417,7 +455,9 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.listActivationsMatchingName(
@@ -443,7 +483,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(emptyHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.listActivationsMatchingName(
@@ -472,7 +513,9 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
+        Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = dynamicPathConfig)
 
     await(
       esActivationStore.listActivationsMatchingName(
@@ -498,7 +541,9 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.listActivationsInNamespace(
@@ -523,7 +568,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(emptyHttpResponse, httpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     await(
       esActivationStore.listActivationsInNamespace(
@@ -551,7 +597,9 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(defaultHttpResponse, httpRequest)),
-        elasticSearchConfig = dynamicPathConfig)
+        Some(testFlow(defaultLogHttpResponse, defaultLogHttpRequest)),
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = dynamicPathConfig)
 
     await(
       esActivationStore.listActivationsInNamespace(
@@ -572,7 +620,8 @@ class ElasticSearchActivationStoreTests
         materializer,
         logging,
         Some(testFlow(httpResponse, defaultHttpRequest)),
-        elasticSearchConfig = defaultConfig)
+        elasticSearchConfig = defaultLogConfig,
+        elasticSearchConfig2 = defaultConfig)
 
     a[RuntimeException] should be thrownBy await(
       esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
@@ -597,7 +646,8 @@ class ElasticSearchActivationStoreTests
       system,
       materializer,
       logging,
-      elasticSearchConfig = invalidHostConfig)
+      elasticSearchConfig = defaultLogConfig,
+      elasticSearchConfig2 = invalidHostConfig)
   }
 
 }

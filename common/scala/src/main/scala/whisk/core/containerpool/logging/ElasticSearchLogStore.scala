@@ -27,7 +27,7 @@ import whisk.core.entity.{ActivationLogs, Identity, WhiskActivation}
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 import whisk.core.ConfigKeys
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Try
 
 import spray.json._
@@ -52,13 +52,14 @@ case class ElasticSearchLogStoreConfig(protocol: String,
  * stdout/stderr to JSON formatted files. Those files can be processed by a backend service asynchronously to store
  * user logs in ElasticSearch. This log store allows user logs then to be fetched from ElasticSearch.
  */
-class ElasticSearchLogStore(
-  system: ActorSystem,
-  httpFlow: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
-  destinationDirectory: Path = Paths.get("logs"),
-  elasticSearchConfig: ElasticSearchLogStoreConfig =
-    loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.logStoreElasticSearch))
-    extends DockerToActivationFileLogStore(system, destinationDirectory) {
+trait ElasticSearchLogRestClient {
+
+  implicit val executionContext: ExecutionContext
+  //implicit val actorSystem = system
+
+  implicit val system: ActorSystem
+  val httpFlow: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]]
+  val elasticSearchConfig: ElasticSearchLogStoreConfig
 
   // Schema of resultant logs from ES
   case class UserLogEntry(message: String, stream: String, time: String) {
@@ -74,46 +75,68 @@ class ElasticSearchLogStore(
         elasticSearchConfig.logSchema.time)
   }
 
-  implicit val actorSystem = system
-
-  private val esClient = new ElasticSearchRestClient(
+  protected val esClient = new ElasticSearchRestClient(
     elasticSearchConfig.protocol,
     elasticSearchConfig.host,
     elasticSearchConfig.port,
     httpFlow)
 
-  private def transcribeLogs(queryResult: EsSearchResult): ActivationLogs =
-    ActivationLogs(queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString))
+  protected def transcribeLogs(queryResult: EsSearchResult): Vector[String] =
+    queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString)
 
-  private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
+  protected def extractRequiredHeaders(headers: Seq[HttpHeader]) =
     headers.filter(h => elasticSearchConfig.requiredHeaders.contains(h.lowercaseName)).toList
 
-  private def generatePayload(activation: WhiskActivation) = {
+  protected def generatePayload(activationId: String) = {
     val logQuery =
-      s"_type: ${elasticSearchConfig.logSchema.userLogs} AND ${elasticSearchConfig.logSchema.activationId}: ${activation.activationId}"
+      s"_type: ${elasticSearchConfig.logSchema.userLogs} AND ${elasticSearchConfig.logSchema.activationId}: $activationId"
     val queryString = EsQueryString(logQuery)
     val queryOrder = EsQueryOrder(elasticSearchConfig.logSchema.time, EsOrderAsc)
 
     EsQuery(queryString, Some(queryOrder))
   }
 
-  private def generatePath(user: Identity) = elasticSearchConfig.path.format(user.namespace.uuid.asString)
+  protected def generatePath(user: String) = elasticSearchConfig.path.format(user)
+
+  def fetchLogs3(user: String, activationId: String, headers: List[HttpHeader] = List.empty): Future[Vector[String]] = {
+
+    esClient.search[EsSearchResult](generatePath(user), generatePayload(activationId), headers).flatMap {
+      case Right(queryResult) =>
+        Future.successful(transcribeLogs(queryResult))
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from log store"))
+    }
+  }
+}
+
+/**
+ * ElasticSearch based implementation of a DockerToActivationFileLogStore. When using the JSON log driver, docker writes
+ * stdout/stderr to JSON formatted files. Those files can be processed by a backend service asynchronously to store
+ * user logs in ElasticSearch. This log store allows user logs then to be fetched from ElasticSearch.
+ */
+class ElasticSearchLogStore(
+  override val system: ActorSystem,
+  override val httpFlow: Option[
+    Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]] = None,
+  destinationDirectory: Path = Paths.get("logs"),
+  override val elasticSearchConfig: ElasticSearchLogStoreConfig =
+    loadConfigOrThrow[ElasticSearchLogStoreConfig](ConfigKeys.logStoreElasticSearch))
+    extends DockerToActivationFileLogStore(system, destinationDirectory)
+    with ElasticSearchLogRestClient {
+
+  implicit val executionContext = system.dispatcher
 
   override def fetchLogs(user: Identity, activation: WhiskActivation, request: HttpRequest): Future[ActivationLogs] = {
     val headers = extractRequiredHeaders(request.headers)
 
     // Return logs from ElasticSearch, or return logs from activation if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      esClient.search[EsSearchResult](generatePath(user), generatePayload(activation), headers).flatMap {
-        case Right(queryResult) =>
-          Future.successful(transcribeLogs(queryResult))
-        case Left(code) =>
-          Future.failed(new RuntimeException(s"Status code '$code' was returned from log store"))
-      }
+      fetchLogs3(user.namespace.uuid.asString, activation.activationId.asString, headers).map(ActivationLogs(_))
     } else {
       Future.successful(activation.logs)
     }
   }
+
 }
 
 object ElasticSearchLogStoreProvider extends LogStoreProvider {
