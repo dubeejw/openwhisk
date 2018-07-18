@@ -213,16 +213,16 @@ class ElasticSearchActivationStoreTests
   }
 
   it should "get an activation with error response" in {
+    val error = JsString("message")
     val activationResponses = Seq(
-      (0, ActivationResponse.success(Some(message))),
-      (1, ActivationResponse.applicationError(message)),
-      (2, ActivationResponse.containerError(message)),
-      (3, ActivationResponse.whiskError(message)))
+      (1, ActivationResponse.applicationError(error)),
+      (2, ActivationResponse.containerError(error)),
+      (3, ActivationResponse.whiskError(error)))
 
     activationResponses.foreach {
       case (status, activationResponse) =>
         val content =
-          s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"$status","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]}]}}"""
+          s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"$status","${defaultConfig.schema.message}":"{\\"error\\":\\"message\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]}]}}"""
         val activationWithError = WhiskActivation(
           namespace = namespace,
           name = name,

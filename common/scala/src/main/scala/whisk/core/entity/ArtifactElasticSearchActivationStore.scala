@@ -32,7 +32,7 @@ import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
 import whisk.core.containerpool.logging._
-import whisk.core.database.{ArtifactStore, NoDocumentException}
+import whisk.core.database.NoDocumentException
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
 import scala.util.Try
@@ -74,8 +74,6 @@ class ArtifactElasticSearchActivationStore(
 
   implicit val system = actorSystem
 
-  private val artifactStore: ArtifactStore[WhiskActivation] =
-    WhiskActivationStore.datastore()(actorSystem, logging, actorMaterializer)
   private val esClient =
     new ElasticSearchRestClient(
       elasticSearchConfig.protocol,
@@ -98,9 +96,9 @@ class ArtifactElasticSearchActivationStore(
     def toActivation = {
       val result = status match {
         case "0" => ActivationResponse.success(Some(message.parseJson.asJsObject))
-        case "1" => ActivationResponse.applicationError(message.parseJson.asJsObject)
-        case "2" => ActivationResponse.containerError(message.parseJson.asJsObject)
-        case "3" => ActivationResponse.whiskError(message.parseJson.asJsObject)
+        case "1" => ActivationResponse.applicationError(message.parseJson.asJsObject.fields("error"))
+        case "2" => ActivationResponse.containerError(message.parseJson.asJsObject.fields("error"))
+        case "3" => ActivationResponse.whiskError(message.parseJson.asJsObject.fields("error"))
       }
 
       WhiskActivation(
@@ -132,8 +130,8 @@ class ArtifactElasticSearchActivationStore(
         elasticSearchConfig.schema.namespace)
   }
 
-  private def transcribeActivations(queryResult: EsSearchResult): List[WhiskActivation] = {
-    queryResult.hits.hits.map(_.source.convertTo[ActivationEntry].toActivation).toList
+  private def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
+    queryResult.hits.hits.map(_.source.convertTo[ActivationEntry]).toList
   }
 
   private def extractRequiredHeaders(headers: Seq[HttpHeader]) =
@@ -218,7 +216,7 @@ class ArtifactElasticSearchActivationStore(
           val res = transcribeActivations(queryResult)
 
           if (res.nonEmpty) {
-            Future.successful(res.head)
+            Future.successful(res.head.toActivation)
           } else {
             Future.failed(new NoDocumentException("Document not found"))
           }
@@ -273,7 +271,7 @@ class ArtifactElasticSearchActivationStore(
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
         case Right(queryResult) =>
-          Future.successful(Right(transcribeActivations(queryResult)))
+          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation)))
         case Left(code) =>
           Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
       }
@@ -298,7 +296,7 @@ class ArtifactElasticSearchActivationStore(
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       esClient.search[EsSearchResult](uuid, payload, headers).flatMap {
         case Right(queryResult) =>
-          Future.successful(Right(transcribeActivations(queryResult)))
+          Future.successful(Right(transcribeActivations(queryResult).map(_.toActivation)))
         case Left(code) =>
           Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
       }
