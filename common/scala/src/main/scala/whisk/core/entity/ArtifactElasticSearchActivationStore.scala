@@ -145,38 +145,21 @@ trait ElasticSearchActivationRestClient {
     Vector(sinceRange, uptoRange).flatten
   }
 
-  protected def generateLogPayload(activationId: ActivationId) = {
-    val logQuery =
-      s"_type: user_logs AND ${elasticSearchConfig2.schema.activationId}: ${activationId.asString}"
-    val queryString = EsQueryString(logQuery)
-    val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderAsc)
-
-    EsQuery(queryString, Some(queryOrder))
-  }
-
-  protected def generateGetPayload(activationId: ActivationId) = {
-    val query =
-      s"_type: ${elasticSearchConfig2.schema.activationRecord} AND ${elasticSearchConfig2.schema.activationId}: ${activationId.asString
-        .substring(activationId.asString.indexOf("/") + 1)}"
-
-    EsQuery(EsQueryString(query))
-  }
-
-  protected def generateGetPayload2(activationId: String) = {
+  protected def generateGetPayload(activationId: String) = {
     val query =
       s"_type: ${elasticSearchConfig2.schema.activationRecord} AND ${elasticSearchConfig2.schema.activationId}: $activationId"
 
     EsQuery(EsQueryString(query))
   }
 
-  protected def generateCountActivationsInNamespacePayload(name: Option[EntityPath],
+  protected def generateCountActivationsInNamespacePayload(name: Option[EntityPath] = None,
                                                            skip: Int,
                                                            since: Option[Instant] = None,
                                                            upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
     val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord))
     val entityMatch: Option[EsQueryBoolMatch] = name.map { n =>
-      Some(EsQueryBoolMatch(elasticSearchConfig2.schema.name, n.toString))
+      Some(EsQueryBoolMatch(elasticSearchConfig2.schema.name, n.asString))
     } getOrElse None
     val queryTerms = Vector(activationMatch, entityMatch).flatten
     val queryMust = EsQueryMust(queryTerms, queryRanges)
@@ -217,7 +200,7 @@ trait ElasticSearchActivationRestClient {
 
   def getActivation(activationId: String, uuid: String, headers: List[HttpHeader] = List.empty)(
     implicit transid: TransactionId): Future[ActivationEntry] = {
-    val payload = generateGetPayload2(activationId)
+    val payload = generateGetPayload(activationId)
 
     esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
@@ -229,6 +212,24 @@ trait ElasticSearchActivationRestClient {
           Future.failed(new NoDocumentException("Document not found"))
         }
 
+      case Left(code) =>
+        Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
+    }
+  }
+
+  def count(uuid: String,
+            name: Option[EntityPath] = None,
+            namespace: String,
+            skip: Int,
+            since: Option[Instant] = None,
+            upto: Option[Instant] = None,
+            headers: List[HttpHeader] = List.empty)(implicit transid: TransactionId): Future[JsObject] = {
+    val payload = generateCountActivationsInNamespacePayload(name, skip, since, upto)
+
+    esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
+      case Right(queryResult) =>
+        val total = Math.max(0, queryResult.hits.total - skip)
+        Future.successful(JsObject("activations" -> total.toJson))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
     }
@@ -318,13 +319,7 @@ class ArtifactElasticSearchActivationStore(
     val headers = extractRequiredHeaders2(request.get.headers)
 
     if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
-      esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
-        case Right(queryResult) =>
-          val total = Math.max(0, queryResult.hits.total - skip)
-          Future.successful(JsObject("activations" -> total.toJson))
-        case Left(code) =>
-          Future.failed(new RuntimeException(s"Status code '$code' was returned from activation store"))
-      }
+      count(uuid, name, namespace.asString, skip, since, upto, headers)
     } else {
       super.countActivationsInNamespace(namespace, name, skip, since, upto, user, request)
     }

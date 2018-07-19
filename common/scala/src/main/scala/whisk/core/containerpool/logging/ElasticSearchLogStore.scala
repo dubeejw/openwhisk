@@ -47,11 +47,6 @@ case class ElasticSearchLogStoreConfig(protocol: String,
                                        logSchema: ElasticSearchLogFieldConfig,
                                        requiredHeaders: Seq[String] = Seq.empty)
 
-/**
- * ElasticSearch based implementation of a DockerToActivationFileLogStore. When using the JSON log driver, docker writes
- * stdout/stderr to JSON formatted files. Those files can be processed by a backend service asynchronously to store
- * user logs in ElasticSearch. This log store allows user logs then to be fetched from ElasticSearch.
- */
 trait ElasticSearchLogRestClient {
 
   implicit val executionContext: ExecutionContext
