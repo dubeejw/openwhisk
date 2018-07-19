@@ -55,9 +55,8 @@ case class ElasticSearchLogStoreConfig(protocol: String,
 trait ElasticSearchLogRestClient {
 
   implicit val executionContext: ExecutionContext
-  //implicit val actorSystem = system
-
   implicit val system: ActorSystem
+
   val httpFlow: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]]
   val elasticSearchConfig: ElasticSearchLogStoreConfig
 
@@ -75,7 +74,7 @@ trait ElasticSearchLogRestClient {
         elasticSearchConfig.logSchema.time)
   }
 
-  protected val esClient = new ElasticSearchRestClient(
+  protected val esLogClient = new ElasticSearchRestClient(
     elasticSearchConfig.protocol,
     elasticSearchConfig.host,
     elasticSearchConfig.port,
@@ -98,9 +97,9 @@ trait ElasticSearchLogRestClient {
 
   protected def generatePath(user: String) = elasticSearchConfig.path.format(user)
 
-  def fetchLogs3(user: String, activationId: String, headers: List[HttpHeader] = List.empty): Future[Vector[String]] = {
+  def logs(user: String, activationId: String, headers: List[HttpHeader] = List.empty): Future[Vector[String]] = {
 
-    esClient.search[EsSearchResult](generatePath(user), generatePayload(activationId), headers).flatMap {
+    esLogClient.search[EsSearchResult](generatePath(user), generatePayload(activationId), headers).flatMap {
       case Right(queryResult) =>
         Future.successful(transcribeLogs(queryResult))
       case Left(code) =>
@@ -131,7 +130,7 @@ class ElasticSearchLogStore(
 
     // Return logs from ElasticSearch, or return logs from activation if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      fetchLogs3(user.namespace.uuid.asString, activation.activationId.asString, headers).map(ActivationLogs(_))
+      logs(user.namespace.uuid.asString, activation.activationId.asString, headers).map(ActivationLogs(_))
     } else {
       Future.successful(activation.logs)
     }

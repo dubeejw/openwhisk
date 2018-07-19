@@ -22,9 +22,8 @@ import java.time.Instant
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model._
-import pureconfig.loadConfigOrThrow
-import spray.json.DefaultJsonProtocol
-import spray.json._
+import akka.stream.scaladsl.Flow
+
 import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
 import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
@@ -34,7 +33,11 @@ import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
 
 import scala.util.Try
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import akka.stream.scaladsl.Flow
+
+import pureconfig.loadConfigOrThrow
+
+import spray.json.DefaultJsonProtocol
+import spray.json._
 
 case class ElasticSearchActivationFieldConfig(name: String,
                                               namespace: String,
@@ -57,19 +60,17 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
                                               requiredHeaders: Seq[String] = Seq.empty)
 
 // TODO:
-// Splice logs in to activations
 // Annotations are not in Elasticsearch...
-
+// Trigger, sequence, and conductor logs are not in ES
 trait ElasticSearchActivationRestClient {
 
   implicit val executionContext: ExecutionContext
-  //implicit val actorSystem = system
-
   implicit val system: ActorSystem
+
   val httpFlow2: Option[Flow[(HttpRequest, Promise[HttpResponse]), (Try[HttpResponse], Promise[HttpResponse]), Any]]
   val elasticSearchConfig2: ElasticSearchActivationStoreConfig
 
-  protected val esClient2 =
+  protected val esActivationClient =
     new ElasticSearchRestClient(
       elasticSearchConfig2.protocol,
       elasticSearchConfig2.host,
@@ -218,7 +219,7 @@ trait ElasticSearchActivationRestClient {
     implicit transid: TransactionId): Future[ActivationEntry] = {
     val payload = generateGetPayload2(activationId)
 
-    esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+    esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         val res = transcribeActivations(queryResult)
 
@@ -243,7 +244,7 @@ trait ElasticSearchActivationRestClient {
     headers: List[HttpHeader] = List.empty)(implicit transid: TransactionId): Future[List[ActivationEntry]] = {
     val payload = generateListActiationsMatchNamePayload(name, skip, limit, since, upto)
 
-    esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+    esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         Future.successful(transcribeActivations(queryResult))
       case Left(code) =>
@@ -261,7 +262,7 @@ trait ElasticSearchActivationRestClient {
     headers: List[HttpHeader] = List.empty)(implicit transid: TransactionId): Future[List[ActivationEntry]] = {
     val payload = generateListActivationsInNamespacePayload(namespace, skip, limit, since, upto)
 
-    esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+    esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
       case Right(queryResult) =>
         Future.successful(transcribeActivations(queryResult))
       case Left(code) =>
@@ -298,7 +299,7 @@ class ArtifactElasticSearchActivationStore(
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
       getActivation(id, uuid, headers).flatMap(activation =>
-        fetchLogs3(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs))))
+        logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs))))
     } else {
       super.get(activationId, user, request)
     }
@@ -317,7 +318,7 @@ class ArtifactElasticSearchActivationStore(
     val headers = extractRequiredHeaders2(request.get.headers)
 
     if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
-      esClient2.search[EsSearchResult](uuid, payload, headers).flatMap {
+      esActivationClient.search[EsSearchResult](uuid, payload, headers).flatMap {
         case Right(queryResult) =>
           val total = Math.max(0, queryResult.hits.total - skip)
           Future.successful(JsObject("activations" -> total.toJson))
@@ -346,7 +347,7 @@ class ArtifactElasticSearchActivationStore(
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            fetchLogs3(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
           })
           .map(Right(_))
       }
@@ -371,7 +372,7 @@ class ArtifactElasticSearchActivationStore(
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            fetchLogs3(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
           })
           .map(Right(_))
       }
