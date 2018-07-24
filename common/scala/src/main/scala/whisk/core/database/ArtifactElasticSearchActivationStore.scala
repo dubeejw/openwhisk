@@ -15,37 +15,29 @@
  * limitations under the License.
  */
 
-package whisk.core.entity
+package whisk.core.database
 
-import java.time.Instant
 import java.nio.file.{Path, Paths}
+import java.time.Instant
 
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import akka.stream.alpakka.file.scaladsl.LogRotatorSink
-import akka.http.scaladsl.model._
-import akka.stream.scaladsl.Flow
-import akka.util.ByteString
 import akka.NotUsed
+import akka.actor.ActorSystem
+import akka.http.scaladsl.model._
+import akka.stream.alpakka.file.scaladsl.LogRotatorSink
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, MergeHub, Sink, Source}
-import akka.stream.{Graph, SinkShape, UniformFanOutShape}
-
+import akka.stream.{ActorMaterializer, Graph, SinkShape, UniformFanOutShape}
+import akka.util.ByteString
+import pureconfig.loadConfigOrThrow
+import spray.json.{DefaultJsonProtocol, _}
 import whisk.common.{Logging, TransactionId}
 import whisk.core.ConfigKeys
-import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult}
-import whisk.core.containerpool.logging._
-import whisk.core.database.NoDocumentException
 import whisk.core.containerpool.logging.ElasticSearchJsonProtocol._
-import whisk.core.database.CacheChangeNotification
+import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQueryString, EsSearchResult, _}
+import whisk.core.entity._
 import whisk.core.entity.size._
 
-import scala.util.Try
 import scala.concurrent.{ExecutionContext, Future, Promise}
-
-import pureconfig.loadConfigOrThrow
-
-import spray.json.DefaultJsonProtocol
-import spray.json._
+import scala.util.Try
 
 case class ElasticSearchActivationFieldConfig(name: String,
                                               namespace: String,
@@ -69,7 +61,7 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
 
 // TODO:
 // Annotations are not in Elasticsearch...
-// Trigger, sequence, and conductor logs are not in ES
+// Trigger, sequence, and conductor logs are not formatted properly
 trait ElasticSearchActivationRestClient {
 
   implicit val executionContext: ExecutionContext
@@ -95,7 +87,8 @@ trait ElasticSearchActivationRestClient {
                              timeDate: String,
                              message: String,
                              duration: Int,
-                             namespace: String) {
+                             namespace: String,
+                             kind: String) {
 
     def toActivation(logs: ActivationLogs = ActivationLogs()) = {
       val result = status match {
@@ -104,6 +97,7 @@ trait ElasticSearchActivationRestClient {
         case "2" => ActivationResponse.containerError(message.parseJson.asJsObject.fields("error"))
         case "3" => ActivationResponse.whiskError(message.parseJson.asJsObject.fields("error"))
       }
+      val annotations = Parameters("kind", kind)
 
       WhiskActivation(
         EntityPath(namespace),
@@ -115,7 +109,8 @@ trait ElasticSearchActivationRestClient {
         response = result,
         logs = logs,
         duration = Some(duration),
-        version = SemVer(version))
+        version = SemVer(version),
+        annotations = annotations)
     }
   }
 
@@ -132,7 +127,8 @@ trait ElasticSearchActivationRestClient {
         elasticSearchConfig2.schema.start,
         elasticSearchConfig2.schema.message,
         elasticSearchConfig2.schema.duration,
-        elasticSearchConfig2.schema.namespace)
+        elasticSearchConfig2.schema.namespace,
+        "kind")
   }
 
   protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
@@ -309,16 +305,16 @@ class ArtifactElasticSearchActivationStore(
       val maxSize = bufferSize.toBytes
       var bytesRead = maxSize
       element =>
-      {
-        val size = element.size
-        if (bytesRead + size > maxSize) {
-          bytesRead = size
-          Some(destinationDirectory.resolve(s"userlogs-${Instant.now.toEpochMilli}.log"))
-        } else {
-          bytesRead += size
-          None
+        {
+          val size = element.size
+          if (bytesRead + size > maxSize) {
+            bytesRead = size
+            Some(destinationDirectory.resolve(s"userlogs-${Instant.now.toEpochMilli}.log"))
+          } else {
+            bytesRead += size
+            None
+          }
         }
-      }
     }))
     .run()(actorMaterializer)
 
@@ -358,8 +354,8 @@ class ArtifactElasticSearchActivationStore(
     val toSeq = Flow[ByteString].via(toFormattedString).toMat(Sink.seq[String])(Keep.right)
 
     val toFile = Flow[ByteString]
-      // As each element is a JSON-object, we know we can add the manually constructed fields to it by dropping
-      // the closing "}", adding the fields and finally add "}\n" to the end again.
+    // As each element is a JSON-object, we know we can add the manually constructed fields to it by dropping
+    // the closing "}", adding the fields and finally add "}\n" to the end again.
       .map(_.dropRight(1) ++ metadata ++ eventEnd)
       // As the last element of the stream, print the activation record.
       .concat(Source.single(ByteString(augmentedActivation.toJson.compactPrint + "\n")))
@@ -380,7 +376,7 @@ class ArtifactElasticSearchActivationStore(
   }
 
   override def store(activation: WhiskActivation)(implicit transid: TransactionId,
-                                         notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
+                                                  notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
     writeLog(activation)
     super.store(activation)
   }
@@ -482,9 +478,9 @@ object ArtifactElasticSearchActivationStoreProvider extends ActivationStoreProvi
 object OwSink {
 
   /**
-    * Combines two sinks into one sink using the given strategy. The materialized value is a Tuple2 of the materialized
-    * values of either sink. Code basically copied from {@code Sink.combine}
-    */
+   * Combines two sinks into one sink using the given strategy. The materialized value is a Tuple2 of the materialized
+   * values of either sink. Code basically copied from {@code Sink.combine}
+   */
   def combine[T, U, M1, M2](first: Sink[U, M1], second: Sink[U, M2])(
     strategy: Int ⇒ Graph[UniformFanOutShape[T, U], NotUsed]): Sink[T, (M1, M2)] = {
     Sink.fromGraph(GraphDSL.create(first, second)((_, _)) { implicit b => (s1, s2) =>

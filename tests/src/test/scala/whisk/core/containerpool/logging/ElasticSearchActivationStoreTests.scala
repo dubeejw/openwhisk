@@ -23,7 +23,7 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpMethods.{GET, POST}
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers.{Accept /*, RawHeader*/}
+import akka.http.scaladsl.model.headers.Accept
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Flow
 import akka.testkit.TestKit
@@ -35,7 +35,12 @@ import org.scalatest.{FlatSpecLike, Matchers}
 import pureconfig.error.ConfigReaderException
 import spray.json._
 import whisk.core.entity._
-import whisk.core.database.NoDocumentException
+import whisk.core.database.{
+  ArtifactElasticSearchActivationStore,
+  ElasticSearchActivationFieldConfig,
+  ElasticSearchActivationStoreConfig,
+  NoDocumentException
+}
 
 //import whisk.core.entity.size._
 import whisk.common.TransactionId
@@ -47,7 +52,6 @@ import scala.util.{Success, Try}
 /*
 TODO:
 Required headers
-Logs test...
  */
 @RunWith(classOf[JUnitRunner])
 class ElasticSearchActivationStoreTests
@@ -98,7 +102,7 @@ class ElasticSearchActivationStoreTests
     StatusCodes.OK,
     entity = HttpEntity(
       ContentTypes.`application/json`,
-      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536841193]}]}}"""))
+      s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":2,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","kind": "nodejs:6","${defaultConfig.schema.duration}":101},"sort":[1531536846075]},{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtZ54YCyG38HxigMb","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:01.817Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"0","${defaultConfig.schema.message}":"{\\"result key\\":\\"result value\\"}","kind": "nodejs:6","${defaultConfig.schema.duration}":101},"sort":[1531536841193]}]}}"""))
   private val emptyHttpResponse = HttpResponse(
     StatusCodes.OK,
     entity = HttpEntity(
@@ -195,7 +199,8 @@ class ElasticSearchActivationStoreTests
     end = end,
     response = ActivationResponse.success(Some(message)),
     logs = expectedLogs,
-    duration = Some(101L))
+    duration = Some(101L),
+    annotations = Parameters("kind", "nodejs:6"))
 
   //annotations = Parameters("limits", ActionLimits(TimeLimit(1.second), MemoryLimit(128.MB), LogLimit(1.MB)).toJson))
 
@@ -255,7 +260,7 @@ class ElasticSearchActivationStoreTests
     activationResponses.foreach {
       case (status, activationResponse) =>
         val content =
-          s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"$status","${defaultConfig.schema.message}":"{\\"error\\":\\"message\\"}","${defaultConfig.schema.duration}":101},"sort":[1531536846075]}]}}"""
+          s"""{"took":5,"timed_out":false,"_shards":{"total":5,"successful":5,"failed":0},"hits":{"total":1,"max_score":null,"hits":[{"_index":"whisk_user_logs","_type":"${defaultConfig.schema.activationRecord}","_id":"AWSWtbKiYCyG38HxigNS","_score":null,"_source":{"${defaultConfig.schema.name}":"$name","${defaultConfig.schema.subject}":"$subject","${defaultConfig.schema.activationId}":"$activationId","${defaultConfig.schema.version}":"0.0.1","${defaultConfig.schema.namespace}":"$namespace","@version":"1","@timestamp":"2018-07-14T02:54:06.844Z","type":"${defaultConfig.schema.activationRecord}","${defaultConfig.schema.start}":"$start","${defaultConfig.schema.end}":"$end","ALCH_TENANT_ID":"9cfe57a0-7ac1-4bf4-9026-d7e9e591271f","${defaultConfig.schema.status}":"$status","${defaultConfig.schema.message}":"{\\"error\\":\\"message\\"}","kind": "nodejs:6","${defaultConfig.schema.duration}":101},"sort":[1531536846075]}]}}"""
         val activationWithError = WhiskActivation(
           namespace = namespace,
           name = name,
@@ -265,7 +270,8 @@ class ElasticSearchActivationStoreTests
           end = end,
           response = activationResponse,
           logs = expectedLogs,
-          duration = Some(101L))
+          duration = Some(101L),
+          annotations = Parameters("kind", "nodejs:6"))
         val defaultHttpErrorResponse =
           HttpResponse(StatusCodes.OK, entity = HttpEntity(ContentTypes.`application/json`, content))
         val httpRequest = HttpRequest(
