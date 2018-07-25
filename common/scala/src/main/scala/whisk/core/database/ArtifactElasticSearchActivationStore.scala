@@ -392,7 +392,8 @@ class ArtifactElasticSearchActivationStore(
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
       getActivation(id, uuid, headers).flatMap(activation =>
-        logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs))))
+        //logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.toFormattedString))))
+        logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))))
     } else {
       super.get(activationId, user, request)
     }
@@ -434,7 +435,9 @@ class ArtifactElasticSearchActivationStore(
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
+
+            //logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
           })
           .map(Right(_))
       }
@@ -459,7 +462,9 @@ class ArtifactElasticSearchActivationStore(
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
+
+//            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
           })
           .map(Right(_))
       }

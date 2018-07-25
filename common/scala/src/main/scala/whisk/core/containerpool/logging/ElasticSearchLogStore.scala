@@ -75,8 +75,8 @@ trait ElasticSearchLogRestClient {
     elasticSearchConfig.port,
     httpFlow)
 
-  protected def transcribeLogs(queryResult: EsSearchResult): Vector[String] =
-    queryResult.hits.hits.map(_.source.convertTo[UserLogEntry].toFormattedString)
+  protected def transcribeLogs(queryResult: EsSearchResult): Vector[UserLogEntry] =
+    queryResult.hits.hits.map(_.source.convertTo[UserLogEntry])
 
   protected def extractRequiredHeaders(headers: Seq[HttpHeader]) =
     headers.filter(h => elasticSearchConfig.requiredHeaders.contains(h.lowercaseName)).toList
@@ -92,7 +92,7 @@ trait ElasticSearchLogRestClient {
 
   protected def generatePath(user: String) = elasticSearchConfig.path.format(user)
 
-  def logs(user: String, activationId: String, headers: List[HttpHeader] = List.empty): Future[Vector[String]] = {
+  def logs(user: String, activationId: String, headers: List[HttpHeader] = List.empty): Future[Vector[UserLogEntry]] = {
 
     esLogClient.search[EsSearchResult](generatePath(user), generatePayload(activationId), headers).flatMap {
       case Right(queryResult) =>
@@ -125,7 +125,7 @@ class ElasticSearchLogStore(
 
     // Return logs from ElasticSearch, or return logs from activation if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      logs(user.namespace.uuid.asString, activation.activationId.asString, headers).map(ActivationLogs(_))
+      logs(user.namespace.uuid.asString, activation.activationId.asString, headers).map{l => ActivationLogs(l.map(l2 => l2.toFormattedString))}
     } else {
       Future.successful(activation.logs)
     }
