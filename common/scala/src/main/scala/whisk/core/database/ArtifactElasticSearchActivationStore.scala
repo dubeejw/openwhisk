@@ -86,9 +86,9 @@ trait ElasticSearchActivationRestClient {
                              status: String,
                              timeDate: String,
                              message: String,
-                             duration: Int,
+                             duration: Option[Long] = None,
                              namespace: String,
-                             kind: String,
+                             kind: Option[String] = None,
                              cause: Option[String] = None,
                              causedBy: Option[String] = None,
                              limits: Option[ActionLimits] = None) {
@@ -110,11 +110,16 @@ trait ElasticSearchActivationRestClient {
         case Some(value) => Parameters("limits", JsObject("memory" -> value.memory.megabytes.toJson))
         case None        => Parameters()
       }
+
+      val kindAnnotation: Parameters = kind match {
+        case Some(value) => Parameters("kind", value)
+        case None        => Parameters()
+      }
       /*val memoryAnnotation: Parameters = memory match {
         case Some(value) => Parameters("memory", value)
         case None => Parameters()
       }*/
-      val annotations = Parameters("kind", kind) ++ causeByAnnotation ++ memoryAnnotation
+      val annotations = kindAnnotation ++ causeByAnnotation ++ memoryAnnotation
 
       val c: Option[ActivationId] = cause match {
         case Some(value) => Some(ActivationId(value))
@@ -130,7 +135,7 @@ trait ElasticSearchActivationRestClient {
         Instant.parse(endDate),
         response = result,
         logs = logs,
-        duration = Some(duration),
+        duration = duration,
         version = SemVer(version),
         annotations = annotations,
         cause = c)
@@ -454,7 +459,31 @@ class ArtifactElasticSearchActivationStore(
           //logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.toFormattedString))))
           logs(uuid, id, headers).map(logs =>
             activation.kind match {
-              case "sequence" =>
+              case Some("sequence") =>
+                //val asdf: Seq[Any] = logs
+                /*val a: Vector[String] = logs.map{l =>
+                logging.info(this, s"eeeeee $l")
+                l.toString
+              }
+
+              val b = a.toJson
+
+              //val b = logs.map(l => l.parseJson)
+              //println(b)
+              logging.info(this, s"qwer $a")
+              logging.info(this, s"qwefwefwer $b")
+              activation.toActivation(ActivationLogs(a))*/
+
+                val a: UserLogEntry = logs.head
+                val b: String = a.toString
+                val c: String = b.drop(1).dropRight(1)
+                val d: Array[String] = c.split(", ")
+                logging.info(this, s"$a")
+                logging.info(this, s"$b")
+                logging.info(this, s"$c")
+                logging.info(this, s"$d")
+                activation.toActivation(ActivationLogs(d.toVector))
+              case None =>
                 //val asdf: Seq[Any] = logs
                 /*val a: Vector[String] = logs.map{l =>
                 logging.info(this, s"eeeeee $l")
@@ -479,6 +508,7 @@ class ArtifactElasticSearchActivationStore(
                 logging.info(this, s"$d")
                 activation.toActivation(ActivationLogs(d.toVector))
               case _ =>
+                logging.info(this, s"here1 $logs")
                 activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
           }))
     } else {

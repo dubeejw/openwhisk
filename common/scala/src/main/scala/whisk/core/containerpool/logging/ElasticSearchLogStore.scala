@@ -57,7 +57,7 @@ trait ElasticSearchLogRestClient {
 
   // Schema of resultant logs from ES
   case class UserLogEntry(message: String, stream: String, time: String) {
-    def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
+    def toFormattedString = s"${time} ${stream}: ${message.trim}"
     override def toString = s"${message.stripLineEnd}"
   }
 
@@ -97,6 +97,8 @@ trait ElasticSearchLogRestClient {
 
     esLogClient.search[EsSearchResult](generatePath(user), generatePayload(activationId), headers).flatMap {
       case Right(queryResult) =>
+        println("here2")
+        println(s"$queryResult")
         Future.successful(transcribeLogs(queryResult))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from log store"))
