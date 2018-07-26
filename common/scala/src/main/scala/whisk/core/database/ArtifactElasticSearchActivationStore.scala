@@ -88,7 +88,10 @@ trait ElasticSearchActivationRestClient {
                              message: String,
                              duration: Int,
                              namespace: String,
-                             kind: String) {
+                             kind: String,
+                             cause: Option[String] = None,
+                             causedBy: Option[String] = None,
+                             limits: Option[ActionLimits] = None) {
 
     def toActivation(logs: ActivationLogs = ActivationLogs()) = {
       val result = status match {
@@ -97,7 +100,26 @@ trait ElasticSearchActivationRestClient {
         case "2" => ActivationResponse.containerError(message.parseJson.asJsObject.fields("error"))
         case "3" => ActivationResponse.whiskError(message.parseJson.asJsObject.fields("error"))
       }
-      val annotations = Parameters("kind", kind)
+      val causeByAnnotation: Parameters = causedBy match {
+        case Some(value) => Parameters("causedBy", value)
+        case None        => Parameters()
+      }
+
+      val memoryAnnotation: Parameters = limits match {
+        //case Some(value) => Parameters("memory", value.memory.megabytes.toJson)
+        case Some(value) => Parameters("limits", JsObject("memory" -> value.memory.megabytes.toJson))
+        case None        => Parameters()
+      }
+      /*val memoryAnnotation: Parameters = memory match {
+        case Some(value) => Parameters("memory", value)
+        case None => Parameters()
+      }*/
+      val annotations = Parameters("kind", kind) ++ causeByAnnotation ++ memoryAnnotation
+
+      val c: Option[ActivationId] = cause match {
+        case Some(value) => Some(ActivationId(value))
+        case None        => None
+      }
 
       WhiskActivation(
         EntityPath(namespace),
@@ -110,7 +132,8 @@ trait ElasticSearchActivationRestClient {
         logs = logs,
         duration = Some(duration),
         version = SemVer(version),
-        annotations = annotations)
+        annotations = annotations,
+        cause = c)
     }
   }
 
@@ -128,7 +151,10 @@ trait ElasticSearchActivationRestClient {
         elasticSearchConfig2.schema.message,
         elasticSearchConfig2.schema.duration,
         elasticSearchConfig2.schema.namespace,
-        "kind")
+        "kind",
+        "cause",
+        "causedBy",
+        "limits")
   }
 
   protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
@@ -330,7 +356,7 @@ class ArtifactElasticSearchActivationStore(
 
   private val eventEnd = ByteString("}\n")
 
-  def logs(activation: WhiskActivation): Vector[Source[ByteString, NotUsed]] = {
+  /*def logs(activation: WhiskActivation): Vector[Source[ByteString, NotUsed]] = {
     // What todo about stream?
     activation.logs.logs.map { log =>
       println(log)
@@ -340,6 +366,14 @@ class ArtifactElasticSearchActivationStore(
       Source.single(ByteString(logLine.toJson.compactPrint))
     }
 
+  }*/
+
+  def logs(activation: WhiskActivation): Source[ByteString, NotUsed] = {
+    // What todo about stream?
+    //logging.info(this, s"asdf $log")
+    val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toString)
+    logging.info(this, logLine.toString)
+    Source.single(ByteString(logLine.toJson.compactPrint))
   }
 
   def writeLog(activation: WhiskActivation) = {
@@ -369,7 +403,7 @@ class ArtifactElasticSearchActivationStore(
 
     val combined = OwSink.combine(toSeq, toFile)(Broadcast[ByteString](_))
 
-    logs(activation).map { a =>
+    /*logs(activation).map { a =>
       a.runWith(combined)._1.flatMap { seq =>
         val possibleErrors = Set("Some error", "Some other error")
         val errored = seq.lastOption.exists(last => possibleErrors.exists(last.contains))
@@ -380,6 +414,17 @@ class ArtifactElasticSearchActivationStore(
           Future.failed(new Exception("some error"))
         }
       }
+    }*/
+
+    logs(activation).runWith(combined)._1.flatMap { seq =>
+      val possibleErrors = Set("Some error", "Some other error")
+      val errored = seq.lastOption.exists(last => possibleErrors.exists(last.contains))
+      val logs = ActivationLogs(seq.toVector)
+      if (!errored) {
+        Future.successful(logs)
+      } else {
+        Future.failed(new Exception("some error"))
+      }
     }
   }
 
@@ -388,6 +433,11 @@ class ArtifactElasticSearchActivationStore(
     writeLog(activation)
     super.store(activation)
   }
+
+  /*val source = """{ "some": "JSON source" }"""
+  val a = "asdf"
+  val b = a.parseJson
+  val jsonAst = source.parseJson // or JsonParser(source)*/
 
   override def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
@@ -399,19 +449,38 @@ class ArtifactElasticSearchActivationStore(
       val headers = extractRequiredHeaders2(request.get.headers)
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
-      getActivation(id, uuid, headers).flatMap(activation =>
-        //logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.toFormattedString))))
+      getActivation(id, uuid, headers).flatMap(
+        activation =>
+          //logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.toFormattedString))))
+          logs(uuid, id, headers).map(logs =>
+            activation.kind match {
+              case "sequence" =>
+                //val asdf: Seq[Any] = logs
+                /*val a: Vector[String] = logs.map{l =>
+                logging.info(this, s"eeeeee $l")
+                l.toString
+              }
 
-        logs(uuid, id, headers).map(logs =>
-          activation.kind match {
-            case "sequence" =>
-              val a: Vector[String] = logs.map(l => l.toString)
-              println(a)
-              activation.toActivation(ActivationLogs(a))
-            case _ =>
-              activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-          }
-        ))
+              val b = a.toJson
+
+              //val b = logs.map(l => l.parseJson)
+              //println(b)
+              logging.info(this, s"qwer $a")
+              logging.info(this, s"qwefwefwer $b")
+              activation.toActivation(ActivationLogs(a))*/
+
+                val a: UserLogEntry = logs.head
+                val b: String = a.toString
+                val c: String = b.drop(1).dropRight(1)
+                val d: Array[String] = c.split(", ")
+                logging.info(this, s"$a")
+                logging.info(this, s"$b")
+                logging.info(this, s"$c")
+                logging.info(this, s"$d")
+                activation.toActivation(ActivationLogs(d.toVector))
+              case _ =>
+                activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
+          }))
     } else {
       super.get(activationId, user, request)
     }
@@ -453,9 +522,10 @@ class ArtifactElasticSearchActivationStore(
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
+            logs(uuid, act.activationId, headers).map(logs =>
+              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
 
-            //logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+          //logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
           })
           .map(Right(_))
       }
@@ -480,7 +550,8 @@ class ArtifactElasticSearchActivationStore(
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
+            logs(uuid, act.activationId, headers).map(logs =>
+              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
 
 //            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
           })

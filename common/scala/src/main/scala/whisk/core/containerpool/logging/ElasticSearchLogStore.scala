@@ -126,7 +126,9 @@ class ElasticSearchLogStore(
 
     // Return logs from ElasticSearch, or return logs from activation if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      logs(user.namespace.uuid.asString, activation.activationId.asString, headers).map{l => ActivationLogs(l.map(l2 => l2.toFormattedString))}
+      logs(user.namespace.uuid.asString, activation.activationId.asString, headers).map { l =>
+        ActivationLogs(l.map(l2 => l2.toFormattedString))
+      }
     } else {
       Future.successful(activation.logs)
     }
