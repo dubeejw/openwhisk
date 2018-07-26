@@ -58,6 +58,7 @@ trait ElasticSearchLogRestClient {
   // Schema of resultant logs from ES
   case class UserLogEntry(message: String, stream: String, time: String) {
     def toFormattedString = s"${time} ${stream}: ${message.stripLineEnd}"
+    override def toString = s"${message.stripLineEnd}"
   }
 
   object UserLogEntry extends DefaultJsonProtocol {

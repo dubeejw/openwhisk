@@ -330,10 +330,16 @@ class ArtifactElasticSearchActivationStore(
 
   private val eventEnd = ByteString("}\n")
 
-  def logs(activation: WhiskActivation): Source[ByteString, NotUsed] = {
+  def logs(activation: WhiskActivation): Vector[Source[ByteString, NotUsed]] = {
     // What todo about stream?
-    val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toJson.compactPrint)
-    Source.single(ByteString(logLine.toJson.compactPrint))
+    activation.logs.logs.map { log =>
+      println(log)
+      logging.info(this, s"asdf $log")
+      val logLine = LogLine(Instant.now.toString, "stdout", log)
+      logging.info(this, logLine.toString)
+      Source.single(ByteString(logLine.toJson.compactPrint))
+    }
+
   }
 
   def writeLog(activation: WhiskActivation) = {
@@ -363,14 +369,16 @@ class ArtifactElasticSearchActivationStore(
 
     val combined = OwSink.combine(toSeq, toFile)(Broadcast[ByteString](_))
 
-    logs(activation).runWith(combined)._1.flatMap { seq =>
-      val possibleErrors = Set("Some error", "Some other error")
-      val errored = seq.lastOption.exists(last => possibleErrors.exists(last.contains))
-      val logs = ActivationLogs(seq.toVector)
-      if (!errored) {
-        Future.successful(logs)
-      } else {
-        Future.failed(new Exception("some error"))
+    logs(activation).map { a =>
+      a.runWith(combined)._1.flatMap { seq =>
+        val possibleErrors = Set("Some error", "Some other error")
+        val errored = seq.lastOption.exists(last => possibleErrors.exists(last.contains))
+        val logs = ActivationLogs(seq.toVector)
+        if (!errored) {
+          Future.successful(logs)
+        } else {
+          Future.failed(new Exception("some error"))
+        }
       }
     }
   }
@@ -393,7 +401,17 @@ class ArtifactElasticSearchActivationStore(
 
       getActivation(id, uuid, headers).flatMap(activation =>
         //logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.toFormattedString))))
-        logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))))
+
+        logs(uuid, id, headers).map(logs =>
+          activation.kind match {
+            case "sequence" =>
+              val a: Vector[String] = logs.map(l => l.toString)
+              println(a)
+              activation.toActivation(ActivationLogs(a))
+            case _ =>
+              activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
+          }
+        ))
     } else {
       super.get(activationId, user, request)
     }
