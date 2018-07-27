@@ -106,9 +106,14 @@ trait ElasticSearchActivationRestClient {
       }
 
       val memoryAnnotation: Parameters = limits match {
-        //case Some(value) => Parameters("memory", value.memory.megabytes.toJson)
-        case Some(value) => Parameters("limits", JsObject("memory" -> value.memory.megabytes.toJson))
-        case None        => Parameters()
+        case Some(value) =>
+          Parameters(
+            "limits",
+            JsObject(
+              "memory" -> value.memory.megabytes.toJson,
+              "timeout" -> value.timeout.toJson,
+              "logs" -> value.logs.toJson))
+        case None => Parameters()
       }
 
       val kindAnnotation: Parameters = kind match {
