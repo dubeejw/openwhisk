@@ -91,7 +91,8 @@ trait ElasticSearchActivationRestClient {
                              kind: Option[String] = None,
                              cause: Option[String] = None,
                              causedBy: Option[String] = None,
-                             limits: Option[ActionLimits] = None) {
+                             limits: Option[ActionLimits] = None,
+                             path: Option[String] = None) {
 
     def toActivation(logs: ActivationLogs = ActivationLogs()) = {
       val result = status match {
@@ -120,11 +121,13 @@ trait ElasticSearchActivationRestClient {
         case Some(value) => Parameters("kind", value)
         case None        => Parameters()
       }
-      /*val memoryAnnotation: Parameters = memory match {
-        case Some(value) => Parameters("memory", value)
-        case None => Parameters()
-      }*/
-      val annotations = kindAnnotation ++ causeByAnnotation ++ memoryAnnotation
+
+      val pathAnnotation = path match {
+        case Some(value) => Parameters("path", value)
+        case None        => Parameters()
+      }
+
+      val annotations = kindAnnotation ++ causeByAnnotation ++ memoryAnnotation ++ pathAnnotation
 
       val c: Option[ActivationId] = cause match {
         case Some(value) => Some(ActivationId(value))
@@ -164,7 +167,8 @@ trait ElasticSearchActivationRestClient {
         "kind",
         "cause",
         "causedBy",
-        "limits")
+        "limits",
+        "path")
   }
 
   protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
