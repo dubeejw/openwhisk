@@ -290,13 +290,12 @@ class WskSequenceTests extends TestHelpers with WskTestHelpers with StreamLoggin
       }
       // Check that inherited parameters are passed to the action.
       val now = new Date().toString()
-      val time = now
-      val run = wsk.action.invoke(sName, Map("payload" -> time.toJson))
+      val run = wsk.action.invoke(sName, Map("payload" -> now.toJson))
       // action params trump package params
       checkLogsAtomicAction(
         0,
         run,
-        new Regex(String.format(".*key0: value0.*key1a: value1a.*key1b: value2b.*key2a: value2a.*payload: %s", time)))
+        new Regex(String.format(".*key0: value0.*key1a: value1a.*key1b: value2b.*key2a: value2a.*payload: %s", now)))
   }
 
   /**
@@ -519,10 +518,6 @@ class WskSequenceTests extends TestHelpers with WskTestHelpers with StreamLoggin
         withClue(componentActivation) {
           componentActivation.logs shouldBe defined
           val logs = componentActivation.logs.get.mkString(" ")
-          println("asdf")
-          println(logs)
-          println("qwer")
-          println(regex)
           regex.findFirstIn(logs) shouldBe defined
         }
       }
