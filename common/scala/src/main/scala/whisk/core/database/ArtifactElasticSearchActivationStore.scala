@@ -444,7 +444,12 @@ class ArtifactElasticSearchActivationStore(
 
   override def store(activation: WhiskActivation)(implicit transid: TransactionId,
                                                   notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
-    writeLog(activation)
+    // Write logs for trigger and sequences
+    activation.annotations.get("kind") match {
+      case Some(value) if value == "sequence".toJson => writeLog(activation)
+      case None                                      => writeLog(activation)
+    }
+
     super.store(activation)
   }
 
