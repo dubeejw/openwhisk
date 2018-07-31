@@ -59,9 +59,6 @@ case class ElasticSearchActivationStoreConfig(protocol: String,
                                               schema: ElasticSearchActivationFieldConfig,
                                               requiredHeaders: Seq[String] = Seq.empty)
 
-// TODO:
-// Annotations are not in Elasticsearch...
-// Trigger, sequence, and conductor logs are not formatted properly
 trait ElasticSearchActivationRestClient {
 
   implicit val executionContext: ExecutionContext
@@ -386,7 +383,7 @@ class ArtifactElasticSearchActivationStore(
     // What todo about stream?
     //logging.info(this, s"asdf $log")
     val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toString)
-    logging.info(this, logLine.toString)
+    //logging.info(this, logLine.toString)
     Source.single(ByteString(logLine.toJson.compactPrint))
   }
 
@@ -448,6 +445,7 @@ class ArtifactElasticSearchActivationStore(
     activation.annotations.get("kind") match {
       case Some(value) if value == "sequence".toJson => writeLog(activation)
       case None                                      => writeLog(activation)
+      case _                                         =>
     }
 
     super.store(activation)
@@ -468,63 +466,15 @@ class ArtifactElasticSearchActivationStore(
       val headers = extractRequiredHeaders2(request.get.headers)
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
-      getActivation(id, uuid, headers).flatMap(
-        activation =>
-          //logs(uuid, id, headers).map(logs => activation.toActivation(ActivationLogs(logs.toFormattedString))))
-          logs(uuid, id, headers).map(logs =>
-            activation.kind match {
-              case Some("sequence") =>
-                //val asdf: Seq[Any] = logs
-                /*val a: Vector[String] = logs.map{l =>
-                logging.info(this, s"eeeeee $l")
-                l.toString
-              }
+      getActivation(id, uuid, headers).flatMap(activation =>
+        logs(uuid, id, headers).map(logs =>
+          activation.kind match {
+            case Some("sequence") | None =>
+              activation.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
 
-              val b = a.toJson
-
-              //val b = logs.map(l => l.parseJson)
-              //println(b)
-              logging.info(this, s"qwer $a")
-              logging.info(this, s"qwefwefwer $b")
-              activation.toActivation(ActivationLogs(a))*/
-
-                val a: UserLogEntry = logs.head
-                val b: String = a.toString
-                val c: String = b.drop(1).dropRight(1)
-                val d: Array[String] = c.split(", ")
-                logging.info(this, s"$a")
-                logging.info(this, s"$b")
-                logging.info(this, s"$c")
-                logging.info(this, s"$d")
-                activation.toActivation(ActivationLogs(d.toVector))
-              case None =>
-                //val asdf: Seq[Any] = logs
-                /*val a: Vector[String] = logs.map{l =>
-                logging.info(this, s"eeeeee $l")
-                l.toString
-              }
-
-              val b = a.toJson
-
-              //val b = logs.map(l => l.parseJson)
-              //println(b)
-              logging.info(this, s"qwer $a")
-              logging.info(this, s"qwefwefwer $b")
-              activation.toActivation(ActivationLogs(a))*/
-
-                val a: UserLogEntry = logs.head
-                val b: String = a.toString
-                val c: String = b.drop(1).dropRight(1)
-                val d: Array[String] = c.split(", ")
-                logging.info(this, s"$a")
-                logging.info(this, s"$b")
-                logging.info(this, s"$c")
-                logging.info(this, s"$d")
-                activation.toActivation(ActivationLogs(d.toVector))
-              case _ =>
-                logging.info(this, s"here1 $logs")
-                activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-          }))
+            case _ =>
+              activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
+        }))
     } else {
       super.get(activationId, user, request)
     }
@@ -566,10 +516,14 @@ class ArtifactElasticSearchActivationStore(
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map(logs =>
-              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
+            logs(uuid, act.activationId, headers).map { logs =>
+              act.kind match {
+                case Some("sequence") | None =>
+                  act.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
 
-          //logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+                case _ => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
+              }
+            }
           })
           .map(Right(_))
       }
@@ -594,10 +548,14 @@ class ArtifactElasticSearchActivationStore(
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
           .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map(logs =>
-              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))
+            logs(uuid, act.activationId, headers).map { logs =>
+              act.kind match {
+                case Some("sequence") | None =>
+                  act.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
 
-//            logs(uuid, act.activationId, headers).map(logs => act.toActivation(ActivationLogs(logs)))
+                case _ => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
+              }
+            }
           })
           .map(Right(_))
       }

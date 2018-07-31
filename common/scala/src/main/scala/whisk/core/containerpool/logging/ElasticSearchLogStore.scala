@@ -94,11 +94,8 @@ trait ElasticSearchLogRestClient {
   protected def generatePath(user: String) = elasticSearchConfig.path.format(user)
 
   def logs(user: String, activationId: String, headers: List[HttpHeader] = List.empty): Future[Vector[UserLogEntry]] = {
-
     esLogClient.search[EsSearchResult](generatePath(user), generatePayload(activationId), headers).flatMap {
       case Right(queryResult) =>
-        println("here2")
-        println(s"$queryResult")
         Future.successful(transcribeLogs(queryResult))
       case Left(code) =>
         Future.failed(new RuntimeException(s"Status code '$code' was returned from log store"))
