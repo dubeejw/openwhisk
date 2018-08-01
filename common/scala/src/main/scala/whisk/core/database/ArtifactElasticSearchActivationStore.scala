@@ -169,7 +169,8 @@ trait ElasticSearchActivationRestClient {
   }
 
   protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
-    queryResult.hits.hits.map(_.source.convertTo[ActivationEntry]).toList
+    val activations = queryResult.hits.hits.map(_.source.convertTo[ActivationEntry]).toList
+    activations.sortWith(_.timeDate > _.timeDate)
   }
 
   protected def extractRequiredHeaders2(headers: Seq[HttpHeader]) =
@@ -450,11 +451,6 @@ class ArtifactElasticSearchActivationStore(
 
     super.store(activation)
   }
-
-  /*val source = """{ "some": "JSON source" }"""
-  val a = "asdf"
-  val b = a.parseJson
-  val jsonAst = source.parseJson // or JsonParser(source)*/
 
   override def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
     implicit transid: TransactionId): Future[WhiskActivation] = {

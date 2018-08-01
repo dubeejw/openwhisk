@@ -76,8 +76,10 @@ trait ElasticSearchLogRestClient {
     elasticSearchConfig.port,
     httpFlow)
 
-  protected def transcribeLogs(queryResult: EsSearchResult): Vector[UserLogEntry] =
-    queryResult.hits.hits.map(_.source.convertTo[UserLogEntry])
+  protected def transcribeLogs(queryResult: EsSearchResult): Vector[UserLogEntry] = {
+    val logs = queryResult.hits.hits.map(_.source.convertTo[UserLogEntry])
+    logs.sortWith(_.time < _.time)
+  }
 
   protected def extractRequiredHeaders(headers: Seq[HttpHeader]) =
     headers.filter(h => elasticSearchConfig.requiredHeaders.contains(h.lowercaseName)).toList
