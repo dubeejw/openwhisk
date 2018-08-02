@@ -282,7 +282,9 @@ class InvokerReactive(
       duration = Some(0),
       response = response,
       annotations = {
-        Parameters(WhiskActivation.pathAnnotation, JsString(msg.action.asString)) ++ causedBy
+        Parameters(WhiskActivation.pathAnnotation, JsString(msg.action.asString)) ++ causedBy ++ Parameters(
+          WhiskActivation.kindAnnotation,
+          "unknown".toJson)
       })
   }
 

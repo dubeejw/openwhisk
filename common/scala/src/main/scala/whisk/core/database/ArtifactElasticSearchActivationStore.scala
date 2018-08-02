@@ -465,7 +465,7 @@ class ArtifactElasticSearchActivationStore(
       getActivation(id, uuid, headers).flatMap(activation =>
         logs(uuid, id, headers).map(logs =>
           activation.kind match {
-            case Some("sequence") | None =>
+            case Some("sequence") | None => // Need to retry if logs are empty or throw error
               activation.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
 
             case _ =>
