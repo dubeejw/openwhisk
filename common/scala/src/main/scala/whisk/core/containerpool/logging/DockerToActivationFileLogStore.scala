@@ -116,7 +116,8 @@ class DockerToActivationFileLogStore(system: ActorSystem, destinationDirectory: 
                            container: Container,
                            action: ExecutableWhiskAction): Future[ActivationLogs] = {
 
-    val logs = container.logs(action.limits.logs.asMegaBytes, action.exec.sentinelledLogs)(transid)
+    val logs: Source[ByteString, Any] =
+      container.logs(action.limits.logs.asMegaBytes, action.exec.sentinelledLogs)(transid)
 
     // Adding the userId field to every written record, so any background process can properly correlate.
     val userIdField = Map("namespaceId" -> user.namespace.uuid.toJson)

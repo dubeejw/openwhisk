@@ -542,10 +542,12 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
       activation.response.result shouldBe Some(dynamicParams.toJson)
       activation.duration shouldBe 0L // shouldn't exist but CLI generates it
       activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
-      activation.logs shouldBe defined
-      activation.logs.get.size shouldBe 1
+      val components = getTriggerComponents(activation)
+      components.size shouldBe 1
+      //activation.logs shouldBe defined
+      //activation.logs.get.size shouldBe 1
 
-      val logEntry = activation.logs.get(0).parseJson.asJsObject
+      val logEntry = components(0) //activation.logs.get(0).parseJson.asJsObject
       val logs = JsArray(logEntry)
       val ruleActivationId: String = logEntry.getFields("activationId")(0).convertTo[String]
       val expectedLogs = JsArray(
@@ -743,11 +745,13 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
       withActivation(wsk.activation, run) { activation =>
         activation.duration shouldBe 0L // shouldn't exist but CLI generates it
         activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
-        activation.logs shouldBe defined
-        activation.logs.get.size shouldBe 2
+        val components = getTriggerComponents(activation)
+        //activation.logs shouldBe defined
+        //activation.logs.get.size shouldBe 2
+        components.size shouldBe 2
 
-        val logEntry1 = activation.logs.get(0).parseJson.asJsObject
-        val logEntry2 = activation.logs.get(1).parseJson.asJsObject
+        val logEntry1 = components(0) //activation.logs.get(0).parseJson.asJsObject
+        val logEntry2 = components(1) //activation.logs.get(1).parseJson.asJsObject
         val logs = JsArray(logEntry1, logEntry2)
         val ruleActivationId: String = if (logEntry1.getFields("activationId").size == 1) {
           logEntry1.getFields("activationId")(0).convertTo[String]
@@ -804,11 +808,10 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
       withActivation(wsk.activation, run) { activation =>
         activation.duration shouldBe 0L // shouldn't exist but CLI generates it
         activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
-        activation.logs shouldBe defined
-        activation.logs.get.size shouldBe 2
-
-        val logEntry1 = activation.logs.get(0).parseJson.asJsObject
-        val logEntry2 = activation.logs.get(1).parseJson.asJsObject
+        val components = getTriggerComponents(activation)
+        components.size shouldBe 2
+        val logEntry1 = components(0)
+        val logEntry2 = components(1)
         val logs = JsArray(logEntry1, logEntry2)
         val ruleActivationId: String = if (logEntry1.getFields("activationId").size == 1) {
           logEntry1.getFields("activationId")(0).convertTo[String]
@@ -1036,7 +1039,7 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
       result.getFieldJsValue("start").toString should not be JsObject.empty.toString
       result.getFieldJsValue("end").toString shouldBe JsObject.empty.toString
       result.getFieldJsValue("duration").toString shouldBe JsObject.empty.toString
-      result.getFieldListJsObject("annotations").length shouldBe 0
+      result.getFieldListJsObject("annotations").length shouldBe 1
     }
   }
 
@@ -1057,4 +1060,7 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
     val stderr = wsk.activation.result(Some(name), expectedExitCode = NotFound.intValue).stderr
     stderr should include("The requested resource does not exist.")
   }
+
+  private def getTriggerComponents(activation: ActivationResult) =
+    activation.getAnnotationValue("components").get.convertTo[List[JsObject]]
 }

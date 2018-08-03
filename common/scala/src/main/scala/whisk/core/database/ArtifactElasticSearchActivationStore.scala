@@ -25,7 +25,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
 import akka.stream.alpakka.file.scaladsl.LogRotatorSink
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, MergeHub, Sink, Source}
-import akka.stream.{ActorMaterializer, Graph, SinkShape, UniformFanOutShape}
+import akka.stream._
 import akka.util.ByteString
 import pureconfig.loadConfigOrThrow
 import spray.json.{DefaultJsonProtocol, _}
@@ -36,6 +36,7 @@ import whisk.core.containerpool.logging.{ElasticSearchRestClient, EsQuery, EsQue
 import whisk.core.entity._
 import whisk.core.entity.size._
 
+import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Try
 
@@ -89,7 +90,9 @@ trait ElasticSearchActivationRestClient {
                              cause: Option[String] = None,
                              causedBy: Option[String] = None,
                              limits: Option[ActionLimits] = None,
-                             path: Option[String] = None) {
+                             path: Option[String] = None,
+                             components: Option[JsArray] = None,
+                             components2: Option[JsArray] = None) {
 
     def toActivation(logs: ActivationLogs = ActivationLogs()) = {
       val result = status match {
@@ -124,7 +127,17 @@ trait ElasticSearchActivationRestClient {
         case None        => Parameters()
       }
 
-      val annotations = kindAnnotation ++ causeByAnnotation ++ memoryAnnotation ++ pathAnnotation
+      val componentAnnotation = components match {
+        case Some(value) => Parameters("components", value)
+        case None        => Parameters()
+      }
+
+      val componentAnnotation2 = components2 match {
+        case Some(value) => Parameters("components", value)
+        case None        => Parameters()
+      }
+
+      val annotations = kindAnnotation ++ causeByAnnotation ++ memoryAnnotation ++ pathAnnotation ++ componentAnnotation ++ componentAnnotation2
 
       val c: Option[ActivationId] = cause match {
         case Some(value) => Some(ActivationId(value))
@@ -165,7 +178,9 @@ trait ElasticSearchActivationRestClient {
         "cause",
         "causedBy",
         "limits",
-        "path")
+        "path",
+        "components",
+        "components2")
   }
 
   protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
@@ -368,28 +383,18 @@ class ArtifactElasticSearchActivationStore(
 
   private val eventEnd = ByteString("}\n")
 
-  /*def logs(activation: WhiskActivation): Vector[Source[ByteString, NotUsed]] = {
-    // What todo about stream?
-    activation.logs.logs.map { log =>
-      println(log)
-      logging.info(this, s"asdf $log")
-      val logLine = LogLine(Instant.now.toString, "stdout", log)
-      logging.info(this, logLine.toString)
-      Source.single(ByteString(logLine.toJson.compactPrint))
+  // TODO: Need correct stream for stdout/stderr
+  def logs(activation: WhiskActivation): Source[ByteString, NotUsed] = {
+    val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toJson.compactPrint)
+    val a = activation.logs.logs.map { log =>
+      val logLine = LogLine(Instant.now.toString, "stdout", log.substring(39)).toJson.compactPrint
+      ByteString(logLine)
     }
 
-  }*/
-
-  def logs(activation: WhiskActivation): Source[ByteString, NotUsed] = {
-    // What todo about stream?
-    //logging.info(this, s"asdf $log")
-    val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toString)
-    //logging.info(this, logLine.toString)
-    Source.single(ByteString(logLine.toJson.compactPrint))
+    Source.fromIterator(() => a.toIterator)
   }
 
   def writeLog(activation: WhiskActivation) = {
-
     // Adding the userId field to every written record, so any background process can properly correlate.
     val userIdField = Map("namespaceId" -> activation.namespace.toJson)
 
@@ -398,12 +403,14 @@ class ArtifactElasticSearchActivationStore(
       "activationId" -> activation.activationId.asString.toJson,
       "entity" -> FullyQualifiedEntityName(activation.namespace, activation.name).asString.toJson) ++ userIdField
 
-    val augmentedActivation = JsObject(activation.toJson.fields ++ userIdField)
+    val activationWithNoLogs = activation.withoutLogs
+    val augmentedActivation = JsObject(activationWithNoLogs.toJson.fields ++ userIdField)
 
     // Manually construct JSON fields to omit parsing the whole structure
     val metadata = ByteString("," + fieldsString(additionalMetadata))
 
-    val toSeq = Flow[ByteString].via(toFormattedString).toMat(Sink.seq[String])(Keep.right)
+    val toSeq: Sink[ByteString, Future[immutable.Seq[String]]] =
+      Flow[ByteString].via(toFormattedString).toMat(Sink.seq[String])(Keep.right)
 
     val toFile = Flow[ByteString]
     // As each element is a JSON-object, we know we can add the manually constructed fields to it by dropping
@@ -413,20 +420,8 @@ class ArtifactElasticSearchActivationStore(
       .concat(Source.single(ByteString(augmentedActivation.toJson.compactPrint + "\n")))
       .to(writeToFile)
 
-    val combined = OwSink.combine(toSeq, toFile)(Broadcast[ByteString](_))
-
-    /*logs(activation).map { a =>
-      a.runWith(combined)._1.flatMap { seq =>
-        val possibleErrors = Set("Some error", "Some other error")
-        val errored = seq.lastOption.exists(last => possibleErrors.exists(last.contains))
-        val logs = ActivationLogs(seq.toVector)
-        if (!errored) {
-          Future.successful(logs)
-        } else {
-          Future.failed(new Exception("some error"))
-        }
-      }
-    }*/
+    val combined: Sink[ByteString, (Future[immutable.Seq[String]], NotUsed)] =
+      OwSink.combine(toSeq, toFile)(Broadcast[ByteString](_))
 
     logs(activation).runWith(combined)._1.flatMap { seq =>
       val possibleErrors = Set("Some error", "Some other error")
@@ -442,13 +437,7 @@ class ArtifactElasticSearchActivationStore(
 
   override def store(activation: WhiskActivation)(implicit transid: TransactionId,
                                                   notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
-    // Write logs for trigger and sequences
-    activation.annotations.get("kind") match {
-      case Some(value) if value == "sequence".toJson => writeLog(activation)
-      case None                                      => writeLog(activation)
-      case _                                         =>
-    }
-
+    writeLog(activation)
     super.store(activation)
   }
 
@@ -464,13 +453,7 @@ class ArtifactElasticSearchActivationStore(
 
       getActivation(id, uuid, headers).flatMap(activation =>
         logs(uuid, id, headers).map(logs =>
-          activation.kind match {
-            case Some("sequence") | None => // Need to retry if logs are empty or throw error
-              activation.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
-
-            case _ =>
-              activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-        }))
+          activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))))
     } else {
       super.get(activationId, user, request)
     }
@@ -513,12 +496,7 @@ class ArtifactElasticSearchActivationStore(
         Future
           .sequence(activationList.map { act =>
             logs(uuid, act.activationId, headers).map { logs =>
-              act.kind match {
-                case Some("sequence") | None =>
-                  act.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
-
-                case _ => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-              }
+              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
             }
           })
           .map(Right(_))
@@ -545,12 +523,7 @@ class ArtifactElasticSearchActivationStore(
         Future
           .sequence(activationList.map { act =>
             logs(uuid, act.activationId, headers).map { logs =>
-              act.kind match {
-                case Some("sequence") | None =>
-                  act.toActivation(ActivationLogs(logs.head.toString.drop(1).dropRight(1).split(", ").toVector))
-
-                case _ => act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-              }
+              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
             }
           })
           .map(Right(_))
