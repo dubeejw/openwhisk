@@ -39,8 +39,8 @@ trait ActivationStore {
    * @param notifier cache change notifier
    * @return Future containing DocInfo related to stored activation
    */
-  def store(activation: WhiskActivation)(implicit transid: TransactionId,
-                                         notifier: Option[CacheChangeNotification]): Future[DocInfo]
+  def store(activation: WhiskActivation, user: UUID)(implicit transid: TransactionId,
+                                                     notifier: Option[CacheChangeNotification]): Future[DocInfo]
 
   /**
    * Retrieves an activation corresponding to the specified activation ID.

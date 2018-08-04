@@ -550,7 +550,7 @@ protected[actions] trait PrimitiveActions {
         sequenceLimits,
       duration = Some(session.duration))
 
-    activationStore.store(activation)(transid, notifier = None)
+    activationStore.store(activation, user.namespace.uuid)(transid, notifier = None)
 
     activation
   }

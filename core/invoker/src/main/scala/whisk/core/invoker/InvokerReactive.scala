@@ -160,9 +160,9 @@ class InvokerReactive(
   }
 
   /** Stores an activation in the database. */
-  private val store = (tid: TransactionId, activation: WhiskActivation) => {
+  private val store = (tid: TransactionId, activation: WhiskActivation, user: UUID) => {
     implicit val transid: TransactionId = tid
-    activationStore.store(activation)(tid, notifier = None)
+    activationStore.store(activation, user)(tid, notifier = None)
   }
 
   /** Creates a ContainerProxy Actor when being called. */
@@ -202,7 +202,7 @@ class InvokerReactive(
           val name = msg.action.name
           val actionid = FullyQualifiedEntityName(namespace, name).toDocId.asDocInfo(msg.revision)
           val subject = msg.user.subject
-
+          val user = msg.user.namespace.uuid
           logging.debug(this, s"${actionid.id} $subject ${msg.activationId}")
 
           // caching is enabled since actions have revision id and an updated
@@ -239,7 +239,7 @@ class InvokerReactive(
                 val activation = generateFallbackActivation(msg, response)
                 activationFeed ! MessageFeed.Processed
                 ack(msg.transid, activation, msg.blocking, msg.rootControllerIndex, msg.user.namespace.uuid)
-                store(msg.transid, activation)
+                store(msg.transid, activation, user)
                 Future.successful(())
             }
         } else {

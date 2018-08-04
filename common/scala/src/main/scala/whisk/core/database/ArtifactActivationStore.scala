@@ -38,8 +38,8 @@ class ArtifactActivationStore(actorSystem: ActorSystem, actorMaterializer: Actor
   private val artifactStore: ArtifactStore[WhiskActivation] =
     WhiskActivationStore.datastore()(actorSystem, logging, actorMaterializer)
 
-  def store(activation: WhiskActivation)(implicit transid: TransactionId,
-                                         notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
+  def store(activation: WhiskActivation, user: UUID)(implicit transid: TransactionId,
+                                                     notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
 
     logging.debug(this, s"recording activation '${activation.activationId}'")
 

@@ -383,20 +383,25 @@ class ArtifactElasticSearchActivationStore(
 
   private val eventEnd = ByteString("}\n")
 
-  // TODO: Need correct stream for stdout/stderr
   def logs(activation: WhiskActivation): Source[ByteString, NotUsed] = {
     val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toJson.compactPrint)
     val a = activation.logs.logs.map { log =>
-      val logLine = LogLine(Instant.now.toString, "stdout", log.substring(39)).toJson.compactPrint
+      val a = log.split(" ")
+      val date = a(0) //log.substring(0, 30)
+      val stream = a(1).dropRight(1) //log.substring(31, 37)
+      val message = a.slice(2, a.length).mkString(" ")
+      val logLine = LogLine(date, stream, message).toJson.compactPrint
       ByteString(logLine)
     }
+    //920294979Z
+    //3003466Z
 
     Source.fromIterator(() => a.toIterator)
   }
 
-  def writeLog(activation: WhiskActivation) = {
+  def writeLog(activation: WhiskActivation, user: UUID) = {
     // Adding the userId field to every written record, so any background process can properly correlate.
-    val userIdField = Map("namespaceId" -> activation.namespace.toJson)
+    val userIdField = Map("namespaceId" -> user.toJson)
 
     // What todo with action name?
     val additionalMetadata = Map(
@@ -435,10 +440,11 @@ class ArtifactElasticSearchActivationStore(
     }
   }
 
-  override def store(activation: WhiskActivation)(implicit transid: TransactionId,
-                                                  notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
-    writeLog(activation)
-    super.store(activation)
+  override def store(activation: WhiskActivation, user: UUID)(
+    implicit transid: TransactionId,
+    notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
+    writeLog(activation, user)
+    super.store(activation, user)
   }
 
   override def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(

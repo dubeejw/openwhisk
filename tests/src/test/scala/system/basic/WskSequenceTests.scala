@@ -461,7 +461,12 @@ class WskSequenceTests extends TestHelpers with WskTestHelpers with StreamLoggin
    */
   private def checkEchoSeqRuleResult(triggerFireRun: RunResult, seqName: String, triggerPayload: JsObject) = {
     withActivation(wsk.activation, triggerFireRun) { triggerActivation =>
-      val ruleActivation = triggerActivation.logs.get.map(_.parseJson.convertTo[RuleActivationResult]).head
+      val ruleActivation = triggerActivation
+        .getAnnotationValue("components")
+        .get
+        .convertTo[List[JsObject]]
+        .head
+        .convertTo[RuleActivationResult]
       withActivation(wsk.activation, ruleActivation.activationId) { actionActivation =>
         actionActivation.response.result shouldBe Some(triggerPayload)
         actionActivation.cause shouldBe None

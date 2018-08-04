@@ -92,8 +92,9 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         start = Instant.now,
         end = Instant.now)
     }.toList
+    val user = UUID()
     try {
-      (notExpectedActivations ++ activations).foreach(storeActivation)
+      (notExpectedActivations ++ activations).foreach(storeActivation(_, user))
       waitOnListActivationsInNamespace(namespace, 2)
 
       whisk.utils.retry {
@@ -174,9 +175,10 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         end = Instant.now,
         response = ActivationResponse.success(Some(JsNumber(5))))
     }.toList
+    val user = UUID()
 
     try {
-      (notExpectedActivations ++ activations).foreach(storeActivation)
+      (notExpectedActivations ++ activations).foreach(storeActivation(_, user))
       waitOnListActivationsInNamespace(namespace, 2)
       checkCount("", 2)
 
@@ -249,9 +251,10 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = now.plusSeconds(30),
         end = now.plusSeconds(30))) // should match
+    val user = UUID()
 
     try {
-      (notExpectedActivations ++ activations).foreach(storeActivation)
+      (notExpectedActivations ++ activations).foreach(storeActivation(_, user))
       waitOnListActivationsInNamespace(namespace, activations.length)
 
       { // get between two time stamps
@@ -359,8 +362,10 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         end = Instant.now,
         annotations = Parameters("path", s"${namespace.asString}/pkg/xyz"))
     }.toList
+    val user = UUID()
+
     try {
-      (notExpectedActivations ++ activations ++ activationsInPackage).foreach(storeActivation)
+      (notExpectedActivations ++ activations ++ activationsInPackage).foreach(storeActivation(_, user))
       waitOnListActivationsMatchingName(namespace, EntityPath("xyz"), activations.length)
       waitOnListActivationsMatchingName(namespace, EntityName("pkg").addPath(EntityName("xyz")), activations.length)
       checkCount("name=xyz", activations.length)
@@ -473,8 +478,10 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
+    val user = UUID()
+
     try {
-      storeActivation(activation)
+      storeActivation(activation, user)
 
       Get(s"$collectionPath/${activation.activationId.asString}") ~> Route.seal(routes(creds)) ~> check {
         status should be(OK)
@@ -510,8 +517,10 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
+    val user = UUID()
+
     try {
-      storeActivation(activation)
+      storeActivation(activation, user)
 
       Get(s"$collectionPath/${activation.activationId.asString}/result") ~> Route.seal(routes(creds)) ~> check {
         status should be(OK)
@@ -534,8 +543,10 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
+    val user = UUID()
+
     try {
-      storeActivation(activation)
+      storeActivation(activation, user)
 
       Get(s"$collectionPath/${activation.activationId.asString}/logs") ~> Route.seal(routes(creds)) ~> check {
         status should be(OK)
@@ -558,7 +569,9 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
         ActivationId.generate(),
         start = Instant.now,
         end = Instant.now)
-    storeActivation(activation)
+    val user = UUID()
+
+    storeActivation(activation, user)
     try {
 
       Get(s"$collectionPath/${activation.activationId.asString}/bogus") ~> Route.seal(routes(creds)) ~> check {
@@ -631,7 +644,9 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
 
     val activation =
       new BadActivation(namespace, aname(), creds.subject, ActivationId.generate(), Instant.now, Instant.now)
-    storeActivation(activation)
+    val user = UUID()
+
+    storeActivation(activation, user)
 
     Get(s"$collectionPath/${activation.activationId}") ~> Route.seal(routes(creds)) ~> check {
       status should be(InternalServerError)

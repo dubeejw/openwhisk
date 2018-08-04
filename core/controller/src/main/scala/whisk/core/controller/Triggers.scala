@@ -166,7 +166,7 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
                   triggerActivation
               }
               .map { activation =>
-                activationStore.store(activation)
+                activationStore.store(activation, user.namespace.uuid)
               }
             complete(Accepted, triggerActivationId.toJsObject)
           } else {
