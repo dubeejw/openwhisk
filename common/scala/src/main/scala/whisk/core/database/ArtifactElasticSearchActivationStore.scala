@@ -384,17 +384,13 @@ class ArtifactElasticSearchActivationStore(
   private val eventEnd = ByteString("}\n")
 
   def logs(activation: WhiskActivation): Source[ByteString, NotUsed] = {
-    val logLine = LogLine(Instant.now.toString, "stdout", activation.logs.toJson.compactPrint)
     val a = activation.logs.logs.map { log =>
-      val a = log.split(" ")
-      val date = a(0) //log.substring(0, 30)
-      val stream = a(1).dropRight(1) //log.substring(31, 37)
-      val message = a.slice(2, a.length).mkString(" ")
+      val date = log.substring(0, 30).trim
+      val stream = log.substring(31, 37)
+      val message = log.substring(39)
       val logLine = LogLine(date, stream, message).toJson.compactPrint
       ByteString(logLine)
     }
-    //920294979Z
-    //3003466Z
 
     Source.fromIterator(() => a.toIterator)
   }
