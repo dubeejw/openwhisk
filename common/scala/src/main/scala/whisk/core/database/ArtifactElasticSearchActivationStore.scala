@@ -75,15 +75,36 @@ trait ElasticSearchActivationRestClient {
       elasticSearchConfig2.port,
       httpFlow2)
 
+  /*
+        jsonFormat(
+        ActivationEntry.apply,
+        elasticSearchConfig2.schema.name,
+        elasticSearchConfig2.schema.subject,
+        elasticSearchConfig2.schema.activationId,
+        elasticSearchConfig2.schema.version,
+        elasticSearchConfig2.schema.end,
+        elasticSearchConfig2.schema.start,
+        "response",
+        elasticSearchConfig2.schema.duration,
+        elasticSearchConfig2.schema.namespace,
+        "kind",
+        "cause",
+        "causedBy",
+        "limits",
+        "path",
+        "components",
+        "components2")
+  }
+   */
+
   // Schema of resultant activations from ES
   case class ActivationEntry(name: String,
                              subject: String,
                              activationId: String,
                              version: String,
-                             endDate: String,
-                             status: String,
-                             timeDate: String,
-                             message: String,
+                             endDate: Long,
+                             timeDate: Long,
+                             response: ActivationResponse,
                              duration: Option[Long] = None,
                              namespace: String,
                              kind: Option[String] = None,
@@ -95,12 +116,17 @@ trait ElasticSearchActivationRestClient {
                              components2: Option[JsArray] = None) {
 
     def toActivation(logs: ActivationLogs = ActivationLogs()) = {
-      val result = status match {
-        case "0" => ActivationResponse.success(Some(message.parseJson.asJsObject))
-        case "1" => ActivationResponse.applicationError(message.parseJson.asJsObject.fields("error"))
-        case "2" => ActivationResponse.containerError(message.parseJson.asJsObject.fields("error"))
-        case "3" => ActivationResponse.whiskError(message.parseJson.asJsObject.fields("error"))
-      }
+      val res = response
+     // val a = response.fields("statusCode").convertTo[Int]
+      //val b = response.fields("result").asJsObject
+      //val res = ActivationResponse(a, Some(b))
+      //val res = ActivationResponse(0, Some("asdf".toJson))
+      /*val result = response.statusCode match {
+        case 0 => ActivationResponse.success(Some(response.result.parseJson.asJsObject))
+        case 1 => ActivationResponse.applicationError(message.parseJson.asJsObject.fields("error"))
+        case 2 => ActivationResponse.containerError(message.parseJson.asJsObject.fields("error"))
+        case 3 => ActivationResponse.whiskError(message.parseJson.asJsObject.fields("error"))
+      }*/
       val causeByAnnotation: Parameters = causedBy match {
         case Some(value) => Parameters("causedBy", value)
         case None        => Parameters()
@@ -149,9 +175,9 @@ trait ElasticSearchActivationRestClient {
         EntityName(name),
         Subject(subject),
         ActivationId(activationId),
-        Instant.parse(timeDate),
-        Instant.parse(endDate),
-        response = result,
+        Instant.ofEpochMilli(timeDate),
+        Instant.ofEpochMilli(endDate),
+        response = res,
         logs = logs,
         duration = duration,
         version = SemVer(version),
@@ -169,9 +195,8 @@ trait ElasticSearchActivationRestClient {
         elasticSearchConfig2.schema.activationId,
         elasticSearchConfig2.schema.version,
         elasticSearchConfig2.schema.end,
-        elasticSearchConfig2.schema.status,
         elasticSearchConfig2.schema.start,
-        elasticSearchConfig2.schema.message,
+        "response",
         elasticSearchConfig2.schema.duration,
         elasticSearchConfig2.schema.namespace,
         "kind",
@@ -204,7 +229,7 @@ trait ElasticSearchActivationRestClient {
 
   protected def generateGetPayload(activationId: String) = {
     val query =
-      s"_type: ${elasticSearchConfig2.schema.activationRecord} AND ${elasticSearchConfig2.schema.activationId}: $activationId"
+      s"type: ${elasticSearchConfig2.schema.activationRecord} AND ${elasticSearchConfig2.schema.activationId}: $activationId"
 
     EsQuery(EsQueryString(query))
   }
@@ -214,7 +239,7 @@ trait ElasticSearchActivationRestClient {
                                                            since: Option[Instant] = None,
                                                            upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
-    val activationMatch = Some(EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord))
+    val activationMatch = Some(EsQueryBoolMatch("type", elasticSearchConfig2.schema.activationRecord))
     val entityMatch: Option[EsQueryBoolMatch] = name.map { n =>
       Some(EsQueryBoolMatch(elasticSearchConfig2.schema.name, n.asString))
     } getOrElse None
@@ -232,7 +257,7 @@ trait ElasticSearchActivationRestClient {
                                                        upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
     val queryTerms = Vector(
-      EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord),
+      EsQueryBoolMatch("type", elasticSearchConfig2.schema.activationRecord),
       EsQueryBoolMatch(elasticSearchConfig2.schema.name, name))
     val queryMust = EsQueryMust(queryTerms, queryRanges)
     val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderDesc)
@@ -247,7 +272,7 @@ trait ElasticSearchActivationRestClient {
                                                           upto: Option[Instant] = None) = {
     val queryRanges = getRanges(since, upto)
     val queryTerms = Vector(
-      EsQueryBoolMatch("_type", elasticSearchConfig2.schema.activationRecord),
+      EsQueryBoolMatch("type", elasticSearchConfig2.schema.activationRecord),
       EsQueryBoolMatch(elasticSearchConfig2.schema.subject, namespace))
     val queryMust = EsQueryMust(queryTerms, queryRanges)
     val queryOrder = EsQueryOrder(elasticSearchConfig2.schema.start, EsOrderDesc)
@@ -404,8 +429,12 @@ class ArtifactElasticSearchActivationStore(
       "activationId" -> activation.activationId.asString.toJson,
       "entity" -> FullyQualifiedEntityName(activation.namespace, activation.name).asString.toJson) ++ userIdField
 
-    val activationWithNoLogs = activation.withoutLogs
-    val augmentedActivation = JsObject(activationWithNoLogs.toJson.fields ++ userIdField)
+    val activationWithoutAnnotations = activation.withoutAnnotations
+    val activationWithNoLogs = activation.withoutLogs.withoutAnnotations
+
+    val annotations = activation.annotations.toJsObject.fields
+    logging.info(this, s"ASDASDASDSAD $annotations")
+    val augmentedActivation = JsObject(activationWithNoLogs.toJson.fields ++ userIdField ++ annotations)
 
     // Manually construct JSON fields to omit parsing the whole structure
     val metadata = ByteString("," + fieldsString(additionalMetadata))
@@ -453,9 +482,10 @@ class ArtifactElasticSearchActivationStore(
       val headers = extractRequiredHeaders2(request.get.headers)
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
-      getActivation(id, uuid, headers).flatMap(activation =>
-        logs(uuid, id, headers).map(logs =>
-          activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))))
+      getActivation(id, uuid, headers).flatMap{activation =>
+          logging.info(this, s"$activation")
+          logs(uuid, id, headers).map(logs =>
+          activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString))))}
     } else {
       super.get(activationId, user, request)
     }

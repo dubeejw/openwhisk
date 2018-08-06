@@ -86,7 +86,7 @@ trait ElasticSearchLogRestClient {
 
   protected def generatePayload(activationId: String) = {
     val logQuery =
-      s"_type: ${elasticSearchConfig.logSchema.userLogs} AND ${elasticSearchConfig.logSchema.activationId}: $activationId"
+      s"type: ${elasticSearchConfig.logSchema.userLogs} AND ${elasticSearchConfig.logSchema.activationId}: $activationId"
     val queryString = EsQueryString(logQuery)
     val queryOrder = EsQueryOrder(elasticSearchConfig.logSchema.time, EsOrderAsc)
 

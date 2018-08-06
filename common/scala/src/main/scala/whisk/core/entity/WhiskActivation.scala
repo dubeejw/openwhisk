@@ -115,6 +115,8 @@ case class WhiskActivation(namespace: EntityPath,
   }
 
   def withoutLogs = copy(logs = ActivationLogs()).revision[WhiskActivation](rev)
+  def withoutAnnotations = copy(annotations = Parameters()).revision[WhiskActivation](rev)
+
   def withLogs(logs: ActivationLogs) = copy(logs = logs).revision[WhiskActivation](rev)
   def withAnnotations(annotations: Parameters) = copy(annotations = annotations).revision[WhiskActivation](rev)
 }
