@@ -24,7 +24,7 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
 import akka.stream.alpakka.file.scaladsl.LogRotatorSink
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, MergeHub, Sink, Source}
+import akka.stream.scaladsl.{Flow, GraphDSL, Keep, MergeHub, Sink, Source}
 import akka.stream._
 import akka.util.ByteString
 import pureconfig.loadConfigOrThrow
@@ -92,9 +92,10 @@ trait ElasticSearchActivationRestClient {
                              limits: Option[ActionLimits] = None,
                              path: Option[String] = None,
                              components: Option[JsArray] = None,
-                             components2: Option[JsArray] = None) {
+                             components2: Option[JsArray] = None,
+                             logs: ActivationLogs) {
 
-    def toActivation(logs: ActivationLogs = ActivationLogs()) = {
+    def toActivation() = {
       val result = status match {
         case "0" => ActivationResponse.success(Some(message.parseJson.asJsObject))
         case "1" => ActivationResponse.applicationError(message.parseJson.asJsObject.fields("error"))
@@ -180,7 +181,8 @@ trait ElasticSearchActivationRestClient {
         "limits",
         "path",
         "components",
-        "components2")
+        "components2",
+        "logs")
   }
 
   protected def transcribeActivations(queryResult: EsSearchResult): List[ActivationEntry] = {
@@ -404,8 +406,7 @@ class ArtifactElasticSearchActivationStore(
       "activationId" -> activation.activationId.asString.toJson,
       "entity" -> FullyQualifiedEntityName(activation.namespace, activation.name).asString.toJson) ++ userIdField
 
-    val activationWithNoLogs = activation.withoutLogs
-    val augmentedActivation = JsObject(activationWithNoLogs.toJson.fields ++ userIdField)
+    val augmentedActivation = JsObject(activation.toJson.fields ++ userIdField)
 
     // Manually construct JSON fields to omit parsing the whole structure
     val metadata = ByteString("," + fieldsString(additionalMetadata))
@@ -413,7 +414,7 @@ class ArtifactElasticSearchActivationStore(
     val toSeq: Sink[ByteString, Future[immutable.Seq[String]]] =
       Flow[ByteString].via(toFormattedString).toMat(Sink.seq[String])(Keep.right)
 
-    val toFile = Flow[ByteString]
+    val toFile: Sink[ByteString, NotUsed] = Flow[ByteString]
     // As each element is a JSON-object, we know we can add the manually constructed fields to it by dropping
     // the closing "}", adding the fields and finally add "}\n" to the end again.
       .map(_.dropRight(1) ++ metadata ++ eventEnd)
@@ -421,19 +422,7 @@ class ArtifactElasticSearchActivationStore(
       .concat(Source.single(ByteString(augmentedActivation.toJson.compactPrint + "\n")))
       .to(writeToFile)
 
-    val combined: Sink[ByteString, (Future[immutable.Seq[String]], NotUsed)] =
-      OwSink.combine(toSeq, toFile)(Broadcast[ByteString](_))
-
-    logs(activation).runWith(combined)._1.flatMap { seq =>
-      val possibleErrors = Set("Some error", "Some other error")
-      val errored = seq.lastOption.exists(last => possibleErrors.exists(last.contains))
-      val logs = ActivationLogs(seq.toVector)
-      if (!errored) {
-        Future.successful(logs)
-      } else {
-        Future.failed(new Exception("some error"))
-      }
-    }
+    Source.empty.runWith(toFile)
   }
 
   override def store(activation: WhiskActivation, user: UUID)(
@@ -453,9 +442,7 @@ class ArtifactElasticSearchActivationStore(
       val headers = extractRequiredHeaders2(request.get.headers)
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
-      getActivation(id, uuid, headers).flatMap(activation =>
-        logs(uuid, id, headers).map(logs =>
-          activation.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))))
+      getActivation(id, uuid, headers).map(_.toActivation())
     } else {
       super.get(activationId, user, request)
     }
@@ -496,11 +483,7 @@ class ArtifactElasticSearchActivationStore(
     if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
-          .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map { logs =>
-              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-            }
-          })
+          .sequence(activationList.map(activation => Future.successful(activation.toActivation())))
           .map(Right(_))
       }
     } else {
@@ -523,11 +506,7 @@ class ArtifactElasticSearchActivationStore(
     if (headers.length == elasticSearchConfig2.requiredHeaders.length) {
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).flatMap { activationList =>
         Future
-          .sequence(activationList.map { act =>
-            logs(uuid, act.activationId, headers).map { logs =>
-              act.toActivation(ActivationLogs(logs.map(l => l.toFormattedString)))
-            }
-          })
+          .sequence(activationList.map(activation => Future.successful(activation.toActivation())))
           .map(Right(_))
       }
     } else {
