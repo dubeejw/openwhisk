@@ -135,7 +135,6 @@ trait ActivationStore {
     since: Option[Instant] = None,
     upto: Option[Instant] = None,
     context: UserContext)(implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]]
-
 }
 
 trait ActivationStoreProvider extends Spi {

@@ -21,7 +21,6 @@ import java.time.Instant
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-
 import spray.json.JsObject
 import whisk.common.{Logging, TransactionId}
 import whisk.core.entity._

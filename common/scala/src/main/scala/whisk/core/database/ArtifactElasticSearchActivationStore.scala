@@ -19,7 +19,14 @@ package whisk.core.database
 
 import java.time.Instant
 import java.nio.file.{Files, Path, Paths}
-import java.nio.file.attribute.PosixFilePermission.{GROUP_READ, GROUP_WRITE, OTHERS_READ, OWNER_READ, OWNER_WRITE}
+import java.nio.file.attribute.PosixFilePermission.{
+  GROUP_READ,
+  GROUP_WRITE,
+  OTHERS_READ,
+  OTHERS_WRITE,
+  OWNER_READ,
+  OWNER_WRITE
+}
 import java.util.EnumSet
 import akka.actor.ActorSystem
 import akka.http.scaladsl.model._
@@ -54,7 +61,7 @@ class ArtifactElasticSearchActivationStore(
 
   val destinationDirectory: Path = Paths.get("logs")
   val bufferSize = 100.MB
-  val perms = EnumSet.of(OWNER_READ, OWNER_WRITE, GROUP_READ, GROUP_WRITE, OTHERS_READ)
+  val perms = EnumSet.of(OWNER_READ, OWNER_WRITE, GROUP_READ, GROUP_WRITE, OTHERS_READ, OTHERS_WRITE)
   protected val writeToFile: Sink[ByteString, _] = MergeHub
     .source[ByteString]
     .batchWeighted(bufferSize.toBytes, _.length, identity)(_ ++ _)
@@ -120,7 +127,7 @@ class ArtifactElasticSearchActivationStore(
     implicit transid: TransactionId): Future[WhiskActivation] = {
     val headers = extractRequiredHeaders(context.request.headers)
 
-    // Return activation from ElasticSearch or from artifact store if required headers are not present
+    // Return result from ElasticSearch or from artifact store if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
       val headers = extractRequiredHeaders(context.request.headers)
@@ -141,6 +148,7 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
     val headers = extractRequiredHeaders(context.request.headers)
 
+    // Return result from ElasticSearch or from artifact store if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       count(uuid, name, namespace.asString, skip, since, upto, headers)
     } else {
@@ -160,6 +168,7 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
     val headers = extractRequiredHeaders(context.request.headers)
 
+    // Return result from ElasticSearch or from artifact store if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).map { activationList =>
         Right(activationList.map(activation => activation.toActivation()))
@@ -180,6 +189,7 @@ class ArtifactElasticSearchActivationStore(
     val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
     val headers = extractRequiredHeaders(context.request.headers)
 
+    // Return result from ElasticSearch or from artifact store if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).map { activationList =>
         Right(activationList.map(activation => activation.toActivation()))
