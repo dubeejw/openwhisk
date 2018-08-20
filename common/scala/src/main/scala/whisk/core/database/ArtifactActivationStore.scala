@@ -21,7 +21,6 @@ import java.time.Instant
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.http.scaladsl.model.HttpRequest
 
 import spray.json.JsObject
 import whisk.common.{Logging, TransactionId}

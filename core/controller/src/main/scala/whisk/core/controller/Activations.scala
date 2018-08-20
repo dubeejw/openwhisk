@@ -135,6 +135,7 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
             case _    => reject // should not get here
           }
       }
+    }
   }
 
   /**
@@ -150,26 +151,37 @@ trait WhiskActivationsApi extends Directives with AuthenticatedRouteProvider wit
     import WhiskActivationsApi.stringToListLimit
     import WhiskActivationsApi.stringToListSkip
 
-    parameter(
-      'skip.as[ListSkip] ? ListSkip(collection.defaultListSkip),
-      'limit.as[ListLimit] ? ListLimit(collection.defaultListLimit),
-      'count ? false,
-      'docs ? false,
-      'name.as[Option[EntityPath]] ?,
-      'since.as[Instant] ?,
-      'upto.as[Instant] ?) { (skip, limit, count, docs, name, since, upto) =>
-      if (count && !docs) {
-        countEntities {
-          activationStore.countActivationsInNamespace(namespace, name.flatten, skip.n, since, upto, context)
-        }
-      } else if (count && docs) {
-        terminate(BadRequest, Messages.docsNotAllowedWithCount)
-      } else {
-        val activations = name.flatten match {
-          case Some(action) =>
-            activationStore.listActivationsMatchingName(namespace, action, skip.n, limit.n, docs, since, upto, context)
-          case None =>
-            activationStore.listActivationsInNamespace(namespace, skip.n, limit.n, docs, since, upto, context)
+    extractRequest { request =>
+      parameter(
+        'skip.as[ListSkip] ? ListSkip(collection.defaultListSkip),
+        'limit.as[ListLimit] ? ListLimit(collection.defaultListLimit),
+        'count ? false,
+        'docs ? false,
+        'name.as[Option[EntityPath]] ?,
+        'since.as[Instant] ?,
+        'upto.as[Instant] ?) { (skip, limit, count, docs, name, since, upto) =>
+        if (count && !docs) {
+          countEntities {
+            activationStore.countActivationsInNamespace(namespace, name.flatten, skip.n, since, upto, context)
+          }
+        } else if (count && docs) {
+          terminate(BadRequest, Messages.docsNotAllowedWithCount)
+        } else {
+          val activations = name.flatten match {
+            case Some(action) =>
+              activationStore.listActivationsMatchingName(
+                namespace,
+                action,
+                skip.n,
+                limit.n,
+                docs,
+                since,
+                upto,
+                context)
+            case None =>
+              activationStore.listActivationsInNamespace(namespace, skip.n, limit.n, docs, since, upto, context)
+          }
+          listEntities(activations map (_.fold((js) => js, (wa) => wa.map(_.toExtendedJson))))
         }
       }
     }

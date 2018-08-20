@@ -40,7 +40,8 @@ import whisk.core.database.{
   ArtifactElasticSearchActivationStore,
   ElasticSearchActivationFieldConfig,
   ElasticSearchActivationStoreConfig,
-  NoDocumentException
+  NoDocumentException,
+  UserContext
 }
 
 import whisk.common.TransactionId
@@ -270,7 +271,7 @@ class ElasticSearchActivationStoreTests
       new ArtifactElasticSearchActivationStore(system, materializer, logging, elasticSearchConfig = defaultConfig)
 
     a[Throwable] should be thrownBy await(
-      esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
+      esActivationStore.get(activation.activationId, UserContext(user, defaultLogStoreHttpRequest)))
   }
 
   it should "get an activation" in {
@@ -287,7 +288,7 @@ class ElasticSearchActivationStoreTests
         Some(testFlow(defaultHttpResponse, httpRequest)),
         elasticSearchConfig = defaultConfig)
 
-    await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activation
+    await(esActivationStore.get(activationId, UserContext(user, defaultLogStoreHttpRequest))) shouldBe activation
   }
 
   it should "get an activation with error response" in {
@@ -363,7 +364,7 @@ class ElasticSearchActivationStoreTests
             Some(testFlow(defaultHttpErrorResponse, httpRequest)),
             elasticSearchConfig = defaultConfig)
 
-        await(esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest))) shouldBe activationWithError
+        await(esActivationStore.get(activationId, UserContext(user, defaultLogStoreHttpRequest))) shouldBe activationWithError
     }
   }
 
@@ -382,7 +383,7 @@ class ElasticSearchActivationStoreTests
         elasticSearchConfig = defaultConfig)
 
     a[NoDocumentException] should be thrownBy await(
-      esActivationStore.get(activationId, user = Some(user), request = Some(defaultLogStoreHttpRequest)))
+      esActivationStore.get(activationId, UserContext(user, defaultLogStoreHttpRequest)))
   }
 
   it should "dynamically replace $UUID when getting an activation" in {
@@ -402,7 +403,7 @@ class ElasticSearchActivationStoreTests
         Some(testFlow(defaultHttpResponse, httpRequest)),
         elasticSearchConfig = dynamicPathConfig)
 
-    await(esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest))) shouldBe activation
+    await(esActivationStore.get(activation.activationId, UserContext(user, defaultLogStoreHttpRequest))) shouldBe activation
   }
 
   it should "count activations in namespace" in {
@@ -426,8 +427,7 @@ class ElasticSearchActivationStoreTests
         1,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+        UserContext(user, defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
   }
 
   it should "count activations in namespace with no entity name" in {
@@ -461,8 +461,7 @@ class ElasticSearchActivationStoreTests
         skip = 1,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
   }
 
   it should "count zero activations in when there are not any activations that match entity" in {
@@ -486,8 +485,7 @@ class ElasticSearchActivationStoreTests
         1,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(0))
+        UserContext(user, defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(0))
   }
 
   it should "dynamically replace $UUID in request when counting activations" in {
@@ -514,8 +512,7 @@ class ElasticSearchActivationStoreTests
         1,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
+        UserContext(user, defaultLogStoreHttpRequest))) shouldBe JsObject("activations" -> JsNumber(1))
   }
 
   it should "list activations matching entity name" in {
@@ -540,8 +537,7 @@ class ElasticSearchActivationStoreTests
         2,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
   it should "display empty activations list when there are not any activations that match entity name" in {
@@ -566,8 +562,7 @@ class ElasticSearchActivationStoreTests
         2,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List.empty)
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe Right(List.empty)
   }
 
   it should "dynamically replace $UUID in request when getting activations matching entity name" in {
@@ -595,8 +590,7 @@ class ElasticSearchActivationStoreTests
         2,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
   it should "list activations in namespace" in {
@@ -620,8 +614,7 @@ class ElasticSearchActivationStoreTests
         2,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
   it should "display empty activations list when there are not any activations in namespace" in {
@@ -645,8 +638,7 @@ class ElasticSearchActivationStoreTests
         2,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List.empty)
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe Right(List.empty)
   }
 
   it should "dynamically replace $UUID in request when listing activations in namespace" in {
@@ -673,8 +665,7 @@ class ElasticSearchActivationStoreTests
         2,
         since = Some(since),
         upto = Some(upto),
-        user = Some(user),
-        request = Some(defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
+        context = UserContext(user, defaultLogStoreHttpRequest))) shouldBe Right(List(activation, activation))
   }
 
   it should "forward errors from Elasticsearch" in {
@@ -688,11 +679,20 @@ class ElasticSearchActivationStoreTests
         elasticSearchConfig = defaultConfig)
 
     a[RuntimeException] should be thrownBy await(
-      esActivationStore.get(activation.activationId, Some(user), Some(defaultLogStoreHttpRequest)))
-    a[RuntimeException] should be thrownBy await(esActivationStore.listActivationsInNamespace(EntityPath(""), 0, 0))
+      esActivationStore.get(activation.activationId, UserContext(user, defaultLogStoreHttpRequest)))
     a[RuntimeException] should be thrownBy await(
-      esActivationStore.listActivationsMatchingName(EntityPath(""), EntityPath(""), 0, 0))
-    a[RuntimeException] should be thrownBy await(esActivationStore.countActivationsInNamespace(EntityPath(""), None, 0))
+      esActivationStore
+        .listActivationsInNamespace(EntityPath(""), 0, 0, context = UserContext(user, defaultLogStoreHttpRequest)))
+    a[RuntimeException] should be thrownBy await(
+      esActivationStore.listActivationsMatchingName(
+        EntityPath(""),
+        EntityPath(""),
+        0,
+        0,
+        context = UserContext(user, defaultLogStoreHttpRequest)))
+    a[RuntimeException] should be thrownBy await(
+      esActivationStore
+        .countActivationsInNamespace(EntityPath(""), None, 0, context = UserContext(user, defaultLogStoreHttpRequest)))
   }
 
   it should "fail when loading out of box configs since whisk.activationstore.elasticsearch does not exist" in {

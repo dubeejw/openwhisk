@@ -87,8 +87,8 @@ class ArtifactElasticSearchActivationStore(
     })
     .run()
 
-  def writeActivation(activation: WhiskActivation, user: UUID) = {
-    val userIdField = Map("namespaceId" -> user.toJson)
+  def writeActivation(activation: WhiskActivation, context: UserContext) = {
+    val userIdField = Map("namespaceId" -> context.user.toJson)
     val namespace = Map("namespace" -> activation.namespace.toJson)
     val name = Map("name" -> activation.name.toJson)
     val subject = Map("subject" -> activation.subject.toJson)
@@ -109,87 +109,83 @@ class ArtifactElasticSearchActivationStore(
     Source.single(line).runWith(Flow[ByteString].to(writeToFile))
   }
 
-  override def store(activation: WhiskActivation, user: UUID)(
+  override def store(activation: WhiskActivation, context: UserContext)(
     implicit transid: TransactionId,
     notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
-    writeActivation(activation, user)
-    super.store(activation, user)
+    writeActivation(activation, context)
+    super.store(activation, context)
   }
 
-  override def get(activationId: ActivationId, user: Option[Identity] = None, request: Option[HttpRequest] = None)(
+  override def get(activationId: ActivationId, context: UserContext)(
     implicit transid: TransactionId): Future[WhiskActivation] = {
-    val headers = extractRequiredHeaders(request.get.headers)
+    val headers = extractRequiredHeaders(context.request.headers)
 
     // Return activation from ElasticSearch or from artifact store if required headers are not present
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
-      val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-      val headers = extractRequiredHeaders(request.get.headers)
+      val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
+      val headers = extractRequiredHeaders(context.request.headers)
       val id = activationId.asString.substring(activationId.asString.indexOf("/") + 1)
 
       getActivation(id, uuid, headers).map(_.toActivation())
     } else {
-      super.get(activationId, user, request)
+      super.get(activationId, context)
     }
   }
 
-  override def countActivationsInNamespace(
-    namespace: EntityPath,
-    name: Option[EntityPath] = None,
-    skip: Int,
-    since: Option[Instant] = None,
-    upto: Option[Instant] = None,
-    user: Option[Identity] = None,
-    request: Option[HttpRequest] = None)(implicit transid: TransactionId): Future[JsObject] = {
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+  override def countActivationsInNamespace(namespace: EntityPath,
+                                           name: Option[EntityPath] = None,
+                                           skip: Int,
+                                           since: Option[Instant] = None,
+                                           upto: Option[Instant] = None,
+                                           context: UserContext)(implicit transid: TransactionId): Future[JsObject] = {
+    val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
+    val headers = extractRequiredHeaders(context.request.headers)
 
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       count(uuid, name, namespace.asString, skip, since, upto, headers)
     } else {
-      super.countActivationsInNamespace(namespace, name, skip, since, upto, user, request)
+      super.countActivationsInNamespace(namespace, name, skip, since, upto, context)
     }
   }
 
-  override def listActivationsMatchingName(namespace: EntityPath,
-                                           name: EntityPath,
-                                           skip: Int,
-                                           limit: Int,
-                                           includeDocs: Boolean = false,
-                                           since: Option[Instant] = None,
-                                           upto: Option[Instant] = None,
-                                           user: Option[Identity] = None,
-                                           request: Option[HttpRequest] = None)(
-    implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+  override def listActivationsMatchingName(
+    namespace: EntityPath,
+    name: EntityPath,
+    skip: Int,
+    limit: Int,
+    includeDocs: Boolean = false,
+    since: Option[Instant] = None,
+    upto: Option[Instant] = None,
+    context: UserContext)(implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
+    val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
+    val headers = extractRequiredHeaders(context.request.headers)
 
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       listActivationMatching(uuid, name.toString, skip, limit, since, upto, headers).map { activationList =>
         Right(activationList.map(activation => activation.toActivation()))
       }
     } else {
-      super.listActivationsMatchingName(namespace, name, skip, limit, includeDocs, since, upto, user, request)
+      super.listActivationsMatchingName(namespace, name, skip, limit, includeDocs, since, upto, context)
     }
   }
 
-  override def listActivationsInNamespace(namespace: EntityPath,
-                                          skip: Int,
-                                          limit: Int,
-                                          includeDocs: Boolean = false,
-                                          since: Option[Instant] = None,
-                                          upto: Option[Instant] = None,
-                                          user: Option[Identity] = None,
-                                          request: Option[HttpRequest] = None)(
-    implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
-    val uuid = elasticSearchConfig.path.format(user.get.namespace.uuid.asString)
-    val headers = extractRequiredHeaders(request.get.headers)
+  override def listActivationsInNamespace(
+    namespace: EntityPath,
+    skip: Int,
+    limit: Int,
+    includeDocs: Boolean = false,
+    since: Option[Instant] = None,
+    upto: Option[Instant] = None,
+    context: UserContext)(implicit transid: TransactionId): Future[Either[List[JsObject], List[WhiskActivation]]] = {
+    val uuid = elasticSearchConfig.path.format(context.user.namespace.uuid.asString)
+    val headers = extractRequiredHeaders(context.request.headers)
 
     if (headers.length == elasticSearchConfig.requiredHeaders.length) {
       listActivationsNamespace(uuid, namespace.asString, skip, limit, since, upto, headers).map { activationList =>
         Right(activationList.map(activation => activation.toActivation()))
       }
     } else {
-      super.listActivationsInNamespace(namespace, skip, limit, includeDocs, since, upto, user, request)
+      super.listActivationsInNamespace(namespace, skip, limit, includeDocs, since, upto, context)
     }
   }
 
