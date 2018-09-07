@@ -44,6 +44,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
+import java.time.Instant
 
 /**
  * A loadbalancer that schedules workload based on a hashing-algorithm.
@@ -225,10 +226,10 @@ class ShardingContainerPoolBalancer(config: WhiskConfig, controllerInstance: Con
   override def publish(action: ExecutableWhiskActionMetaData, msg: ActivationMessage)(
     implicit transid: TransactionId): Future[Future[Either[ActivationId, WhiskActivation]]] = {
 
-    val (invokersToUse, stepSizes) =
+    /*val (invokersToUse, stepSizes) =
       if (!action.exec.pull) (schedulingState.managedInvokers, schedulingState.managedStepSizes)
       else (schedulingState.blackboxInvokers, schedulingState.blackboxStepSizes)
-    val chosen = if (invokersToUse.nonEmpty) {
+    val chosen: Option[InvokerInstanceId] = if (invokersToUse.nonEmpty) {
       val hash = ShardingContainerPoolBalancer.generateHash(msg.user.namespace.name, action.fullyQualifiedName(false))
       val homeInvoker = hash % invokersToUse.size
       val stepSize = stepSizes(hash % stepSizes.size)
@@ -240,14 +241,21 @@ class ShardingContainerPoolBalancer(config: WhiskConfig, controllerInstance: Con
         stepSize)
     } else {
       None
-    }
+    }*/
 
-    chosen
+    Future.successful(Future.successful(Right(WhiskActivation(msg.action.namespace.toPath,
+      msg.action.name,
+      msg.user.subject,
+      msg.activationId,
+      Instant.now,
+      Instant.now
+    ))))
+    /*chosen
       .map { invoker =>
         val entry = setupActivation(msg, action, invoker)
-        sendActivationToInvoker(messageProducer, msg, invoker).map { _ =>
+        //sendActivationToInvoker(messageProducer, msg, invoker).map { _ =>
           entry.promise.future
-        }
+        //}
       }
       .getOrElse {
         // report the state of all invokers
@@ -259,7 +267,7 @@ class ShardingContainerPoolBalancer(config: WhiskConfig, controllerInstance: Con
 
         logging.error(this, s"failed to schedule $actionType action, invokers to use: $invokerStates")
         Future.failed(LoadBalancerException("No invokers available"))
-      }
+      }*/
   }
 
   /** 2. Update local state with the to be executed activation */
@@ -275,7 +283,7 @@ class ShardingContainerPoolBalancer(config: WhiskConfig, controllerInstance: Con
     // value for action durations to avoid too tight timeouts.
     // Timeouts in general are diluted by a configurable factor. In essence this factor controls how much slack you want
     // to allow in your topics before you start reporting failed activations.
-    val timeout = (action.limits.timeout.duration.max(TimeLimit.STD_DURATION) * lbConfig.timeoutFactor) + 1.minute
+    //val timeout = (action.limits.timeout.duration.max(TimeLimit.STD_DURATION) * lbConfig.timeoutFactor) + 1.minute
 
     // Install a timeout handler for the catastrophic case where an active ack is not received at all
     // (because say an invoker is down completely, or the connection to the message bus is disrupted) or when
@@ -283,8 +291,8 @@ class ShardingContainerPoolBalancer(config: WhiskConfig, controllerInstance: Con
     // in this case, if the activation handler is still registered, remove it and update the books.
     activations.getOrElseUpdate(
       msg.activationId, {
-        val timeoutHandler = actorSystem.scheduler.scheduleOnce(timeout) {
-          processCompletion(Left(msg.activationId), msg.transid, forced = true, invoker = instance)
+        val timeoutHandler = actorSystem.scheduler.scheduleOnce(0.minutes) {
+          processCompletion(Left(msg.activationId), msg.transid, forced = false, invoker = instance)
         }
 
         // please note: timeoutHandler.cancel must be called on all non-timeout paths, e.g. Success
