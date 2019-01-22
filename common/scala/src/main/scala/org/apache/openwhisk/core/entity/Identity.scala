@@ -40,10 +40,10 @@ object UserLimits extends DefaultJsonProtocol {
   implicit val serdes = jsonFormat4(UserLimits.apply)
 }
 
-protected[core] case class Namespace(name: EntityName, uuid: UUID)
+protected[core] case class Namespace(name: EntityName, uuid: UUID, metadata: Map[String, JsValue] = Map())
 
 protected[core] object Namespace extends DefaultJsonProtocol {
-  implicit val serdes = jsonFormat2(Namespace.apply)
+  implicit val serdes = jsonFormat3(Namespace.apply)
 }
 
 protected[core] case class Identity(subject: Subject,
@@ -136,9 +136,10 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         val JsString(uuid) = value("uuid")
         val JsString(secret) = value("key")
         val JsString(namespace) = value("namespace")
+        val JsObject(metadata) = value("metadata")
         Identity(
           subject,
-          Namespace(EntityName(namespace), UUID(uuid)),
+          Namespace(EntityName(namespace), UUID(uuid), metadata),
           BasicAuthenticationAuthKey(UUID(uuid), Secret(secret)),
           Privilege.ALL,
           limits)
