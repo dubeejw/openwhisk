@@ -42,14 +42,14 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
 
   behavior of "Whisk actions"
 
-  it should "create an action with an empty file" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "create an action with an empty file" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "empty"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("empty.js")))
     }
   }
 
-  it should "invoke an action returning a promise" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "invoke an action returning a promise" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "hello promise"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("helloPromise.js")))
@@ -63,7 +63,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "invoke an action with a space in the name" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "invoke an action with a space in the name" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "hello Async"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("helloAsync.js")))
@@ -77,7 +77,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "invoke an action that throws an uncaught exception and returns correct status code" in withAssetCleaner(
+  ignore should "invoke an action that throws an uncaught exception and returns correct status code" in withAssetCleaner(
     wskprops) { (wp, assetHelper) =>
     val name = "throwExceptionAction"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
@@ -92,7 +92,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "pass parameters bound on creation-time to the action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "pass parameters bound on creation-time to the action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "printParams"
     val params = Map("param1" -> "test1", "param2" -> "test2")
 
@@ -115,7 +115,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "copy an action and invoke it successfully" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "copy an action and invoke it successfully" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "copied"
     val packageName = "samples"
     val actionName = "wordcount"
@@ -143,7 +143,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "copy an action and ensure exec, parameters, and annotations copied" in withAssetCleaner(wskprops) {
+  ignore should "copy an action and ensure exec, parameters, and annotations copied" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
       val origActionName = "origAction"
       val copiedActionName = "copiedAction"
@@ -169,7 +169,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
       copiedAction.fields("version") shouldBe JsString("0.0.1")
   }
 
-  it should "add new parameters and annotations while copying an action" in withAssetCleaner(wskprops) {
+  ignore should "add new parameters and annotations while copying an action" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
       val origName = "origAction"
       val copiedName = "copiedAction"
@@ -207,7 +207,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
       copiedAction.fields("annotations").convertTo[Seq[JsObject]] diff resAnnots shouldBe List.empty
   }
 
-  it should "recreate and invoke a new action with different code" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "recreate and invoke a new action with different code" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "recreatedAction"
     assetHelper.withCleaner(wsk.action, name, false) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("wc.js")))
@@ -231,7 +231,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "fail to invoke an action with an empty file" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "fail to invoke an action with an empty file" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "empty"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("empty.js")))
@@ -243,7 +243,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "blocking invoke of nested blocking actions" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "blocking invoke of nested blocking actions" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "nestedBlockingAction"
     val child = "wc"
 
@@ -263,7 +263,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "blocking invoke an asynchronous action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "blocking invoke an asynchronous action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "helloAsync"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("helloAsync.js")))
@@ -279,7 +279,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "not be able to use 'ping' in an action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "not be able to use 'ping' in an action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "ping"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("ping.js")))
@@ -297,7 +297,7 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     }
   }
 
-  it should "support UTF-8 as input and output format" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  ignore should "support UTF-8 as input and output format" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "utf8Test"
     assetHelper.withCleaner(wsk.action, name) { (action, _) =>
       action.create(name, Some(TestUtils.getTestActionFilename("hello.js")))
@@ -313,22 +313,24 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
 
   it should "invoke action with large code" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     val name = "big-hello"
-    assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-      val filePath = TestUtils.getTestActionFilename("hello.js")
-      val code = FileUtils.readFileToString(new File(filePath), StandardCharsets.UTF_8)
-      val largeCode = code + " " * (WhiskProperties.getMaxActionSizeMB * FileUtils.ONE_MB).toInt
-      val tmpFile = File.createTempFile("whisk", ".js")
-      FileUtils.write(tmpFile, largeCode, StandardCharsets.UTF_8)
-      val result = action.create(name, Some(tmpFile.getAbsolutePath))
-      tmpFile.delete()
-      result
-    }
+    while(true) {
+      assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+        val filePath = TestUtils.getTestActionFilename("hello.js")
+        val code = FileUtils.readFileToString(new File(filePath), StandardCharsets.UTF_8)
+        val largeCode = code + " " * (WhiskProperties.getMaxActionSizeMB * FileUtils.ONE_MB).toInt
+        val tmpFile = File.createTempFile("whisk", ".js")
+        FileUtils.write(tmpFile, largeCode, StandardCharsets.UTF_8)
+        val result = action.create(name, Some(tmpFile.getAbsolutePath))
+        tmpFile.delete()
+        result
+      }
 
-    val hello = "hello"
-    val run = wsk.action.invoke(name, Map("payload" -> hello.toJson))
-    withActivation(wsk.activation, run) { activation =>
-      activation.response.status shouldBe "success"
-      activation.logs.get.mkString(" ") should include(s"hello, $hello")
+      val hello = "hello"
+      val run = wsk.action.invoke(name, Map("payload" -> hello.toJson))
+      withActivation(wsk.activation, run) { activation =>
+        activation.response.status shouldBe "success"
+        activation.logs.get.mkString(" ") should include(s"hello, $hello")
+      }
     }
   }
 

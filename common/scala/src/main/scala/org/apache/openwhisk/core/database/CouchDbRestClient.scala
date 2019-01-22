@@ -147,10 +147,17 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                     attName: String,
                     contentType: ContentType,
                     source: Source[ByteString, _]): Future[Either[StatusCode, JsObject]] = {
+    logging.info(this, "here0")
     val entity = HttpEntity.Chunked(contentType, source.map(bs => HttpEntity.ChunkStreamPart(bs)))
+    logging.info(this, "here1")
     val request =
       mkRequest(HttpMethods.PUT, uri(db, id, attName), Future.successful(entity), baseHeaders ++ revHeader(rev))
-    requestJson[JsObject](request)
+    logging.info(this, "here2")
+
+    val a = requestJson[JsObject](request)
+    logging.info(this, "here2a")
+
+    a
   }
 
   // Retrieves and streams an attachment into a Sink, producing a result of type T.

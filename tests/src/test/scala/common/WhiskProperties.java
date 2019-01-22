@@ -350,7 +350,7 @@ public class WhiskProperties {
     }
 
     public static int getMaxActionSizeMB(){
-        return Integer.parseInt(getProperty("whisk.action.size.max", "10"));
+        return Integer.parseInt(getProperty("whisk.action.size.max", "40"));
     }
 
     /**

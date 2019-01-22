@@ -99,6 +99,8 @@ class PoolingRestClient(
       case QueueOfferResult.Failure(f)  => Future.failed(f)
     }
   }
+  import org.apache.openwhisk.common.AkkaLogging
+  private val logging = new AkkaLogging(system.log)
 
   /**
    * Execute an HttpRequest on the underlying connection pool and return an unmarshalled result.
@@ -106,13 +108,26 @@ class PoolingRestClient(
    * @return either the unmarshalled result or a status code, if the status code is not a success (2xx class)
    */
   def requestJson[T: RootJsonReader](futureRequest: Future[HttpRequest]): Future[Either[StatusCode, T]] =
-    request(futureRequest).flatMap { response =>
-      if (response.status.isSuccess) {
-        Unmarshal(response.entity.withoutSizeLimit).to[T].map(Right.apply)
+
+  request(futureRequest).flatMap { response =>
+    logging.info(this, "here3")
+
+    if (response.status.isSuccess) {
+      logging.info(this, "here4")
+
+      val a = Unmarshal(response.entity.withoutSizeLimit).to[T].map(Right.apply)
+      logging.info(this, "here5")
+
+      a
       } else {
-        // This is important, as it drains the entity stream.
+      logging.info(this, "here6")
+
+      // This is important, as it drains the entity stream.
         // Otherwise the connection stays open and the pool dries up.
-        response.discardEntityBytes().future.map(_ => Left(response.status))
+        val b = response.discardEntityBytes().future.map(_ => Left(response.status))
+      logging.info(this, "here7")
+
+      b
       }
     }
 
