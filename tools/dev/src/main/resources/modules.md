@@ -24,14 +24,13 @@ This page is generated via script `./gradlew :tools:dev:renderModuleDetails`. Se
 # Modules
 
 <% categories.each { c -> %>
-## ${c.name}
-<% if (c.travisEnabled) {%>
-| Module | Description | Module Status |
-|---	|---	|---    |
-<% c.repos.each { repo -> %>| [${repo.name}](https://github.com/apache/${repo.name}) | ${repo.description} | [![Build Status](https://travis-ci.org/apache/${repo.name}.svg?branch=master)](https://travis-ci.org/apache/${repo.name}) |
-<% }  %><% } else { %>
-| Module | Description |
-|---	|---	|
-<% c.repos.each { repo -> %>| [${repo.name}](https://github.com/apache/${repo.name}) | ${repo.description} |
-<% } %><% } %>
-<% } %>
+
+## \${c.name}
+
+<% if (c.travisEnabled) {%> | Module | Description | Module Status | |--- |---
+|--- | <% c.repos.each { repo -> %>|
+[\${repo.name}](https://github.com/apache/${repo.name}) |
+${repo.description} | [![Build Status](https://travis-ci.org/apache/${repo.name}.svg?branch=master)](https://travis-ci.org/apache/${repo.name})
+| <% } %><% } else { %> | Module | Description | |--- |--- | <% c.repos.each {
+repo -> %>| [\${repo.name}](https://github.com/apache/${repo.name}) |
+\${repo.description} | <% } %><% } %> <% } %>

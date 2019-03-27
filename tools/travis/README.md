@@ -19,18 +19,26 @@
 
 # Travis Setup
 
-Travis build is configured to perform build of this repo in multiple parallel jobs as listed below.
+Travis build is configured to perform build of this repo in multiple parallel
+jobs as listed below.
 
 1. Unit Tests - Runs the test which only need database service.
-2. System Tests - Runs those tests which need complete OpenWhisk system up and running.
-3. Performance test suite - Run basic performance tests with the objective to check if tests are working or not.
+2. System Tests - Runs those tests which need complete OpenWhisk system up and
+   running.
+3. Performance test suite - Run basic performance tests with the objective to
+   check if tests are working or not.
 
 These jobs make use of following scripts
 
-1. `scan.sh` - Performs various code scan task like python flake scan, scala formatting etc.
-2. `setupPrereq.sh` - Performs setup if basis prerequisites like database setup and property file generation.
+1. `scan.sh` - Performs various code scan task like python flake scan, scala
+   formatting etc.
+2. `setupPrereq.sh` - Performs setup if basis prerequisites like database setup
+   and property file generation.
 3. `distDocker.sh` - Builds the various docker containers.
-4. `setupSystem.sh` - Runs the various containers which are part of an OpenWhisk setup like Controller, Invoker etc.
-5. `runTests.sh` - Runs the tests. It make use of `ORG_GRADLE_PROJECT_testSetName` env setting to determine which test
-   suite to run.
-6. `checkAndUploadLogs.sh` -  Collects the logs, checks them and uploads them to https://openwhisk.box.com/v/travis-logs.
+4. `setupSystem.sh` - Runs the various containers which are part of an OpenWhisk
+   setup like Controller, Invoker etc.
+5. `runTests.sh` - Runs the tests. It make use of
+   `ORG_GRADLE_PROJECT_testSetName` env setting to determine which test suite to
+   run.
+6. `checkAndUploadLogs.sh` - Collects the logs, checks them and uploads them to
+   https://openwhisk.box.com/v/travis-logs.

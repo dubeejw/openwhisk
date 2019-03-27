@@ -19,11 +19,16 @@
 
 ## Creating and invoking .NET Core actions
 
-The following sections guide you through creating and invoking a single .NET Core action.
+The following sections guide you through creating and invoking a single .NET
+Core action.
 
-In order to compile, test and archive .NET Core projects, you must have the [.NET Core SDK](https://www.microsoft.com/net/download) installed locally and the environment variable `DOTNET_HOME` set to the location where the `dotnet` executable can be found.
+In order to compile, test and archive .NET Core projects, you must have the
+[.NET Core SDK](https://www.microsoft.com/net/download) installed locally and
+the environment variable `DOTNET_HOME` set to the location where the `dotnet`
+executable can be found.
 
-A .NET Core action is a .NET Core class library with a method called `Main` that has the exact signature as follows:
+A .NET Core action is a .NET Core class library with a method called `Main` that
+has the exact signature as follows:
 
 ```csharp
 public Newtonsoft.Json.Linq.JObject Main(Newtonsoft.Json.Linq.JObject);
@@ -36,7 +41,8 @@ dotnet new classlib -n Apache.OpenWhisk.Example.Dotnet -lang "C#"
 cd Apache.OpenWhisk.Example.Dotnet
 ```
 
-Install the [Newtonsoft.Json](https://www.newtonsoft.com/json) NuGet package as follows:
+Install the [Newtonsoft.Json](https://www.newtonsoft.com/json) NuGet package as
+follows:
 
 ```bash
 dotnet add package Newtonsoft.Json -v 12.0.1
@@ -94,14 +100,15 @@ wsk action update helloDotNet helloDotNet.zip --main Apache.OpenWhisk.Example.Do
 
 ### Invoke the .NET Core Action
 
-Action invocation is the same for .NET Core actions as it is for Swift and JavaScript actions:
+Action invocation is the same for .NET Core actions as it is for Swift and
+JavaScript actions:
 
 ```bash
 wsk action invoke --result helloDotNet --param name World
 ```
 
 ```json
-  {
-      "greeting": "Hello World!"
-  }
+{
+  "greeting": "Hello World!"
+}
 ```

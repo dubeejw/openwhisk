@@ -17,12 +17,11 @@
 #
 -->
 
-Utility image for executing tasks
-================
+# Utility image for executing tasks
 
-This `ow-utils` image can be used to execute various utility tasks
-for OpenWhisk using most of the tools that are used in the project.
-It includes a JDK8, python/ansible, nodejs, and standard packages
-such as bash, git, wget, curl, and docker.
+This `ow-utils` image can be used to execute various utility tasks for OpenWhisk
+using most of the tools that are used in the project. It includes a JDK8,
+python/ansible, nodejs, and standard packages such as bash, git, wget, curl, and
+docker.
 
 It also includes the `wsk` and `wskadmin` CLIs.

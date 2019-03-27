@@ -17,4 +17,6 @@
 #
 -->
 
-This folder contains approved OpenWhisk logo images bearing the Trademark (TM) symbol that indicates that the OpenWhisk project has been granted (or has filed for) a trademark for the OpenWhisk name and/or logo in various geographies.
+This folder contains approved OpenWhisk logo images bearing the Trademark (TM)
+symbol that indicates that the OpenWhisk project has been granted (or has filed
+for) a trademark for the OpenWhisk name and/or logo in various geographies.

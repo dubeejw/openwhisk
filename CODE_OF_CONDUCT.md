@@ -19,4 +19,5 @@
 
 # Apache OpenWhisk Community Code of Conduct
 
-Please refer to the [Apache Code of Conduct](https://www.apache.org/foundation/policies/conduct.html).
+Please refer to the
+[Apache Code of Conduct](https://www.apache.org/foundation/policies/conduct.html).

@@ -25,19 +25,26 @@
 [![codecov](https://codecov.io/gh/apache/incubator-openwhisk/branch/master/graph/badge.svg)](https://codecov.io/gh/apache/incubator-openwhisk)
 [![Twitter](https://img.shields.io/twitter/follow/openwhisk.svg?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=openwhisk)
 
-OpenWhisk is a cloud-first distributed event-based programming service. It provides a programming model to upload event handlers to a cloud service, and register the handlers to respond to various events. Learn more at [http://openwhisk.incubator.apache.org](http://openwhisk.incubator.apache.org).
+OpenWhisk is a cloud-first distributed event-based programming service. It
+provides a programming model to upload event handlers to a cloud service, and
+register the handlers to respond to various events. Learn more at
+[http://openwhisk.incubator.apache.org](http://openwhisk.incubator.apache.org).
 
-
-* [Quick Start](#quick-start) (Docker-Compose)
-* [Native development](#native-development) (Mac and Ubuntu)
-* [Kubernetes](#kubernetes-setup)
-* [Vagrant](#vagrant-setup)
-* [Learn concepts and commands](#learn-concepts-and-commands)
-* [Issues](#issues)
-* [Slack](#slack)
+- [Quick Start](#quick-start) (Docker-Compose)
+- [Native development](#native-development) (Mac and Ubuntu)
+- [Kubernetes](#kubernetes-setup)
+- [Vagrant](#vagrant-setup)
+- [Learn concepts and commands](#learn-concepts-and-commands)
+- [Issues](#issues)
+- [Slack](#slack)
 
 ### Quick Start
-The easiest way to start using OpenWhisk is to get Docker installed on Mac, Windows or Linux. The [Docker website](https://docs.docker.com/install/) has detailed instructions on getting the tools installed. This does not give you a production deployment but gives you enough of the pieces to start writing functions and seeing them run.
+
+The easiest way to start using OpenWhisk is to get Docker installed on Mac,
+Windows or Linux. The [Docker website](https://docs.docker.com/install/) has
+detailed instructions on getting the tools installed. This does not give you a
+production deployment but gives you enough of the pieces to start writing
+functions and seeing them run.
 
 ```
 git clone https://github.com/apache/incubator-openwhisk-devtools.git
@@ -45,25 +52,41 @@ cd incubator-openwhisk-devtools/docker-compose
 make quick-start
 ```
 
-For more detailed instructions or if you encounter problems see the [OpenWhisk-dev tools](https://github.com/apache/incubator-openwhisk-devtools/blob/master/docker-compose/README.md) project.
+For more detailed instructions or if you encounter problems see the
+[OpenWhisk-dev tools](https://github.com/apache/incubator-openwhisk-devtools/blob/master/docker-compose/README.md)
+project.
 
 ### Kubernetes Setup
 
-Another path to quickly starting to use OpenWhisk is to install it on a Kubernetes cluster.  On a Mac, you can use the Kubernetes support built into Docker 18.06 (or higher). You can also deploy OpenWhisk on Minikube, on a managed Kubernetes cluster provisioned from a public cloud provider, or on a Kubernetes cluster you manage yourself. To get started,
+Another path to quickly starting to use OpenWhisk is to install it on a
+Kubernetes cluster. On a Mac, you can use the Kubernetes support built into
+Docker 18.06 (or higher). You can also deploy OpenWhisk on Minikube, on a
+managed Kubernetes cluster provisioned from a public cloud provider, or on a
+Kubernetes cluster you manage yourself. To get started,
 
 ```
 git clone https://github.com/apache/incubator-openwhisk-deploy-kube.git
 ```
 
-Then follow the instructions in the [OpenWhisk on Kubernetes README.md](https://github.com/apache/incubator-openwhisk-deploy-kube/blob/master/README.md).
+Then follow the instructions in the
+[OpenWhisk on Kubernetes README.md](https://github.com/apache/incubator-openwhisk-deploy-kube/blob/master/README.md).
 
 ### Vagrant Setup
-A [Vagrant](http://vagrantup.com) machine is also available to run OpenWhisk on Mac, Windows PC or GNU/Linux but isn't used by as much of the dev team so sometimes lags behind.
-Download and install [VirtualBox](https://www.virtualbox.org/wiki/Downloads) and [Vagrant](https://www.vagrantup.com/downloads.html) for your operating system and architecture.
 
-**Note:** For Windows, you may need to install an ssh client in order to use the command `vagrant ssh`. Cygwin works well for this, and Git Bash comes with an ssh client you can point to. If you run the command and no ssh is installed, Vagrant will give you some options to try.
+A [Vagrant](http://vagrantup.com) machine is also available to run OpenWhisk on
+Mac, Windows PC or GNU/Linux but isn't used by as much of the dev team so
+sometimes lags behind. Download and install
+[VirtualBox](https://www.virtualbox.org/wiki/Downloads) and
+[Vagrant](https://www.vagrantup.com/downloads.html) for your operating system
+and architecture.
+
+**Note:** For Windows, you may need to install an ssh client in order to use the
+command `vagrant ssh`. Cygwin works well for this, and Git Bash comes with an
+ssh client you can point to. If you run the command and no ssh is installed,
+Vagrant will give you some options to try.
 
 Follow these step to run your first OpenWhisk Action:
+
 ```
 # Clone openwhisk
 git clone --depth=1 https://github.com/apache/incubator-openwhisk.git openwhisk
@@ -76,6 +99,7 @@ cd openwhisk/tools/vagrant
 ```
 
 Wait for hello action output:
+
 ```
 wsk action invoke /whisk.system/utils/echo -p message hello --result
 {
@@ -83,18 +107,23 @@ wsk action invoke /whisk.system/utils/echo -p message hello --result
 }
 ```
 
-These steps were tested on Mac OS X El Capitan, Ubuntu 14.04.3 LTS and Windows using Vagrant.
-For more information about using OpenWhisk on Vagrant see the [tools/vagrant/README.md](tools/vagrant/README.md)
+These steps were tested on Mac OS X El Capitan, Ubuntu 14.04.3 LTS and Windows
+using Vagrant. For more information about using OpenWhisk on Vagrant see the
+[tools/vagrant/README.md](tools/vagrant/README.md)
 
-During the Vagrant setup, the Oracle JDK 8 is used as the default Java environment. If you would like to use OpenJDK 8, please change the line "su vagrant -c 'source all.sh oracle'" into "su vagrant -c 'source all.sh'" in tools/vagrant/Vagrantfile.
+During the Vagrant setup, the Oracle JDK 8 is used as the default Java
+environment. If you would like to use OpenJDK 8, please change the line "su
+vagrant -c 'source all.sh oracle'" into "su vagrant -c 'source all.sh'" in
+tools/vagrant/Vagrantfile.
 
 ### Native development
 
-Docker must be natively installed in order to build and deploy OpenWhisk.
-If you plan to make contributions to OpenWhisk, we recommend either a Mac or Ubuntu environment.
+Docker must be natively installed in order to build and deploy OpenWhisk. If you
+plan to make contributions to OpenWhisk, we recommend either a Mac or Ubuntu
+environment.
 
-* [Setup Mac for OpenWhisk](tools/macos/README.md)
-* [Setup Ubuntu for OpenWhisk](tools/ubuntu-setup/README.md)
+- [Setup Mac for OpenWhisk](tools/macos/README.md)
+- [Setup Ubuntu for OpenWhisk](tools/ubuntu-setup/README.md)
 
 ### Learn concepts and commands
 
@@ -113,7 +142,10 @@ interested in:
 
 ### Repository Structure
 
-The OpenWhisk system is built from a [number of components](docs/dev/modules.md).  The picture below groups the components by their GitHub repos. Please open issues for a component against the appropriate repo (if in doubt just open against the main openwhisk repo).
+The OpenWhisk system is built from a
+[number of components](docs/dev/modules.md). The picture below groups the
+components by their GitHub repos. Please open issues for a component against the
+appropriate repo (if in doubt just open against the main openwhisk repo).
 
 ![component/repo mapping](docs/images/components_to_repos.png)
 
@@ -123,8 +155,17 @@ Report bugs, ask questions and request features [here on GitHub](../../issues).
 
 ### Slack
 
-You can also join the OpenWhisk Team on Slack [https://openwhisk-team.slack.com](https://openwhisk-team.slack.com) and chat with developers. To get access to our public slack team, request an invite [https://openwhisk.incubator.apache.org/slack.html](https://openwhisk.incubator.apache.org/slack.html).
+You can also join the OpenWhisk Team on Slack
+[https://openwhisk-team.slack.com](https://openwhisk-team.slack.com) and chat
+with developers. To get access to our public slack team, request an invite
+[https://openwhisk.incubator.apache.org/slack.html](https://openwhisk.incubator.apache.org/slack.html).
 
 # Disclaimer
 
-Apache OpenWhisk is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
+Apache OpenWhisk is an effort undergoing incubation at The Apache Software
+Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of
+all newly accepted projects until a further review indicates that the
+infrastructure, communications, and decision making process have stabilized in a
+manner consistent with other successful ASF projects. While incubation status is
+not necessarily a reflection of the completeness or stability of the code, it
+does indicate that the project has yet to be fully endorsed by the ASF.
